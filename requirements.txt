@@ -1,0 +1,17 @@
+# Minimal requirements for Docling PDF processing
+docling
+
+# Sentence transformers for text embeddings
+sentence-transformers
+
+# Qdrant vector database client
+qdrant-client
+
+# Configuration management
+PyYAML
+
+# Environment variable management
+python-dotenv
+
+# OpenAI API client
+openai

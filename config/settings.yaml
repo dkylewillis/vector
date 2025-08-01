@@ -1,0 +1,104 @@
+# RegScout Configuration Settings
+
+# Embedding Model Settings
+embedder:
+  model_name: "all-MiniLM-L6-v2"  # Sentence transformer model
+  # batch_size: 32                   # Default batch size for embedding
+  # max_tokens: null                 # Max tokens (null = use model default)
+
+# AI Model Settings
+ai_model:
+  name: "gpt-3.5-turbo"           # OpenAI model name
+  max_tokens: 512                 # Maximum tokens in AI response
+  temperature: 0.1                # Temperature for AI responses (0.0 = deterministic)
+  provider: "openai"              # AI provider (openai, anthropic, etc.)
+  # api_key_env: "OPENAI_API_KEY"   # Environment variable for API key
+  # system_prompt: "You are a helpful assistant that answers questions based on provided ordinance documents. Be accurate and cite the relevant sections when possible."
+  # context_limit: 3                # Number of relevant documents to include in context
+
+# Vector Database Settings (Qdrant)
+vector_database:
+  # Server mode settings (set host to null for local mode)
+  host: null          # Set to null for local file storage
+  port: 6333
+  
+  # Local storage settings (used when host is null or local_path is specified)
+  local_path: "./qdrant_db" # Path for local file storage
+  
+  # Common settings
+  collection_name: "documents"
+  # distance_metric: "COSINE"      # Distance metric for similarity search
+  # vector_size: 384               # Dimension for all-MiniLM-L6-v2 model
+
+# File Processing Settings
+# file_processing:
+#   supported_formats:
+#     - "pdf"
+#     - "docx"
+#   
+#   # PDF Processing Options
+#   pdf:
+#     do_ocr: false                  # Enable OCR for scanned PDFs
+#     do_table_structure: true       # Extract table structures
+#     do_cell_matching: true         # Match table cells
+#     ocr_language: ["en"]           # OCR language codes
+#     num_threads: 4                 # Number of processing threads
+#     accelerator_device: "AUTO"     # GPU acceleration (AUTO/CPU/CUDA)
+# 
+#   # Text Chunking Settings
+#   chunking:
+#     tokenizer_model: "sentence-transformers/all-MiniLM-L6-v2"
+#     chunk_overlap: 50              # Token overlap between chunks
+#     min_chunk_size: 100            # Minimum chunk size in tokens
+#     max_chunk_size: 512            # Maximum chunk size in tokens
+
+# Data Paths
+# data:
+#   input_dir: "data"
+#   output_dir: "output"
+#   processed_dir: "data/processed"
+#   
+#   # Specific data locations
+#   coweta:
+#     ordinances_dir: "data/Coweta/ordinances"
+#     index_file: "data/Coweta/Coweta_Ordinance_index.xlsx"
+#     pdf_file: "data/Coweta/Coweta_Ordinances.pdf"
+
+# Search Settings
+# search:
+#   default_top_k: 5               # Default number of search results
+#   score_threshold: 0.5           # Minimum similarity score threshold
+#   max_results: 100               # Maximum results to return
+
+# Logging Settings
+# logging:
+#   level: "INFO"                  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+#   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+#   file: "logs/regscout.log"
+
+# Application Settings
+# app:
+#   name: "RegScout"
+#   version: "1.0.0"
+#   description: "Document processing and search system for ordinances"
+#   
+# Environment Settings
+# environment:
+#   development:
+#     debug: true
+#     log_level: "DEBUG"
+#   
+#   production:
+#     debug: false
+#     log_level: "INFO"
+#     
+# Performance Settings
+# performance:
+#   batch_processing:
+#     documents_per_batch: 50
+#     embedding_batch_size: 32
+#     max_concurrent_tasks: 4
+#   
+#   memory:
+#     max_document_size_mb: 100
+#     cache_size_mb: 512
