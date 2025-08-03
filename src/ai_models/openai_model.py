@@ -12,13 +12,15 @@ class OpenAIModel(BaseAIModel):
         self.client = OpenAI(api_key=self.api_key) if self.api_key else None
         self.max_tokens = kwargs.get('max_tokens', 512)
         self.temperature = kwargs.get('temperature', 0.1)
-    
-    def generate_response(self, user_prompt: str, system_prompt: str) -> str:
+
+    def generate_response(self, user_prompt: str, system_prompt: str, max_tokens: Optional[int] = None) -> str:
         """Generate response using OpenAI API."""
         if not self.is_available():
             return "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."
-        
-        
+
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
@@ -29,7 +31,7 @@ class OpenAIModel(BaseAIModel):
                     },
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=self.max_tokens,
+                max_tokens=max_tokens,
                 temperature=self.temperature
             )
             return response.choices[0].message.content.strip()

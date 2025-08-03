@@ -8,13 +8,19 @@ embedder:
 
 # AI Model Settings
 ai_model:
-  name: "gpt-3.5-turbo"           # OpenAI model name
-  max_tokens: 512                 # Maximum tokens in AI response
+  name: "gpt-4.1"           # OpenAI model name
+  max_tokens: 4000                 # Maximum tokens in AI response
   temperature: 0.1                # Temperature for AI responses (0.0 = deterministic)
   provider: "openai"              # AI provider (openai, anthropic, etc.)
   # api_key_env: "OPENAI_API_KEY"   # Environment variable for API key
   # system_prompt: "You are a helpful assistant that answers questions based on provided ordinance documents. Be accurate and cite the relevant sections when possible."
   # context_limit: 3                # Number of relevant documents to include in context
+  
+  # Response length presets for ask command
+  response_lengths:
+    short: 150      # Brief, concise answers
+    medium: 500     # Balanced detail level
+    long: 1500      # Comprehensive answers
 
 # Vector Database Settings (Qdrant)
 vector_database:

@@ -17,4 +17,3 @@ class BaseAIModel(ABC):
     def is_available(self) -> bool:
         """Check if the model is available and configured."""
         pass
-    

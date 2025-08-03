@@ -10,21 +10,22 @@ load_dotenv()
 from data_pipeline.embedder import Embedder
 from data_pipeline.vector_database import VectorDatabase
 from config import config
-from services.ai_models import AIModelFactory
+from ai_models import AIModelFactory
 from typing import List, Dict, Any, Optional
 import numpy as np
 
-system_prompt = (
+SYSTEM_PROMPT = (
     "You are a professional civil engineering assistant specialized in land development and site design. "
     "Your job is to extract and provide accurate, relevant information from the given context based on the user's prompt.\n\n"
     "The context may include civil engineering documents, design standards, ordinances, grading plans, hydrology reports, or utility layout descriptions. You must:\n\n"
     "• Identify the most relevant parts of the context to answer the user’s question.\n"
+    "• Include all dimensions, units, and specific details from the context.\n"
     "• Use terminology consistent with industry practices (e.g., grading, drainage, erosion control, easements, impervious cover, detention basins).\n"
     "• If the question is about regulations, refer only to content in the provided context (e.g., local ordinance excerpts).\n"
     "• If no relevant information is found in the context, state that clearly instead of guessing.\n"
     "• Avoid generic responses—prioritize specificity based on context.\n"
     "• Always respond in a clear, concise, and technically accurate manner, as if advising a licensed civil engineer or reviewing engineer."
-    "• Always include the source of the information when available, such as document names or section numbers. They are typically located in the beginning of the document."
+    "• Always include the headings of the document you are referencing.\n\n"
 )
 
 
@@ -121,33 +122,40 @@ class ResearchAgent:
         for i, doc in enumerate(context, 1):
             content = doc.get('content', doc.get('text', ''))
             metadata = doc.get('metadata', {})
-            source = metadata.get('source', f'Document {i}')
-            
-            context_text += f"\n[Source: {source}]\n{content}\n"
-        
+            headings = metadata.get('headings', [])
+
+            context_text += f"\n[Headings: {' > '.join(headings)}]\n{content}\n"
+
         context_text += "\n--- END DOCUMENTS ---\n\n"
         
-        return f"{context_text}Based on the above documents, please answer: {prompt}"
+        return f"{context_text}\n Based on the above documents, please answer: {prompt}"
 
-    def ask(self, prompt: str, use_context: bool = True) -> str:
+    def ask(self, user_prompt: str, use_context: bool = True, max_tokens: Optional[int] = None) -> str:
         """
         Ask a question using AI model with optional context from the knowledge base.
-        
+
         Args:
             prompt: The question to ask
             use_context: Whether to include relevant documents as context
-            
+
         Returns:
             AI-generated response
         """
+        preprocess_prompt = (
+            "Given a user question, rephrase or expand it into a list "
+            "of key terms and related concepts that are likely to appear in regulatory or ordinance text."
+        )
+
+        context_search_prompt = self.ai_model_instance.generate_response(user_prompt, preprocess_prompt, 512)
+        
         if use_context:
             # Get relevant context from vector search
-            context = self.search(prompt, top_k=10, score_threshold=0.5)
-            enhanced_prompt = self.build_context_prompt(prompt, context)
+            context = self.search(context_search_prompt, top_k=20, score_threshold=0.5)
+            enhanced_prompt = self.build_context_prompt(user_prompt, context)
         else:
-            enhanced_prompt = prompt
-        
-        return self.ai_model_instance.generate_response(enhanced_prompt, system_prompt)
+            enhanced_prompt = user_prompt
+
+        return self.ai_model_instance.generate_response(enhanced_prompt, SYSTEM_PROMPT, max_tokens=max_tokens)
 
     def research(self, topic: str) -> Dict[str, Any]:
         """

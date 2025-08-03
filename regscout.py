@@ -183,16 +183,28 @@ class RegScoutCLI:
                                     chunk_text = chunk.get('text', chunk.get('content', str(chunk)))
                                 else:
                                     chunk_text = str(chunk)
-                                
+
+                                # Extract meta if available
+                                if hasattr(chunk, 'meta'):
+                                    chunk_meta = chunk.meta
+                                elif isinstance(chunk, dict):
+                                    chunk_meta = chunk.get('meta', {})
+                                else:
+                                    chunk_meta = {}
+
                                 # Add each chunk as a separate document
                                 documents.append(chunk_text)
-                                metadata.append({
+                                # Merge chunk_meta with default metadata
+                                merged_meta = {
                                     'filename': path.name,
                                     'file_type': 'docx',
                                     'source_path': str(path),
                                     'chunk_index': i,
-                                    'total_chunks': len(chunks)
-                                })
+                                    'total_chunks': len(chunks),
+                                    'headings': chunk_meta.get('headings', []),  # Preserve headings if available
+                            
+                                }
+                                metadata.append(merged_meta)
                         else:
                             # Fallback if no chunks extracted
                             content = f"DOCX Document: {path.name}\n[No content extracted]"
@@ -317,7 +329,7 @@ class RegScoutCLI:
         
         print(f"\n✨ Search completed - showing top {len(results)} results")
     
-    def ask_ai(self, question: str):
+    def ask_ai(self, question: str, response_length: str = "medium"):
         """Ask AI a question with document context"""
         self.init_components()
         
@@ -333,21 +345,17 @@ class RegScoutCLI:
             print("   Get your API key from: https://platform.openai.com/api-keys")
             return
         
+        # Get max_tokens from config based on response length
+        response_lengths = self.research_agent.config.get('ai_model.response_lengths', {})
+        max_tokens = response_lengths.get(response_length, response_lengths.get('short', 256))
+        
+        print(f"📏 Response length: {response_length} ({max_tokens} tokens)")
+        
         try:
             print("🤔 Thinking...")
             # Use the research agent's ask function directly
-            response = self.research_agent.ask(question, use_context=True)
+            response = self.research_agent.ask(question, use_context=True, max_tokens=max_tokens)
             print(f"\n💡 AI Answer:\n{response}\n")
-            
-            # Get the context that was used for reference
-            context_results = self.research_agent.search(question, top_k=3)
-            if context_results:
-                print("📖 Sources used:")
-                for i, result in enumerate(context_results, 1):
-                    filename = result['metadata'].get('filename', 'Unknown')
-                    print(f"  {i}. {filename} (relevance: {result['score']:.3f})")
-            else:
-                print("📖 No relevant documents found for context")
                 
         except Exception as e:
             print(f"❌ AI service error: {e}")
@@ -413,7 +421,9 @@ def main():
 Examples:
   %(prog)s process ordinance.pdf rules.txt          # Add documents to knowledge base
   %(prog)s search "setback requirements"            # Search for relevant content
-  %(prog)s ask "What are the parking rules?"       # Get AI-powered answers
+  %(prog)s ask "What are the parking rules?"       # Get AI-powered answers (medium length)
+  %(prog)s ask --short "What is setback?"          # Get brief answer
+  %(prog)s ask --long "Explain zoning rules"       # Get comprehensive answer
   %(prog)s info                                     # Show knowledge base status
   %(prog)s clear                                    # Clear all documents
 
@@ -454,6 +464,33 @@ The tool uses local file storage and works offline (except for AI features).
     )
     ask_parser.add_argument('question', help='Question for AI')
     
+    # Response length group - mutually exclusive
+    length_group = ask_parser.add_mutually_exclusive_group()
+    length_group.add_argument(
+        '--short', 
+        action='store_const', 
+        const='short', 
+        dest='response_length',
+        help='Short, concise answer (150 tokens)'
+    )
+    length_group.add_argument(
+        '--medium', 
+        action='store_const', 
+        const='medium', 
+        dest='response_length',
+        help='Balanced detail level (500 tokens) [default]'
+    )
+    length_group.add_argument(
+        '--long', 
+        action='store_const', 
+        const='long', 
+        dest='response_length',
+        help='Comprehensive answer (1500 tokens)'
+    )
+    
+    # Set default response length
+    ask_parser.set_defaults(response_length='medium')
+    
     # Info command
     subparsers.add_parser(
         'info', 
@@ -482,7 +519,7 @@ The tool uses local file storage and works offline (except for AI features).
         elif args.command == 'search':
             cli.search_documents(args.question, args.top_k)
         elif args.command == 'ask':
-            cli.ask_ai(args.question)
+            cli.ask_ai(args.question, args.response_length)
         elif args.command == 'info':
             cli.show_info()
         elif args.command == 'clear':

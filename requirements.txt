@@ -1,17 +1,23 @@
-# Minimal requirements for Docling PDF processing
+# Core document processing
 docling
+docling-core
 
-# Sentence transformers for text embeddings
+# Machine learning and transformers
+transformers
+torch
+
+# Text embeddings
 sentence-transformers
 
-# Qdrant vector database client
+# Vector database
 qdrant-client
 
-# Configuration management
-PyYAML
+# Numerical computing
+numpy
 
-# Environment variable management
+# Configuration and environment
+PyYAML
 python-dotenv
 
-# OpenAI API client
+# AI services
 openai
