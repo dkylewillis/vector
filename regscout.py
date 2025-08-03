@@ -7,7 +7,7 @@ import argparse
 import sys
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Any
 
 from src.data_pipeline.file_processing import FileProcessor
 from src.agents.research_agent import ResearchAgent
@@ -113,28 +113,104 @@ class RegScoutCLI:
                 chunks.append(current_chunk.strip())
         
         return chunks if chunks else [text]  # Return original text if chunking fails
-            
-
     
-# ...existing code...
-    def process_files(self, file_paths: List[str]):
+    def _is_file_already_processed(self, file_path: Path) -> bool:
+        """
+        Check if a file has already been processed by searching for it in the knowledge base.
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            True if file is already in knowledge base, False otherwise
+        """
+        try:
+            # Simple approach: search for the filename in documents
+            # This is not perfect but works for basic duplicate detection
+            results = self.research_agent.search(
+                f"filename:{file_path.name}", 
+                top_k=5, 
+                score_threshold=0.1
+            )
+            
+            # Check if any results have matching filename in metadata
+            for result in results:
+                if result.get('metadata', {}).get('filename') == file_path.name:
+                    return True
+            
+            return False
+            
+        except Exception:
+            # If we can't check, assume it's not processed to be safe
+            return False
+
+    def process_files(self, file_paths: List[str], force: bool = False):
         """Process files and add them to the knowledge base"""
         self.init_components()
         self.file_processor = FileProcessor()
         
-        documents = []
-        metadata = []
-        
-        print(f"📁 Processing {len(file_paths)} file(s)...")
+        # Expand directories to individual files
+        expanded_files = []
+        supported_extensions = {'.txt', '.md', '.pdf', '.docx'}
         
         for file_path in file_paths:
             path = Path(file_path)
             
-            if not path.exists():
-                print(f"⚠️  File not found: {file_path}")
-                continue
+            if path.is_dir():
+                print(f"📁 Scanning directory: {path}")
+                # Find all supported files in directory (recursive)
+                for ext in supported_extensions:
+                    found_files = list(path.rglob(f"*{ext}"))
+                    expanded_files.extend(found_files)
+                    if found_files:
+                        print(f"   Found {len(found_files)} {ext} file(s)")
+            elif path.exists():
+                expanded_files.append(path)
+            else:
+                print(f"⚠️  File/directory not found: {file_path}")
+        
+        if not expanded_files:
+            print("❌ No supported files found")
+            return
+        
+        # Remove duplicates and sort
+        expanded_files = sorted(set(expanded_files))
+        
+        # Filter out already processed files unless force is True
+        files_to_process = []
+        skipped_files = []
+        
+        if not force:
+            print(f"🔍 Checking {len(expanded_files)} file(s) for duplicates...")
+            for file_path in expanded_files:
+                if self._is_file_already_processed(file_path):
+                    skipped_files.append(file_path)
+                else:
+                    files_to_process.append(file_path)
+        else:
+            files_to_process = expanded_files
+        
+        # Report what we're doing
+        if skipped_files:
+            print(f"⏭️  Skipping {len(skipped_files)} already processed file(s)")
+            if len(skipped_files) <= 5:  # Show filenames if not too many
+                for file_path in skipped_files:
+                    print(f"   📄 {file_path.name}")
+            else:
+                print(f"   📄 {skipped_files[0].name} ... and {len(skipped_files)-1} more")
+        
+        if not files_to_process:
+            print("✅ All files already processed! Use --force to reprocess.")
+            return
             
-            print(f"  📄 {path.name}")
+        print(f"📁 Processing {len(files_to_process)} new file(s)...")
+        
+        documents = []
+        metadata = []
+        
+        for path in files_to_process:
+            rel_path = path.relative_to(Path.cwd()) if path.is_relative_to(Path.cwd()) else path
+            print(f"  📄 {rel_path}")
             
             try:
                 # Read file content using appropriate processor
@@ -369,6 +445,73 @@ class RegScoutCLI:
                     print(f"  📁 {filename}: {text}")
             else:
                 print("❌ No relevant documents found")
+
+    def research_topic(self, topic: str, depth: str = "medium", additional_questions: List[str] = None, save_report: bool = False):
+        """Conduct comprehensive research on a topic"""
+        self.init_components()
+        
+        print(f"🔬 Researching: '{topic}' (depth: {depth})")
+        print("=" * 80)
+        
+        try:
+            research_results = self.research_agent.research(
+                topic, 
+                depth=depth, 
+                additional_questions=additional_questions
+            )
+            
+            # Display research summary
+            print(f"\n✅ Research Complete!")
+            print(f"📊 Questions researched: {len(research_results['research_questions'])}")
+            print(f"📁 Source documents: {research_results['source_documents']}")
+            print(f"📄 Key sources: {', '.join(research_results['key_sources'])}")
+            
+            print(f"\n📋 RESEARCH REPORT")
+            print("=" * 80)
+            print(research_results['report'])
+            
+            # Optionally save detailed report
+            if save_report:
+                self._save_research_report(topic, research_results)
+                
+            return research_results
+            
+        except Exception as e:
+            print(f"❌ Research failed: {e}")
+            return None
+
+    def _save_research_report(self, topic: str, research_results: Dict[str, Any]):
+        """Save detailed research report to file"""
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        filename = f"research_report_{safe_topic.replace(' ', '_')}_{timestamp}.txt"
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(f"RESEARCH REPORT: {topic}\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Research Depth: {research_results.get('depth', 'medium')}\n")
+            f.write("=" * 80 + "\n\n")
+            
+            f.write("EXECUTIVE SUMMARY\n")
+            f.write("-" * 40 + "\n")
+            f.write(research_results['report'] + "\n\n")
+            
+            f.write("DETAILED FINDINGS\n")
+            f.write("-" * 40 + "\n")
+            for i, question in enumerate(research_results['research_questions'], 1):
+                answer = research_results['findings'].get(question, "No answer found")
+                f.write(f"\nQ{i}: {question}\n")
+                f.write(f"A{i}: {answer}\n")
+                f.write("-" * 60 + "\n")
+            
+            f.write(f"\nSOURCE DOCUMENTS\n")
+            f.write("-" * 40 + "\n")
+            f.write(f"Total documents consulted: {research_results['source_documents']}\n")
+            f.write(f"Key sources: {', '.join(research_results['key_sources'])}\n")
+        
+        print(f"💾 Detailed report saved to: {filename}")
     
     def show_info(self):
         """Show knowledge base information"""
@@ -419,11 +562,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s process ordinance.pdf rules.txt          # Add documents to knowledge base
+  %(prog)s process ordinance.pdf rules.txt          # Process specific files
+  %(prog)s process data/                             # Process all files in directory (skip duplicates)
+  %(prog)s process data/ --force                     # Process directory, including already processed files
+  %(prog)s process data/ more_docs/                  # Process multiple directories
   %(prog)s search "setback requirements"            # Search for relevant content
   %(prog)s ask "What are the parking rules?"       # Get AI-powered answers (medium length)
   %(prog)s ask --short "What is setback?"          # Get brief answer
   %(prog)s ask --long "Explain zoning rules"       # Get comprehensive answer
+  %(prog)s research "stormwater management"        # Comprehensive research with report
+  %(prog)s research "parking" --depth shallow      # Quick research (3 questions)
+  %(prog)s research "drainage" --save               # Save detailed report to file
+  %(prog)s research "setbacks" --questions "What are corner lot requirements?" "How are setbacks measured?"  # Add custom questions
   %(prog)s info                                     # Show knowledge base status
   %(prog)s clear                                    # Clear all documents
 
@@ -441,7 +591,12 @@ The tool uses local file storage and works offline (except for AI features).
     process_parser.add_argument(
         'files', 
         nargs='+', 
-        help='Files to process (supports .txt, .md, .pdf, .docx)'
+        help='Files or directories to process (supports .txt, .md, .pdf, .docx). Directories are processed recursively.'
+    )
+    process_parser.add_argument(
+        '--force', 
+        action='store_true',
+        help='Force reprocessing of files even if already in knowledge base'
     )
     
     # Search command
@@ -491,6 +646,29 @@ The tool uses local file storage and works offline (except for AI features).
     # Set default response length
     ask_parser.set_defaults(response_length='medium')
     
+    # Research command
+    research_parser = subparsers.add_parser(
+        'research', 
+        help='Conduct comprehensive research on a topic'
+    )
+    research_parser.add_argument('topic', help='Topic to research')
+    research_parser.add_argument(
+        '--depth', 
+        choices=['shallow', 'medium', 'comprehensive'],
+        default='medium',
+        help='Research depth (default: medium)'
+    )
+    research_parser.add_argument(
+        '--questions', 
+        nargs='*',
+        help='Additional research questions to include'
+    )
+    research_parser.add_argument(
+        '--save', 
+        action='store_true',
+        help='Save detailed report to file'
+    )
+    
     # Info command
     subparsers.add_parser(
         'info', 
@@ -515,11 +693,13 @@ The tool uses local file storage and works offline (except for AI features).
     
     try:
         if args.command == 'process':
-            cli.process_files(args.files)
+            cli.process_files(args.files, force=args.force)
         elif args.command == 'search':
             cli.search_documents(args.question, args.top_k)
         elif args.command == 'ask':
             cli.ask_ai(args.question, args.response_length)
+        elif args.command == 'research':
+            cli.research_topic(args.topic, depth=args.depth, additional_questions=args.questions, save_report=args.save)
         elif args.command == 'info':
             cli.show_info()
         elif args.command == 'clear':

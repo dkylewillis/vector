@@ -1,0 +1,76 @@
+# Research Configuration for RegScout
+
+# System prompts for different research purposes
+system_prompts:
+  default: |
+    You are a professional civil engineering assistant specialized in land development and site design. 
+    Your job is to extract and provide accurate, relevant information from the given context based on the user's prompt.
+
+    The context may include civil engineering documents, design standards, ordinances, grading plans, hydrology reports, or utility layout descriptions. You must:
+
+    • Identify the most relevant parts of the context to answer the user's question.
+    • Include all dimensions, units, and specific details from the context.
+    • Use terminology consistent with industry practices (e.g., grading, drainage, erosion control, easements, impervious cover, detention basins).
+    • If the question is about regulations, refer only to content in the provided context (e.g., local ordinance excerpts).
+    • If no relevant information is found in the context, state that clearly instead of guessing.
+    • Avoid generic responses—prioritize specificity based on context.
+    • Always respond in a clear, concise, and technically accurate manner, as if advising a licensed civil engineer or reviewing engineer.
+    • Always include the headings of the document you are referencing.
+
+  question_generator: |
+    You are an expert at generating targeted research questions for civil engineering and regulatory topics.
+    Generate specific, actionable questions that would help understand requirements, standards, procedures, and compliance criteria.
+    Focus on practical questions that can be answered using regulatory documents and engineering standards.
+
+  report_compiler: |
+    You are a technical writer specializing in civil engineering reports.
+    Create comprehensive, well-structured reports suitable for professional engineers and regulatory officials.
+    Use clear headings, include specific requirements with dimensions and specifications, and maintain a professional tone throughout.
+
+# Question templates for different topic categories
+question_templates:
+  general:
+    - "What are the specific requirements for {topic}?"
+    - "What approval process is required for {topic}?"
+    - "What standards and specifications apply to {topic}?"
+    - "What are the design considerations for {topic}?"
+    - "What compliance criteria must be met for {topic}?"
+    - "What documentation is required for {topic}?"
+
+  zoning:
+    - "What are the setback requirements for {topic}?"
+    - "What are the height restrictions for {topic}?"
+    - "What density limitations apply to {topic}?"
+    - "What parking requirements apply to {topic}?"
+    - "What landscaping requirements are specified for {topic}?"
+
+  drainage:
+    - "What are the stormwater management requirements for {topic}?"
+    - "What are the minimum pipe sizes for {topic}?"
+    - "What are the required detention volumes for {topic}?"
+    - "What are the approved discharge rates for {topic}?"
+    - "What erosion control measures are required for {topic}?"
+
+  utilities:
+    - "What are the utility easement requirements for {topic}?"
+    - "What are the minimum cover depths for {topic}?"
+    - "What separation distances are required for {topic}?"
+    - "What materials are approved for {topic}?"
+    - "What testing requirements apply to {topic}?"
+
+# Research depth configurations
+research_depths:
+  shallow:
+    question_count: 3
+    max_tokens_per_question: 400
+    report_max_tokens: 800
+    
+  medium:
+    question_count: 6
+    max_tokens_per_question: 600
+    report_max_tokens: 1500
+    
+  comprehensive:
+    question_count: 10
+    max_tokens_per_question: 800
+    report_max_tokens: 2500

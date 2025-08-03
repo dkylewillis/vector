@@ -157,33 +157,199 @@ class ResearchAgent:
 
         return self.ai_model_instance.generate_response(enhanced_prompt, SYSTEM_PROMPT, max_tokens=max_tokens)
 
-    def research(self, topic: str) -> Dict[str, Any]:
+    def research(self, topic: str, depth: str = "medium", additional_questions: List[str] = None) -> Dict[str, Any]:
         """
-        Comprehensive research on a topic.
+        Comprehensive research on a topic using multi-step analysis.
         
         Args:
             topic: The topic to research
+            depth: Research depth - "shallow", "medium", "comprehensive"
+            additional_questions: Optional list of user-provided questions to include
             
         Returns:
-            Dictionary with research findings
+            Dictionary with research findings and report
         """
-        results = self.search(topic, top_k=10)
+        print(f"🔬 Starting research on: {topic}")
         
-        if not results:
-            return {"topic": topic, "findings": "No relevant information found"}
+        # Step 1: Generate research questions
+        research_questions = self._generate_research_questions(topic, depth)
         
-        # Generate comprehensive response
-        summary = self.ai_model_instance.generate_response(
-            f"Provide a comprehensive summary about: {topic}", 
-            results
-        )
+        # Add user-provided questions if any
+        if additional_questions:
+            research_questions.extend(additional_questions)
+            print(f"📝 Generated {len(research_questions) - len(additional_questions)} questions + {len(additional_questions)} user questions")
+        else:
+            print(f"📝 Generated {len(research_questions)} research questions")
+        
+        # Step 2: Answer each question using the ask function
+        findings = {}
+        research_config = self._load_research_config()
+        depth_config = research_config.get('research_depths', {}).get(depth, {})
+        max_tokens = depth_config.get('max_tokens_per_question', 600)
+        
+        for i, question in enumerate(research_questions, 1):
+            print(f"🔍 Researching question {i}/{len(research_questions)}: {question[:60]}...")
+            answer = self.ask(question, use_context=True, max_tokens=max_tokens)
+            findings[question] = answer
+        
+        # Step 3: Generate comprehensive report
+        print("📊 Compiling research report...")
+        report = self._compile_research_report(topic, research_questions, findings, depth)
+        
+        # Step 4: Get source documents for reference
+        source_docs = self.search(topic, top_k=15, score_threshold=0.3)
         
         return {
             "topic": topic,
-            "summary": summary,
-            "source_documents": len(results),
-            "key_findings": results[:3]  # Top 3 most relevant
+            "depth": depth,
+            "research_questions": research_questions,
+            "findings": findings,
+            "report": report,
+            "source_documents": len(source_docs),
+            "key_sources": [doc['metadata'].get('filename', 'Unknown') for doc in source_docs[:5]]
         }
+
+    def _load_research_config(self) -> Dict[str, Any]:
+        """Load research configuration from yaml file."""
+        import yaml
+        from pathlib import Path
+        
+        try:
+            config_path = Path(__file__).parent.parent.parent / "config" / "research.yaml"
+            with open(config_path, 'r', encoding='utf-8') as file:
+                return yaml.safe_load(file) or {}
+        except Exception as e:
+            print(f"⚠️  Could not load research config: {e}")
+            return {}
+
+    def _generate_research_questions(self, topic: str, depth: str = "medium") -> List[str]:
+        """
+        Generate targeted research questions for a given topic.
+        
+        Args:
+            topic: The research topic
+            depth: Research depth level
+            
+        Returns:
+            List of research questions
+        """
+        research_config = self._load_research_config()
+        depth_config = research_config.get('research_depths', {}).get(depth, {'question_count': 6})
+        num_questions = depth_config.get('question_count', 6)
+        
+        # Get question templates
+        templates = research_config.get('question_templates', {})
+        
+        # Determine topic category for better templates
+        topic_category = self._categorize_topic(topic.lower())
+        relevant_templates = templates.get(topic_category, templates.get('general', []))
+        
+        # Build prompt with templates as examples
+        template_examples = "\n".join([f"- {template.format(topic='[TOPIC]')}" for template in relevant_templates[:3]])
+        
+        system_prompt = research_config.get('system_prompts', {}).get('question_generator', 
+            "Generate specific research questions for regulatory and civil engineering topics.")
+        
+        prompt = f"""
+        Generate {num_questions} specific, actionable research questions about "{topic}" for civil engineering and regulatory compliance.
+        
+        Examples of good question formats:
+        {template_examples}
+        
+        Focus on questions that would help understand:
+        - Requirements and regulations
+        - Standards and specifications  
+        - Procedures and processes
+        - Compliance and approval criteria
+        - Design considerations
+        - Implementation guidelines
+        
+        Format as a numbered list. Make questions specific enough to find concrete answers in regulatory documents.
+        Each question should be complete and self-contained.
+        """
+        
+        response = self.ai_model_instance.generate_response(prompt, system_prompt, max_tokens=600)
+        
+        # Parse questions from response
+        questions = self._parse_questions_from_response(response, num_questions)
+        
+        return questions
+
+    def _categorize_topic(self, topic: str) -> str:
+        """Categorize topic to select appropriate question templates."""
+        if any(word in topic for word in ['setback', 'height', 'density', 'zoning', 'parking', 'landscape']):
+            return 'zoning'
+        elif any(word in topic for word in ['drainage', 'stormwater', 'detention', 'pipe', 'erosion']):
+            return 'drainage'
+        elif any(word in topic for word in ['utility', 'utilities', 'easement', 'cover', 'separation']):
+            return 'utilities'
+        else:
+            return 'general'
+
+    def _parse_questions_from_response(self, response: str, target_count: int) -> List[str]:
+        """Parse questions from AI response."""
+        questions = []
+        for line in response.split('\n'):
+            line = line.strip()
+            if line and (line[0].isdigit() or line.startswith('-') or line.startswith('•')):
+                # Remove numbering and clean up
+                question = line.split('.', 1)[-1].split('-', 1)[-1].split('•', 1)[-1].strip()
+                if question and ('?' in question or question.endswith('?')):
+                    # Ensure question ends with ?
+                    if not question.endswith('?'):
+                        question = question.split('?')[0] + '?'
+                    questions.append(question)
+        
+        return questions[:target_count]
+
+    def _compile_research_report(self, topic: str, questions: List[str], findings: Dict[str, str], depth: str) -> str:
+        """
+        Compile research findings into a comprehensive report.
+        
+        Args:
+            topic: Research topic
+            questions: List of research questions
+            findings: Dictionary mapping questions to answers
+            depth: Research depth level
+            
+        Returns:
+            Formatted research report
+        """
+        research_config = self._load_research_config()
+        depth_config = research_config.get('research_depths', {}).get(depth, {})
+        max_tokens = depth_config.get('report_max_tokens', 1500)
+        
+        system_prompt = research_config.get('system_prompts', {}).get('report_compiler',
+            "Create comprehensive technical reports for civil engineering professionals.")
+        
+        report_prompt = f"""
+        Based on the research findings below, create a comprehensive report about "{topic}".
+        
+        Structure the report with these sections:
+        1. Executive Summary
+        2. Key Requirements and Regulations
+        3. Standards and Specifications
+        4. Compliance Procedures
+        5. Design Considerations
+        6. Recommendations
+        
+        Research Findings:
+        {self._format_findings_for_report(questions, findings)}
+        
+        Write in a professional tone suitable for civil engineers and regulatory professionals.
+        Include specific requirements, dimensions, and procedures found in the research.
+        Cite document headings and sources when available.
+        """
+        
+        return self.ai_model_instance.generate_response(report_prompt, system_prompt, max_tokens=max_tokens)
+
+    def _format_findings_for_report(self, questions: List[str], findings: Dict[str, str]) -> str:
+        """Format research findings for report generation."""
+        formatted = ""
+        for i, question in enumerate(questions, 1):
+            answer = findings.get(question, "No answer found")
+            formatted += f"\nQ{i}: {question}\nA{i}: {answer}\n{'-'*50}\n"
+        return formatted
 
     def summarize(self, documents: List[Dict[str, Any]]) -> str:
         """
