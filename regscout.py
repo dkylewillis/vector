@@ -32,7 +32,7 @@ class RegScoutCLI:
         self.vector_db = None
         self.embedder = None
     
-    def init_components(self, collection_name: str = "regscout_documents"):
+    def init_components(self, collection_name: str = "regscout_documents", setup_collection: bool = True):
         """Initialize research agent"""
         if self.research_agent is not None:
             return
@@ -51,10 +51,20 @@ class RegScoutCLI:
             self.embedder = self.research_agent.embedder
             self.vector_db = self.research_agent.vector_db
             
-            # Setup collection
-            vector_size = self.research_agent.setup_collection()
-            
-            print(f"✓ Ready (embedding dimension: {vector_size})")
+            # Only setup collection if needed
+            if setup_collection:
+                # Check if collection exists before prompting
+                if not self.vector_db.collection_exists():
+                    print(f"📦 Collection '{collection_name}' does not exist.")
+                    response = input(f"Create new collection '{collection_name}'? (y/N): ")
+                    if response.lower() != 'y':
+                        print("❌ Operation cancelled - collection creation required for processing")
+                        sys.exit(0)
+                
+                vector_size = self.research_agent.setup_collection()
+                print(f"✓ Ready (embedding dimension: {vector_size})")
+            else:
+                print(f"✓ Ready (read-only mode)")
             
         except Exception as e:
             print(f"❌ Failed to initialize: {e}")
@@ -144,9 +154,9 @@ class RegScoutCLI:
             # If we can't check, assume it's not processed to be safe
             return False
 
-    def process_files(self, file_paths: List[str], force: bool = False):
+    def process_files(self, file_paths: List[str], force: bool = False, collection_name: str = "regscout_documents"):
         """Process files and add them to the knowledge base"""
-        self.init_components()
+        self.init_components(collection_name=collection_name, setup_collection=True)  # Only process creates collections
         self.file_processor = FileProcessor()
         
         # Expand directories to individual files
@@ -325,9 +335,9 @@ class RegScoutCLI:
         else:
             print("⚠️  No documents were processed")
     
-    def search_documents(self, question: str, top_k: int = 5):
+    def search_documents(self, question: str, top_k: int = 5, collection_name: str = "regscout_documents"):
         """Search the knowledge base"""
-        self.init_components()
+        self.init_components(collection_name=collection_name, setup_collection=False)  # Read-only mode
         
         print(f"🔍 Searching: '{question}'")
         results = self.research_agent.search(question, top_k=top_k)
@@ -405,9 +415,9 @@ class RegScoutCLI:
         
         print(f"\n✨ Search completed - showing top {len(results)} results")
     
-    def ask_ai(self, question: str, response_length: str = "medium"):
+    def ask_ai(self, question: str, response_length: str = "medium", collection_name: str = "regscout_documents"):
         """Ask AI a question with document context"""
-        self.init_components()
+        self.init_components(collection_name=collection_name, setup_collection=False)  # Read-only mode
         
         print(f"🤖 AI Question: '{question}'")
         
@@ -446,9 +456,9 @@ class RegScoutCLI:
             else:
                 print("❌ No relevant documents found")
 
-    def research_topic(self, topic: str, depth: str = "medium", additional_questions: List[str] = None, save_report: bool = False):
+    def research_topic(self, topic: str, depth: str = "medium", additional_questions: List[str] = None, save_report: bool = False, collection_name: str = "regscout_documents"):
         """Conduct comprehensive research on a topic"""
-        self.init_components()
+        self.init_components(collection_name=collection_name, setup_collection=False)  # Read-only mode
         
         print(f"🔬 Researching: '{topic}' (depth: {depth})")
         print("=" * 80)
@@ -513,9 +523,13 @@ class RegScoutCLI:
         
         print(f"💾 Detailed report saved to: {filename}")
     
-    def show_info(self):
+    def show_info(self, collection_name: str = "regscout_documents"):
         """Show knowledge base information"""
-        self.init_components()
+        if collection_name == "all":
+            self.list_all_collections()
+            return
+            
+        self.init_components(collection_name=collection_name, setup_collection=False)  # Read-only mode
         
         info = self.research_agent.get_knowledge_base_info()
         
@@ -532,25 +546,47 @@ class RegScoutCLI:
         print(f"   💾 Storage: Local file-based")
         print()
     
-    def clear_knowledge_base(self):
+    def list_all_collections(self):
+        """List all available collections"""
+        try:
+            from qdrant_client import QdrantClient
+            client = QdrantClient(path="qdrant_db")
+            collections = client.get_collections()
+            
+            print("\n📁 Available Collections:")
+            if not collections.collections:
+                print("   No collections found")
+            else:
+                for collection in collections.collections:
+                    try:
+                        count = client.count(collection.name)
+                        print(f"   • {collection.name} ({count.count} documents)")
+                    except Exception:
+                        print(f"   • {collection.name} (unable to get count)")
+        except Exception as e:
+            print(f"❌ Error listing collections: {e}")
+    
+    def clear_knowledge_base(self, collection_name: str = "regscout_documents"):
         """Clear the knowledge base"""
-        self.init_components()
+        self.init_components(collection_name=collection_name, setup_collection=False)  # Read-only mode
         
         # Get current info
         info = self.research_agent.get_knowledge_base_info()
         collection_info = info.get('collection_info', {})
         doc_count = collection_info.get('points_count', 0)
         
+        collection_display = collection_name or info['collection_name']
+        
         if doc_count == 0:
-            print("📭 Knowledge base is already empty")
+            print(f"📭 Collection '{collection_display}' is already empty")
             return
         
-        print(f"⚠️  This will delete {doc_count} document(s) from the knowledge base")
+        print(f"⚠️  This will delete {doc_count} document(s) from collection '{collection_display}'")
         response = input("Continue? (y/N): ")
         
         if response.lower() == 'y':
             self.vector_db.clear_documents()
-            print("✅ Knowledge base cleared")
+            print(f"✅ Collection '{collection_display}' cleared")
         else:
             print("❌ Operation cancelled")
 
@@ -563,22 +599,37 @@ def main():
         epilog="""
 Examples:
   %(prog)s process ordinance.pdf rules.txt          # Process specific files
+  %(prog)s --collection zoning process data/        # Process to specific collection
+  %(prog)s -c utilities process utilities/          # Process to utilities collection
   %(prog)s process data/                             # Process all files in directory (skip duplicates)
   %(prog)s process data/ --force                     # Process directory, including already processed files
   %(prog)s process data/ more_docs/                  # Process multiple directories
   %(prog)s search "setback requirements"            # Search for relevant content
+  %(prog)s --collection zoning search "setbacks"   # Search in specific collection
   %(prog)s ask "What are the parking rules?"       # Get AI-powered answers (medium length)
   %(prog)s ask --short "What is setback?"          # Get brief answer
   %(prog)s ask --long "Explain zoning rules"       # Get comprehensive answer
+  %(prog)s -c drainage ask "What are pipe requirements?" # Ask using specific collection
   %(prog)s research "stormwater management"        # Comprehensive research with report
   %(prog)s research "parking" --depth shallow      # Quick research (3 questions)
   %(prog)s research "drainage" --save               # Save detailed report to file
+  %(prog)s --collection zoning research "parking"  # Research in specific collection
   %(prog)s research "setbacks" --questions "What are corner lot requirements?" "How are setbacks measured?"  # Add custom questions
   %(prog)s info                                     # Show knowledge base status
+  %(prog)s --collection all info                   # Show info for all collections
   %(prog)s clear                                    # Clear all documents
+  %(prog)s --collection temp clear                 # Clear specific collection
 
 The tool uses local file storage and works offline (except for AI features).
         """
+    )
+    
+    # Global collection argument
+    parser.add_argument(
+        '--collection', '-c',
+        type=str,
+        default=None,
+        help='Specify collection name (default: regscout_documents)'
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
@@ -691,19 +742,24 @@ The tool uses local file storage and works offline (except for AI features).
     # Initialize CLI
     cli = RegScoutCLI()
     
+    # Determine collection name
+    collection_name = args.collection or "regscout_documents"
+    
+    # Remove the global init_components call - let each method handle it
+    
     try:
         if args.command == 'process':
-            cli.process_files(args.files, force=args.force)
+            cli.process_files(args.files, force=args.force, collection_name=collection_name)
         elif args.command == 'search':
-            cli.search_documents(args.question, args.top_k)
+            cli.search_documents(args.question, args.top_k, collection_name=collection_name)
         elif args.command == 'ask':
-            cli.ask_ai(args.question, args.response_length)
+            cli.ask_ai(args.question, args.response_length, collection_name=collection_name)
         elif args.command == 'research':
-            cli.research_topic(args.topic, depth=args.depth, additional_questions=args.questions, save_report=args.save)
+            cli.research_topic(args.topic, depth=args.depth, additional_questions=args.questions, save_report=args.save, collection_name=collection_name)
         elif args.command == 'info':
-            cli.show_info()
+            cli.show_info(collection_name)
         elif args.command == 'clear':
-            cli.clear_knowledge_base()
+            cli.clear_knowledge_base(collection_name)
             
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")

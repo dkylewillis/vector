@@ -14,20 +14,8 @@ from ai_models import AIModelFactory
 from typing import List, Dict, Any, Optional
 import numpy as np
 
-SYSTEM_PROMPT = (
-    "You are a professional civil engineering assistant specialized in land development and site design. "
-    "Your job is to extract and provide accurate, relevant information from the given context based on the user's prompt.\n\n"
-    "The context may include civil engineering documents, design standards, ordinances, grading plans, hydrology reports, or utility layout descriptions. You must:\n\n"
-    "• Identify the most relevant parts of the context to answer the user’s question.\n"
-    "• Include all dimensions, units, and specific details from the context.\n"
-    "• Use terminology consistent with industry practices (e.g., grading, drainage, erosion control, easements, impervious cover, detention basins).\n"
-    "• If the question is about regulations, refer only to content in the provided context (e.g., local ordinance excerpts).\n"
-    "• If no relevant information is found in the context, state that clearly instead of guessing.\n"
-    "• Avoid generic responses—prioritize specificity based on context.\n"
-    "• Always respond in a clear, concise, and technically accurate manner, as if advising a licensed civil engineer or reviewing engineer."
-    "• Always include the headings of the document you are referencing.\n\n"
-)
-
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modules.module")
 
 class ResearchAgent:
     """
@@ -76,6 +64,27 @@ class ResearchAgent:
         vector_size = self.embedder.get_embedding_dimension()
         self.vector_db.create_collection(vector_size=vector_size)
         return vector_size
+
+    def _get_system_prompt(self, prompt_type: str = "default") -> str:
+        """
+        Get system prompt from research configuration.
+        
+        Args:
+            prompt_type: Type of prompt to retrieve (default, question_generator, report_compiler)
+            
+        Returns:
+            System prompt string
+        """
+        research_config = self._load_research_config()
+        system_prompts = research_config.get('system_prompts', {})
+        
+        # Default fallback prompt if not found in config
+        default_prompt = (
+            "You are a professional civil engineering assistant specialized in land development and site design. "
+            "Your job is to extract and provide accurate, relevant information from the given context based on the user's prompt."
+        )
+        
+        return system_prompts.get(prompt_type, default_prompt)
 
     def search(self, 
                question: str, 
@@ -155,7 +164,10 @@ class ResearchAgent:
         else:
             enhanced_prompt = user_prompt
 
-        return self.ai_model_instance.generate_response(enhanced_prompt, SYSTEM_PROMPT, max_tokens=max_tokens)
+        # Get system prompt from configuration
+        system_prompt = self._get_system_prompt("default")
+        
+        return self.ai_model_instance.generate_response(enhanced_prompt, system_prompt, max_tokens=max_tokens)
 
     def research(self, topic: str, depth: str = "medium", additional_questions: List[str] = None) -> Dict[str, Any]:
         """
@@ -246,27 +258,17 @@ class ResearchAgent:
         
         # Build prompt with templates as examples
         template_examples = "\n".join([f"- {template.format(topic='[TOPIC]')}" for template in relevant_templates[:3]])
-        
-        system_prompt = research_config.get('system_prompts', {}).get('question_generator', 
-            "Generate specific research questions for regulatory and civil engineering topics.")
-        
-        prompt = f"""
-        Generate {num_questions} specific, actionable research questions about "{topic}" for civil engineering and regulatory compliance.
-        
-        Examples of good question formats:
-        {template_examples}
-        
-        Focus on questions that would help understand:
-        - Requirements and regulations
-        - Standards and specifications  
-        - Procedures and processes
-        - Compliance and approval criteria
-        - Design considerations
-        - Implementation guidelines
-        
-        Format as a numbered list. Make questions specific enough to find concrete answers in regulatory documents.
-        Each question should be complete and self-contained.
-        """
+        system_prompt = research_config.get('system_prompts', {}).get(
+            'question_generator',
+            "Generate specific research questions for regulatory and civil engineering topics."
+        )
+
+        prompt = (
+            f"Generate {num_questions} specific, actionable research questions about \"{topic}\" "
+            "for civil engineering and regulatory compliance.\n\n"
+            "Examples of good question formats:\n"
+            f"{template_examples}"
+        )
         
         response = self.ai_model_instance.generate_response(prompt, system_prompt, max_tokens=600)
         
@@ -322,24 +324,11 @@ class ResearchAgent:
         system_prompt = research_config.get('system_prompts', {}).get('report_compiler',
             "Create comprehensive technical reports for civil engineering professionals.")
         
-        report_prompt = f"""
-        Based on the research findings below, create a comprehensive report about "{topic}".
-        
-        Structure the report with these sections:
-        1. Executive Summary
-        2. Key Requirements and Regulations
-        3. Standards and Specifications
-        4. Compliance Procedures
-        5. Design Considerations
-        6. Recommendations
-        
-        Research Findings:
-        {self._format_findings_for_report(questions, findings)}
-        
-        Write in a professional tone suitable for civil engineers and regulatory professionals.
-        Include specific requirements, dimensions, and procedures found in the research.
-        Cite document headings and sources when available.
-        """
+        report_prompt = (
+            f'Based on the research findings below, create a comprehensive report about "{topic}".\n\n'
+            "Research Findings:\n"
+            f"{self._format_findings_for_report(questions, findings)}"
+        )
         
         return self.ai_model_instance.generate_response(report_prompt, system_prompt, max_tokens=max_tokens)
 

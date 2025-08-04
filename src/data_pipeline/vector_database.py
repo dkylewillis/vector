@@ -7,21 +7,53 @@ import uuid
 from pathlib import Path
 import yaml
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # Load vector database settings from YAML config
 with open("./config/settings.yaml", "r", encoding="utf-8") as f:
     _vector_db_config = yaml.safe_load(f).get("vector_database", {})
 
 QDRANT_LOCAL_PATH = _vector_db_config.get("local_path", "./qdrant_data")
-QDRANT_HOST = _vector_db_config.get("host", "localhost")
-QDRANT_PORT = _vector_db_config.get("port", 6333)
+QDRANT_URL = _vector_db_config.get("url", None)
 
-if QDRANT_LOCAL_PATH is not None or QDRANT_HOST is None:
-    path = Path(QDRANT_LOCAL_PATH)
+# Initialize client at module level
+if QDRANT_URL is None or QDRANT_LOCAL_PATH is not None:
+    # Use local mode
+    path = Path(QDRANT_LOCAL_PATH or "./qdrant_db")
     path.mkdir(parents=True, exist_ok=True)
-    client =  QdrantClient(path=str(path))
+    CLIENT = QdrantClient(path=str(path))
+    STORAGE_MODE = "local"
+    print(f"🔧 Using local Qdrant storage at: {path}")
 else:
-    client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    # Use cloud mode with proper configuration
+    api_key = os.getenv("QDRANT_API_KEY")
+    if not api_key:
+        print(f"⚠️  Warning: No API key found for {'QDRANT_API_KEY'}")
+        print("🔄 Falling back to local mode...")
+        path = Path("./qdrant_db")
+        path.mkdir(parents=True, exist_ok=True)
+        CLIENT = QdrantClient(path=str(path))
+        STORAGE_MODE = "local"
+    else:
+        try:
+            CLIENT = QdrantClient(
+                url=QDRANT_URL,
+                api_key=api_key,
+                timeout=60,  # Set timeout to 30 seconds
+                prefer_grpc=False,  # Use HTTP instead of gRPC
+            )
+            STORAGE_MODE = "server"
+            print(f"🌐 Using Qdrant cloud at: {QDRANT_URL}")
+        except Exception as e:
+            print(f"❌ Cloud connection failed: {e}")
+            print("🔄 Falling back to local mode...")
+            path = Path("./qdrant_db")
+            path.mkdir(parents=True, exist_ok=True)
+            CLIENT = QdrantClient(path=str(path))
+            STORAGE_MODE = "local"
 
 class VectorDatabase:
     """
@@ -36,9 +68,8 @@ class VectorDatabase:
             collection_name: Name of the collection to use
         """
         self.collection_name = collection_name
-
-        self.client = client
-        self.storage_mode = "local" if QDRANT_LOCAL_PATH is not None or QDRANT_HOST is None else "server"
+        self.client = CLIENT
+        self.storage_mode = STORAGE_MODE
 
     def close(self):
         """Close this database connection."""
@@ -52,7 +83,11 @@ class VectorDatabase:
         try:
             collections = self.client.get_collections().collections
             return any(col.name == self.collection_name for col in collections)
-        except:
+        except Exception as e:
+            error_str = str(e).lower()
+            if "timeout" in error_str or "timed out" in error_str:
+                print(f"❌ Connection timeout while checking collections")
+                print(f"💡 Try switching to local mode in settings.yaml")
             return False
     
     def create_collection(self, vector_size: int, distance: Distance = Distance.COSINE):
@@ -102,14 +137,26 @@ class VectorDatabase:
                 payload=payload
             ))
         
-        # Insert points into collection
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=points
-        )
-        
-        print(f"Added {len(points)} documents to collection '{self.collection_name}'")
-        return doc_ids
+        # Insert points into collection with error handling
+        try:
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
+            print(f"✅ Added {len(points)} documents to collection '{self.collection_name}'")
+            return doc_ids
+        except Exception as e:
+            error_str = str(e).lower()
+            if "timeout" in error_str or "timed out" in error_str:
+                print(f"❌ Connection timeout while adding documents")
+                print(f"💡 Try switching to local mode in settings.yaml:")
+                print(f"   Set url: null and local_path: './qdrant_db'")
+            elif "connection" in error_str or "refused" in error_str:
+                print(f"❌ Connection refused. Check your Qdrant configuration.")
+                print(f"💡 Try switching to local mode in settings.yaml")
+            else:
+                print(f"❌ Error adding documents: {e}")
+            raise e
     
     def search(self, 
                query_embedding: np.ndarray, 

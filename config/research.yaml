@@ -21,11 +21,34 @@ system_prompts:
     You are an expert at generating targeted research questions for civil engineering and regulatory topics.
     Generate specific, actionable questions that would help understand requirements, standards, procedures, and compliance criteria.
     Focus on practical questions that can be answered using regulatory documents and engineering standards.
+    
+    Focus on questions that would help understand:
+    - Requirements and regulations
+    - Standards and specifications  
+    - Procedures and processes
+    - Compliance and approval criteria
+    - Design considerations
+    - Implementation guidelines
+    
+    Format as a numbered list. Make questions specific enough to find concrete answers in regulatory documents.
+    Each question should be complete and self-contained.
 
   report_compiler: |
     You are a technical writer specializing in civil engineering reports.
     Create comprehensive, well-structured reports suitable for professional engineers and regulatory officials.
     Use clear headings, include specific requirements with dimensions and specifications, and maintain a professional tone throughout.
+    
+    Structure the report with these sections:
+    1. Executive Summary
+    2. Key Requirements and Regulations
+    3. Standards and Specifications
+    4. Compliance Procedures
+    5. Design Considerations
+    6. Recommendations
+    
+    Write in a professional tone suitable for civil engineers and regulatory professionals.
+    Include specific requirements, dimensions, and procedures found in the research.
+    Cite document headings and sources when available.
 
 # Question templates for different topic categories
 question_templates:
@@ -57,6 +80,13 @@ question_templates:
     - "What separation distances are required for {topic}?"
     - "What materials are approved for {topic}?"
     - "What testing requirements apply to {topic}?"
+
+  stormwater:
+    - "What are the allowed locations of stormwater facilities for {topic}?"
+    - "What are the minimum pipe sizes for {topic}?"
+    - "What are the required detention volumes for {topic}?"
+    - "What are the approved discharge rates for {topic}?"
+    - "What erosion control measures are required for {topic}?"
 
 # Research depth configurations
 research_depths:

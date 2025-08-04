@@ -30,9 +30,16 @@ A command-line tool for processing regulatory documents and querying them with A
 
 **Main CLI:** Use `regscout.py`
 
+**Collection Management:**
+All commands support the `--collection` or `-c` flag to specify which collection to use.
+
 ```cmd
 # Process documents (supports PDF, DOCX, TXT, MD)
 python regscout.py process data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx
+
+# Process to specific collections
+python regscout.py --collection zoning process data\zoning\
+python regscout.py -c utilities process data\utilities\
 
 # Process entire directories (skip duplicates automatically)
 python regscout.py process data\
@@ -42,29 +49,35 @@ python regscout.py process data\ --force
 
 # Search documents using semantic search
 python regscout.py search "setback requirements"
+python regscout.py --collection zoning search "setback requirements"
 
 # Ask AI questions with different response lengths
 python regscout.py ask "What are the parking regulations?"
 python regscout.py ask --short "What is a setback?"
 python regscout.py ask --long "Explain zoning regulations in detail"
+python regscout.py --collection drainage ask "What are pipe sizing requirements?"
 
 # Conduct comprehensive research with automated question generation
 python regscout.py research "stormwater management"
 python regscout.py research "parking" --depth shallow
 python regscout.py research "drainage" --save
+python regscout.py --collection zoning research "parking requirements"
 
 # Add custom questions to research
 python regscout.py research "setbacks" --questions "What about corner lots?" "How are setbacks measured?"
 
 # Show knowledge base status
 python regscout.py info
+python regscout.py --collection all info    # Show info for all collections
 
 # Clear knowledge base
 python regscout.py clear
+python regscout.py --collection temp clear  # Clear specific collection
 ```
 
 ## Commands
 
+- **`--collection <name>`** - Global flag to specify collection (works with all commands)
 - **`process <files/dirs>`** - Add documents to knowledge base (supports directories)
   - `--force` - Reprocess files even if already in knowledge base
 - **`search <query>`** - Search for relevant content using semantic similarity
@@ -77,7 +90,29 @@ python regscout.py clear
   - `--questions "Q1?" "Q2?"` - Add custom research questions
   - `--save` - Save detailed report to file
 - **`info`** - Show knowledge base information and statistics
+  - Use `--collection all` to see all collections
 - **`clear`** - Clear all documents from knowledge base
+
+## Collection Examples by Use Case
+
+```cmd
+# Separate by jurisdiction
+python regscout.py -c coweta process coweta_docs\
+python regscout.py -c fulton process fulton_docs\
+
+# Separate by topic
+python regscout.py -c zoning process zoning_ordinances\
+python regscout.py -c stormwater process drainage_manuals\
+
+# Separate by project
+python regscout.py -c project_alpha process project_alpha_docs\
+python regscout.py -c project_beta process project_beta_docs\
+
+# Query specific collections
+python regscout.py -c zoning search "setback requirements"
+python regscout.py -c utilities ask "What are easement requirements?"
+python regscout.py -c drainage research "pipe sizing standards"
+```
 
 ## Configuration
 
