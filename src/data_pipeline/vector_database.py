@@ -17,8 +17,8 @@ load_dotenv()
 with open("./config/settings.yaml", "r", encoding="utf-8") as f:
     _vector_db_config = yaml.safe_load(f).get("vector_database", {})
 
-QDRANT_LOCAL_PATH = _vector_db_config.get("local_path", "./qdrant_data")
-QDRANT_URL = _vector_db_config.get("url", None)
+QDRANT_LOCAL_PATH = _vector_db_config.get("local_path", None)
+QDRANT_URL = os.getenv("QDRANT_API_URL")
 
 # Initialize client at module level
 if QDRANT_URL is None or QDRANT_LOCAL_PATH is not None:

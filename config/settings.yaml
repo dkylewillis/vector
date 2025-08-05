@@ -25,9 +25,6 @@ ai_model:
 # Vector Database Settings (Qdrant)
 vector_database:
   # Server mode settings (set url to null for local mode)
-  url: "https://74f6dd7e-d502-40f1-974b-bd7898518e89.us-east4-0.gcp.cloud.qdrant.io:6333"
-  api_key_env: "QDRANT_API_KEY"    # Use API key from environment
-  
   # Local storage settings (used when url is null or local_path is specified)
   local_path: null #"./qdrant_db" # Path for local file storage
   
