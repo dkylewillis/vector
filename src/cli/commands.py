@@ -112,31 +112,7 @@ class RegScoutCommands:
             print(f"❌ AI service error: {e}")
             self._show_fallback_results(question)
 
-    def research(self, topic: str = None, depth: str = "medium", 
-                 additional_questions: List[str] = None, 
-                 save_report: bool = False,
-                 collection_name: str = "regscout_documents"):
-        """Conduct comprehensive research using structured topics."""
-        self.init_components(collection_name=collection_name, 
-                           setup_collection=False)
-        
-        if topic:
-            print(f"🔬 Researching specific topic: '{topic}' (depth: {depth})")
-        else:
-            print(f"🔬 Researching all topics from topics.yaml (depth: {depth})")
-        print("=" * 80)
-        
-        try:
-            results = self.research_agent.research(
-                topic=topic, depth=depth, additional_questions=additional_questions)
-            
-            self._display_research_results(results)
-            if save_report:
-                self._save_research_report(topic or "All_Topics", results)
-            return results
-        except Exception as e:
-            print(f"❌ Research failed: {e}")
-            return None
+
 
     def info(self, collection_name: str = "regscout_documents"):
         """Show knowledge base information."""
@@ -417,28 +393,6 @@ class RegScoutCommands:
 
         print(f"\n✨ Search completed - showing top {len(results)} results")
         
-    def _display_research_results(self, results: Dict):
-        """Display research results."""
-        print(f"\n✅ Due Diligence Report Complete!")
-        
-        # Display summary information
-        print(f"📊 Topics researched: {len(results['topics_researched'])}")
-        print(f"🔍 Total items processed: {results['total_items']}")
-        
-        print(f"\n📋 TOPICS COVERED:")
-        for topic in results['topics_researched']:
-            print(f"   • {topic.replace('_', ' ').title()}")
-
-        print(f"\n📋 MARKDOWN REPORT PREVIEW")
-        print("=" * 80)
-        
-        # Show first 1000 characters of the markdown report
-        preview = results['markdown_report'][:1000]
-        if len(results['markdown_report']) > 1000:
-            preview += "\n\n[... Report continues ...]"
-        
-        print(preview)
-        
     def _display_info(self, info: Dict):
         """Display knowledge base info."""
         print("\n📊 Knowledge Base Information:")
@@ -451,7 +405,7 @@ class RegScoutCommands:
             doc_count = collection_info.get('points_count', 0)
             print(f"   📚 Documents Stored: {doc_count}")
 
-        print("   💾 Storage: Local file-based")
+        print(f"   💾 Storage: {info['storage_mode']}")
         print()
         
     def _list_all_collections(self):

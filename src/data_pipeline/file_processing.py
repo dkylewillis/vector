@@ -9,6 +9,7 @@ from transformers import AutoTokenizer
 from docling.chunking import HybridChunker
 
 from typing import Dict, List, Any
+import os
 
 
 class FileProcessor:
@@ -53,12 +54,17 @@ class FileProcessor:
         processed_chunks = []
         for chunk in chunks:
             contextualized_text = self.chunker.contextualize(chunk=chunk)
-
+            metadata = chunk.meta.export_json_dict()
+            folder = os.path.dirname(docx_path)
+            if folder not in ['ordinances', 'manuals', 'checklists']:
+                folder = 'other'
             chunk_data = {
                 'text': contextualized_text,
-                'meta': chunk.meta.export_json_dict() if hasattr(
-                    chunk.meta,
-                    'export_json_dict') else chunk.meta}
+                'meta': {
+                    "filename": metadata.get('origin', {}).get('filename', str(docx_path)),
+                    "headings": metadata.get('headings', []),
+                    "source": folder
+                }}
             processed_chunks.append(chunk_data)
 
         return processed_chunks

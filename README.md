@@ -8,7 +8,6 @@ A command-line tool for processing regulatory documents and querying them with A
 - **Directory Processing**: Process entire directories recursively with duplicate detection
 - **Vector Search**: Fast semantic search using embeddings
 - **AI-Powered Q&A**: Get intelligent answers with document context
-- **Comprehensive Research**: Multi-step research with question generation and professional reports
 - **Configurable Response Lengths**: Short, medium, or long AI responses
 - **Local Storage**: Works offline with local file-based vector database
 - **Professional Focus**: Specialized for civil engineering and regulatory documents
@@ -57,15 +56,6 @@ python regscout.py ask --short "What is a setback?"
 python regscout.py ask --long "Explain zoning regulations in detail"
 python regscout.py --collection drainage ask "What are pipe sizing requirements?"
 
-# Conduct comprehensive research with automated question generation
-python regscout.py research "stormwater management"
-python regscout.py research "parking" --depth shallow
-python regscout.py research "drainage" --save
-python regscout.py --collection zoning research "parking requirements"
-
-# Add custom questions to research
-python regscout.py research "setbacks" --questions "What about corner lots?" "How are setbacks measured?"
-
 # Show knowledge base status
 python regscout.py info
 python regscout.py --collection all info    # Show info for all collections
@@ -85,10 +75,6 @@ python regscout.py --collection temp clear  # Clear specific collection
   - `--short` - Brief answers (150 tokens)
   - `--medium` - Balanced answers (500 tokens) [default]
   - `--long` - Comprehensive answers (1500 tokens)
-- **`research <topic>`** - Conduct multi-step research with automated question generation
-  - `--depth shallow|medium|comprehensive` - Research depth
-  - `--questions "Q1?" "Q2?"` - Add custom research questions
-  - `--save` - Save detailed report to file
 - **`info`** - Show knowledge base information and statistics
   - Use `--collection all` to see all collections
 - **`clear`** - Clear all documents from knowledge base
@@ -111,7 +97,6 @@ python regscout.py -c project_beta process project_beta_docs\
 # Query specific collections
 python regscout.py -c zoning search "setback requirements"
 python regscout.py -c utilities ask "What are easement requirements?"
-python regscout.py -c drainage research "pipe sizing standards"
 ```
 
 ## Configuration
@@ -122,11 +107,6 @@ Edit `config/settings.yaml` to customize:
 - Vector database configuration
 - File processing options
 - Response length presets
-
-Edit `config/research.yaml` to customize:
-- Research question templates
-- System prompts for different purposes
-- Research depth configurations
 
 ## Requirements
 
@@ -140,8 +120,7 @@ Edit `config/research.yaml` to customize:
 regscout/
 ├── regscout.py          # Main CLI entry point
 ├── config/
-│   ├── settings.yaml    # Main configuration file
-│   └── research.yaml    # Research templates and prompts
+│   └── settings.yaml    # Main configuration file
 ├── src/
 │   ├── agents/          # AI research agents
 │   ├── ai_models/       # AI model implementations
@@ -157,12 +136,6 @@ regscout/
 - Automatic chunking for better search results
 - Preserves document structure and headings
 - Duplicate detection prevents reprocessing
-
-### AI-Powered Research
-- Generates targeted research questions automatically
-- Conducts systematic research using your document corpus
-- Compiles professional reports with structured findings
-- Supports custom questions and configurable research depth
 
 ### Smart Search & Q&A
 - Semantic search finds relevant content even with different wording

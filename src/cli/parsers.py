@@ -22,7 +22,6 @@ def create_parser():
     _add_process_parser(subparsers)
     _add_search_parser(subparsers)
     _add_ask_parser(subparsers)
-    _add_research_parser(subparsers)
     _add_info_parser(subparsers)
     _add_clear_parser(subparsers)
 
@@ -96,35 +95,6 @@ def _add_ask_parser(subparsers):
     parser.set_defaults(response_length='medium')
 
 
-def _add_research_parser(subparsers):
-    """Add research command parser."""
-    parser = subparsers.add_parser(
-        'research', 
-        help='Generate civil engineering due diligence report from topics.yaml'
-    )
-    parser.add_argument(
-        'topic', 
-        nargs='?',  # Make topic optional
-        help='Specific topic to research (if not provided, researches all topics for comprehensive due diligence)'
-    )
-    parser.add_argument(
-        '--depth', 
-        choices=['shallow', 'medium', 'comprehensive'],
-        default='medium',
-        help='Research depth (default: medium)'
-    )
-    parser.add_argument(
-        '--questions', 
-        nargs='*',
-        help='Additional research questions to include'
-    )
-    parser.add_argument(
-        '--save', 
-        action='store_true',
-        help='Save markdown report and summary to files'
-    )
-
-
 def _add_info_parser(subparsers):
     """Add info command parser."""
     subparsers.add_parser('info', help='Show knowledge base information')
@@ -150,13 +120,7 @@ def _get_examples_text():
         "  %(prog)s ask \"What are the parking rules?\"       # Get AI-powered answers\n"
         "  %(prog)s ask --short \"What is setback?\"          # Get brief answer\n"
         "  %(prog)s ask --long \"Explain zoning rules\"       # Get comprehensive answer\n"
-        "  %(prog)s -c drainage ask \"What are pipe requirements?\" # Ask using specific\n"
-        "  %(prog)s research                               # Generate comprehensive due diligence report (all topics)\n"
-        "  %(prog)s research \"Zoning\"                     # Generate focused report on specific topic\n"
-        "  %(prog)s research --save                          # Generate report and save markdown file\n"
-        "  %(prog)s research \"parking\" --depth shallow      # Quick research with less detail\n"
-        "  %(prog)s --collection zoning research \"parking\"  # Research using specific document collection\n"
-        "  %(prog)s research --questions \"What about loading zones?\" # Add custom questions\n"
+        "  %(prog)s -c drainage ask \"What are pipe requirements?\" # Ask using specific collection\n"
         "  %(prog)s info                                     # Show knowledge base status\n"
         "  %(prog)s --collection all info                   # Show info for all collections\n"
         "  %(prog)s clear                                    # Clear all documents\n"

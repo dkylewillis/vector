@@ -69,7 +69,7 @@ class VectorDatabase:
         Args:
             collection_name: Name of the collection to use
         """
-        self.collection_name = collection_name
+        self.collection_name = collection_name.lower()
         self.client = CLIENT
         self.storage_mode = STORAGE_MODE
 
@@ -241,7 +241,8 @@ class VectorDatabase:
                 "name": self.collection_name,
                 "points_count": info.points_count,
                 "status": info.status,
-                "vector_size": info.config.params.vectors.size
+                "vector_size": info.config.params.vectors.size,
+                "storage_mode": self.storage_mode,
             }
         except Exception as e:
             print(f"Error getting collection info: {e}")

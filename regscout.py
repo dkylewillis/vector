@@ -38,9 +38,6 @@ def main():
             commands.search(args.question, args.top_k, collection_name)
         elif args.command == 'ask':
             commands.ask(args.question, args.response_length, collection_name)
-        elif args.command == 'research':
-            commands.research(args.topic, args.depth, args.questions,
-                              args.save, collection_name)
         elif args.command == 'info':
             commands.info(collection_name)
         elif args.command == 'clear':
