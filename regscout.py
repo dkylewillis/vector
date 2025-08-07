@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).parent / "src"))
 
 from src.cli.parsers import create_parser
 from src.cli.commands import RegScoutCommands
+from config import Config
 
 # Load environment variables
 load_dotenv()
@@ -27,17 +28,18 @@ def main():
         return
 
     # Initialize commands
-    commands = RegScoutCommands()
-    collection_name = args.collection or "regscout_documents"
+    config = Config('./config/settings.yaml')
+    commands = RegScoutCommands(config)
+    collection_name = args.collection or "regscout_chunks"
 
     try:
         # Route to appropriate command
         if args.command == 'process':
             commands.process(args.files, args.force, collection_name)
         elif args.command == 'search':
-            commands.search(args.question, args.top_k, collection_name)
+            commands.search(args.question, args.top_k, collection_name, args.filename)
         elif args.command == 'ask':
-            commands.ask(args.question, args.response_length, collection_name)
+            commands.ask(args.question, args.response_length, collection_name, args.filename)
         elif args.command == 'info':
             commands.info(collection_name)
         elif args.command == 'clear':

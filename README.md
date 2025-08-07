@@ -50,11 +50,18 @@ python regscout.py process data\ --force
 python regscout.py search "setback requirements"
 python regscout.py --collection zoning search "setback requirements"
 
+# Search with filename filtering
+python regscout.py search "parking" --filename "zoning_ordinance.pdf"
+python regscout.py -c fayette search "utilities" --filename "Chapter_28___UTILITIES.docx"
+
 # Ask AI questions with different response lengths
 python regscout.py ask "What are the parking regulations?"
 python regscout.py ask --short "What is a setback?"
 python regscout.py ask --long "Explain zoning regulations in detail"
 python regscout.py --collection drainage ask "What are pipe sizing requirements?"
+
+# Ask with context filtering
+python regscout.py ask "What are height limits?" --filename "zoning_ordinance.pdf"
 
 # Show knowledge base status
 python regscout.py info
@@ -71,13 +78,15 @@ python regscout.py --collection temp clear  # Clear specific collection
 - **`process <files/dirs>`** - Add documents to knowledge base (supports directories)
   - `--force` - Reprocess files even if already in knowledge base
 - **`search <query>`** - Search for relevant content using semantic similarity
+  - `--filename <name>` - Filter results by specific filename
 - **`ask <question>`** - Get AI-powered answers with document context
   - `--short` - Brief answers (150 tokens)
   - `--medium` - Balanced answers (500 tokens) [default]
   - `--long` - Comprehensive answers (1500 tokens)
+  - `--filename <name>` - Filter context by specific filename
 - **`info`** - Show knowledge base information and statistics
   - Use `--collection all` to see all collections
-- **`clear`** - Clear all documents from knowledge base
+- **`clear`** - Clear all chunks from knowledge base
 
 ## Collection Examples by Use Case
 
@@ -142,5 +151,6 @@ regscout/
 - Context-aware AI responses with source citations
 - Configurable response lengths for different use cases
 - Professional civil engineering focus
+- Intelligent text chunking for optimal search results
 
 The tool uses local file storage and works offline (except for AI features).

@@ -68,6 +68,40 @@ class FileProcessor:
             processed_chunks.append(chunk_data)
 
         return processed_chunks
+    
+    def process_pdf(self, pdf_path) -> list[dict[str, Any]]:
+        """Process a single PDF with Docling and return contextualized chunks."""
+        print(f"Processing: {pdf_path}")
+
+        # Convert PDF
+        doc = self.converter.convert(str(pdf_path)).document
+        if not doc:
+            print(f"Failed to convert {pdf_path}.")
+            return None
+
+        chunks = self.chunk_text(doc)
+        if not chunks:
+            print(f"No chunks created for {pdf_path}.")
+            return None
+
+        # Process chunks and contextualize them
+        processed_chunks = []
+        for chunk in chunks:
+            contextualized_text = self.chunker.contextualize(chunk=chunk)
+            metadata = chunk.meta.export_json_dict()
+            folder = os.path.dirname(pdf_path)
+            if folder not in ['ordinances', 'manuals', 'checklists']:
+                folder = 'other'
+            chunk_data = {
+                'text': contextualized_text,
+                'meta': {
+                    "filename": metadata.get('origin', {}).get('filename', str(pdf_path)),
+                    "headings": metadata.get('headings', []),
+                    "source": folder
+                }}
+            processed_chunks.append(chunk_data)
+
+        return processed_chunks
 
     def chunk_text(self, doc):
         chunk_iter = self.chunker.chunk(dl_doc=doc)

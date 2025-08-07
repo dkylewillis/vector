@@ -63,7 +63,7 @@ class VectorDatabase:
     Supports both server-based and local file-based persistence.
     """
 
-    def __init__(self, collection_name: str = "documents"):
+    def __init__(self, collection_name: str = "chunks"):
         """
         Initialize the vector database connection.
         Args:
@@ -106,36 +106,36 @@ class VectorDatabase:
         except Exception as e:
             print(f"Error creating collection: {e}")
 
-    def add_documents(self,
-                      texts: List[str],
-                      embeddings: np.ndarray,
-                      metadata: Optional[List[Dict[str, Any]]] = None) -> List[str]:
+    def add_chunks(self,
+                   texts: List[str],
+                   embeddings: np.ndarray,
+                   metadata: Optional[List[Dict[str, Any]]] = None) -> List[str]:
         """
-        Add documents with their embeddings to the vector database.
+        Add text chunks with their embeddings to the vector database.
 
         Args:
-            texts: List of document texts
+            texts: List of chunk texts
             embeddings: Corresponding embeddings as numpy array
-            metadata: Optional metadata for each document
+            metadata: Optional metadata for each chunk
 
         Returns:
-            List of document IDs
+            List of chunk IDs
         """
         if metadata is None:
             metadata = [{"text": text} for text in texts]
 
-        # Generate unique IDs for each document
-        doc_ids = [str(uuid.uuid4()) for _ in texts]
+        # Generate unique IDs for each chunk
+        chunk_ids = [str(uuid.uuid4()) for _ in texts]
 
         # Create points for Qdrant
         points = []
-        for i, (doc_id, text, embedding) in enumerate(zip(doc_ids, texts, embeddings)):
+        for i, (chunk_id, text, embedding) in enumerate(zip(chunk_ids, texts, embeddings)):
             payload = metadata[i] if i < len(metadata) else {"text": text}
             payload["text"] = text  # Ensure text is always included
 
             points.append(
                 PointStruct(
-                    id=doc_id,
+                    id=chunk_id,
                     vector=embedding.tolist() if isinstance(
                         embedding,
                         np.ndarray) else embedding,
@@ -149,33 +149,35 @@ class VectorDatabase:
             )
             print(
                 f"✅ Added {
-                    len(points)} documents to collection '{
+                    len(points)} chunks to collection '{
                     self.collection_name}'")
-            return doc_ids
+            return chunk_ids
         except Exception as e:
             error_str = str(e).lower()
             if "timeout" in error_str or "timed out" in error_str:
-                print(f"❌ Connection timeout while adding documents")
+                print(f"❌ Connection timeout while adding chunks")
                 print(f"💡 Try switching to local mode in settings.yaml:")
                 print(f"   Set url: null and local_path: './qdrant_db'")
             elif "connection" in error_str or "refused" in error_str:
                 print(f"❌ Connection refused. Check your Qdrant configuration.")
                 print(f"💡 Try switching to local mode in settings.yaml")
             else:
-                print(f"❌ Error adding documents: {e}")
+                print(f"❌ Error adding chunks: {e}")
             raise e
 
     def search(self,
                query_embedding: np.ndarray,
                top_k: int = 5,
-               score_threshold: Optional[float] = None) -> List[Dict[str, Any]]:
+               score_threshold: Optional[float] = None,
+               metadata_filter: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
-        Search for similar documents using a query embedding.
+        Search for similar chunks using a query embedding.
 
         Args:
             query_embedding: Query vector as numpy array
             top_k: Number of top results to return
             score_threshold: Minimum similarity score threshold
+            metadata_filter: Optional dict to filter by metadata (e.g., {"filename": "doc.pdf"})
 
         Returns:
             List of search results with scores and metadata
@@ -190,7 +192,29 @@ class VectorDatabase:
         if score_threshold is not None:
             search_params["score_threshold"] = score_threshold
 
-        results = self.client.search(**search_params)
+        # Add metadata filtering if provided
+        if metadata_filter:
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            
+            conditions = []
+            for key, value in metadata_filter.items():
+                conditions.append(
+                    FieldCondition(
+                        key=key,
+                        match=MatchValue(value=value)
+                    )
+                )
+            search_params["query_filter"] = Filter(must=conditions)
+
+        try:
+            results = self.client.search(**search_params)
+        except Exception as e:
+            if "Index required" in str(e) and metadata_filter:
+                print("⚠️  Metadata filtering not supported, searching all chunks...")
+                search_params.pop("query_filter", None)
+                results = self.client.search(**search_params)
+            else:
+                raise
 
         # Format results
         formatted_results = []
@@ -214,8 +238,8 @@ class VectorDatabase:
         except Exception as e:
             print(f"Error deleting collection: {e}")
 
-    def clear_documents(self):
-        """Clear all documents from the collection while keeping the
+    def clear_chunks(self):
+        """Clear all chunks from the collection while keeping the
         collection structure."""
         try:
             # Delete all points from the collection
@@ -223,10 +247,10 @@ class VectorDatabase:
                 collection_name=self.collection_name,
                 points_selector=True  # This deletes all points
             )
-            print(f"All documents cleared from collection "
+            print(f"All chunks cleared from collection "
                   f"'{self.collection_name}'")
         except Exception as e:
-            print(f"Error clearing documents: {e}")
+            print(f"Error clearing chunks: {e}")
 
     def get_collection_info(self) -> Dict[str, Any]:
         """

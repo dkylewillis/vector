@@ -3,9 +3,9 @@ import warnings
 import numpy as np
 from typing import List, Dict, Any, Optional
 from ..ai_models import AIModelFactory
-from config import config
-from ..data_pipeline.vector_database import VectorDatabase
+from config import Config
 from ..data_pipeline.embedder import Embedder
+from ..data_pipeline.vector_database import VectorDatabase
 from dotenv import load_dotenv
 import sys
 import os
@@ -32,6 +32,7 @@ class ResearchAgent:
     """
 
     def __init__(self,
+                 config: Config,
                  ai_model: Optional[str] = None,
                  embedder_model: Optional[str] = None,
                  collection_name: Optional[str] = None):
@@ -39,6 +40,7 @@ class ResearchAgent:
         Initialize the research agent with embedder, vector database, and AI model.
 
         Args:
+            config: Configuration object
             ai_model: Name of the AI model (defaults to config)
             embedder_model: Name of the sentence transformer model (defaults to config)
             collection_name: Name of the vector collection (defaults to config)
@@ -49,7 +51,7 @@ class ResearchAgent:
         embedder_model = embedder_model or self.config.get(
             'embedder.model_name', 'all-MiniLM-L6-v2')
         collection_name = collection_name or self.config.get(
-            'vector_database.collection_name', 'documents')
+            'vector_database.collection_name', 'chunks')
 
         # Initialize components
         self.embedder = Embedder(model_name=embedder_model)
@@ -91,7 +93,7 @@ class ResearchAgent:
             "in land development and site design. Your job is to extract and "
             "provide accurate, relevant information from the given context "
             "based on the user's prompt.\n\n"
-            "The context may include civil engineering documents, design standards, "
+            "The context may include civil engineering chunks, design standards, "
             "ordinances, grading plans, hydrology reports, or utility layout descriptions. "
             "You must:\n\n"
             "• Identify the most relevant parts of the context to answer the user's question.\n"
@@ -104,7 +106,7 @@ class ResearchAgent:
             "• Avoid generic responses—prioritize specificity based on context.\n"
             "• Always respond in a clear, concise, and technically accurate manner, as if advising "
             "a licensed civil engineer or reviewing engineer.\n"
-            "• Always include the headings of the document you are referencing."
+            "• Always include the headings of the chunk you are referencing."
         )
 
         return default_prompt
@@ -112,14 +114,16 @@ class ResearchAgent:
     def search(self,
                question: str,
                top_k: int = 5,
-               score_threshold: Optional[float] = None) -> List[Dict[str, Any]]:
+               score_threshold: Optional[float] = None,
+               metadata_filter: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
-        Search for relevant documents based on search term.
+        Search for relevant chunks based on search term.
 
         Args:
             question: The question or search text
             top_k: Number of top results to return
             score_threshold: Minimum similarity score threshold
+            metadata_filter: Optional dict to filter by metadata (e.g., {"filename": "doc.pdf"})
 
         Returns:
             List of search results with scores and metadata
@@ -131,7 +135,8 @@ class ResearchAgent:
         results = self.vector_db.search(
             query_embedding=query_embedding[0],
             top_k=top_k,
-            score_threshold=score_threshold
+            score_threshold=score_threshold,
+            metadata_filter=metadata_filter
         )
 
         return results
@@ -152,7 +157,7 @@ class ResearchAgent:
         if not context:
             return prompt
 
-        context_text = "\n\n--- RELEVANT DOCUMENTS ---\n"
+        context_text = "\n\n--- RELEVANT CHUNKS ---\n"
         for i, doc in enumerate(context, 1):
             content = doc.get('content', doc.get('text', ''))
             metadata = doc.get('metadata', {})
@@ -160,18 +165,21 @@ class ResearchAgent:
 
             context_text += f"\n[Headings: {' > '.join(headings)}]\n{content}\n"
 
-        context_text += "\n--- END DOCUMENTS ---\n\n"
+        context_text += "\n--- END CHUNKS ---\n\n"
 
-        return f"{context_text}\n Based on the above documents, please answer: {prompt}"
+        return f"{context_text}\n Based on the above chunks, please answer: {prompt}"
 
     def ask(self, user_prompt: str, use_context: bool = True,
-            max_tokens: Optional[int] = None) -> str:
+            max_tokens: Optional[int] = None,
+            metadata_filter: Optional[Dict[str, Any]] = None) -> str:
         """
         Ask a question using AI model with optional context from the knowledge base.
 
         Args:
-            prompt: The question to ask
-            use_context: Whether to include relevant documents as context
+            user_prompt: The question to ask
+            use_context: Whether to include relevant chunks as context
+            max_tokens: Maximum tokens for response
+            metadata_filter: Optional dict to filter context search (e.g., {"filename": "doc.pdf"})
 
         Returns:
             AI-generated response
@@ -187,7 +195,7 @@ class ResearchAgent:
 
         if use_context:
             # Get relevant context from vector search
-            context = self.search(context_search_prompt, top_k=20, score_threshold=0.5)
+            context = self.search(context_search_prompt, top_k=20, score_threshold=0.5, metadata_filter=metadata_filter)
             enhanced_prompt = self.build_context_prompt(user_prompt, context)
         else:
             enhanced_prompt = user_prompt

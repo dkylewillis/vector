@@ -14,7 +14,7 @@ def create_parser():
     # Global collection argument
     parser.add_argument(
         '--collection', '-c', type=str, default=None,
-        help='Specify collection name (default: regscout_documents)'
+        help='Specify collection name (default: regscout_chunks)'
     )
 
     # Add subcommands
@@ -57,15 +57,23 @@ def _add_search_parser(subparsers):
         default=5, 
         help='Number of results to return (default: 5)'
     )
+    parser.add_argument(
+        '--filename',
+        help='Filter results by specific filename'
+    )
 
 
 def _add_ask_parser(subparsers):
     """Add ask command parser."""
     parser = subparsers.add_parser(
         'ask', 
-        help='Ask AI a question with document context'
+        help='Ask AI a question with chunk context'
     )
     parser.add_argument('question', help='Question for AI')
+    parser.add_argument(
+        '--filename',
+        help='Filter context by specific filename'
+    )
     
     # Response length group - mutually exclusive
     length_group = parser.add_mutually_exclusive_group()
@@ -123,7 +131,7 @@ def _get_examples_text():
         "  %(prog)s -c drainage ask \"What are pipe requirements?\" # Ask using specific collection\n"
         "  %(prog)s info                                     # Show knowledge base status\n"
         "  %(prog)s --collection all info                   # Show info for all collections\n"
-        "  %(prog)s clear                                    # Clear all documents\n"
+        "  %(prog)s clear                                    # Clear all chunks\n"
         "  %(prog)s --collection temp clear                 # Clear specific collection\n"
         "\n"
         "The tool uses local file storage and works offline (except for AI features).\n"

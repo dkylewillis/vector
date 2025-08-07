@@ -8,25 +8,30 @@ from typing import Any, Dict, List
 
 from ..agents.research_agent import ResearchAgent
 from ..data_pipeline.file_processing import FileProcessor
+from config import Config
 
 
 class RegScoutCommands:
     """All RegScout CLI command implementations."""
     
-    def __init__(self):
+    def __init__(self, config: Config):
+        self.config = config
         self.research_agent = None
         self.vector_db = None
         self.embedder = None
         self.file_processor = None
 
-    def init_components(self, collection_name: str = "regscout_documents",
+    def init_components(self, collection_name: str = "regscout_chunks",
                         setup_collection: bool = True):
         """Initialize research agent and components."""
         if self.research_agent is not None:
             return
 
         print("🔧 Initializing RegScout...")
-        self.research_agent = ResearchAgent(collection_name=collection_name)
+        self.research_agent = ResearchAgent(
+            config=self.config,
+            collection_name=collection_name
+        )
         self.embedder = self.research_agent.embedder
         self.vector_db = self.research_agent.vector_db
 
@@ -47,7 +52,7 @@ class RegScoutCommands:
             print("✓ Ready (read-only mode)")
 
     def process(self, file_paths: List[str], force: bool = False, 
-                collection_name: str = "regscout_documents"):
+                collection_name: str = "regscout_chunks"):
         """Process files and add to knowledge base."""
         self.init_components(collection_name=collection_name, 
                            setup_collection=True)
@@ -69,13 +74,22 @@ class RegScoutCommands:
         self._process_and_add_files(files_to_process)
 
     def search(self, question: str, top_k: int = 5, 
-               collection_name: str = "regscout_documents"):
+               collection_name: str = "regscout_chunks",
+               filename: str = None):
         """Search the knowledge base."""
         self.init_components(collection_name=collection_name, 
                            setup_collection=False)
         
-        print(f"🔍 Searching: '{question}'")
-        results = self.research_agent.search(question, top_k=top_k)
+        # Build metadata filter
+        metadata_filter = {}
+        if filename:
+            metadata_filter["filename"] = filename
+        
+        filter_dict = metadata_filter if metadata_filter else None
+        
+        print(f"🔍 Searching: '{question}'" + 
+              (f" (filtered by {metadata_filter})" if filter_dict else ""))
+        results = self.research_agent.search(question, top_k=top_k, metadata_filter=filter_dict)
         
         if not results:
             print("❌ No results found")
@@ -84,8 +98,9 @@ class RegScoutCommands:
         self._display_search_results(results)
 
     def ask(self, question: str, response_length: str = "medium",
-            collection_name: str = "regscout_documents"):
-        """Ask AI with document context."""
+            collection_name: str = "regscout_chunks",
+            filename: str = None):
+        """Ask AI with chunk context."""
         self.init_components(collection_name=collection_name, 
                            setup_collection=False)
         
@@ -93,7 +108,15 @@ class RegScoutCommands:
             self._show_api_key_help()
             return
             
-        print(f"🤖 AI Question: '{question}'")
+        # Build metadata filter
+        metadata_filter = {}
+        if filename:
+            metadata_filter["filename"] = filename
+        
+        filter_dict = metadata_filter if metadata_filter else None
+        
+        print(f"🤖 AI Question: '{question}'" + 
+              (f" (context filtered by {metadata_filter})" if filter_dict else ""))
         
         # Get max_tokens from config
         response_lengths = self.research_agent.config.get(
@@ -106,7 +129,7 @@ class RegScoutCommands:
         try:
             print("🤔 Thinking...")
             response = self.research_agent.ask(
-                question, use_context=True, max_tokens=max_tokens)
+                question, use_context=True, max_tokens=max_tokens, metadata_filter=filter_dict)
             print(f"\n💡 AI Answer:\n{response}\n")
         except Exception as e:
             print(f"❌ AI service error: {e}")
@@ -114,7 +137,7 @@ class RegScoutCommands:
 
 
 
-    def info(self, collection_name: str = "regscout_documents"):
+    def info(self, collection_name: str = "regscout_chunks"):
         """Show knowledge base information."""
         if collection_name == "all":
             self._list_all_collections()
@@ -125,7 +148,7 @@ class RegScoutCommands:
         info = self.research_agent.get_knowledge_base_info()
         self._display_info(info)
 
-    def clear(self, collection_name: str = "regscout_documents"):
+    def clear(self, collection_name: str = "regscout_chunks"):
         """Clear knowledge base."""
         self.init_components(collection_name=collection_name, 
                            setup_collection=False)
@@ -139,10 +162,10 @@ class RegScoutCommands:
             print(f"📭 Collection '{collection_display}' is already empty")
             return
             
-        print(f"⚠️  This will delete {doc_count} document(s) from "
+        print(f"⚠️  This will delete {doc_count} chunk(s) from "
               f"collection '{collection_display}'")
         if input("Continue? (y/N): ").lower() == 'y':
-            self.vector_db.clear_documents()
+            self.vector_db.clear_chunks()
             print(f"✅ Collection '{collection_display}' cleared")
         else:
             print("❌ Operation cancelled")
@@ -218,7 +241,7 @@ class RegScoutCommands:
         """Process files and add to database."""
         print(f"📁 Processing {len(files)} new file(s)...")
         
-        documents = []
+        chunks = []
         metadata = []
 
         for path in files:
@@ -231,31 +254,51 @@ class RegScoutCommands:
                 if content:
                     if isinstance(content, list):
                         # Multiple chunks from DOCX
-                        documents.extend(content)
+                        chunks.extend(content)
                         metadata.extend(file_metadata)
                     else:
-                        # Single document
-                        documents.append(content)
+                        # Single chunk
+                        chunks.append(content)
                         metadata.append(file_metadata)
             except Exception as e:
                 print(f"    ❌ Error processing {path.name}: {e}")
 
-        if documents:
-            print(f"📚 Adding {len(documents)} documents to knowledge base...")
-            embeddings = self.embedder.embed_documents(documents)
-            doc_ids = self.vector_db.add_documents(
-                documents, embeddings, metadata)
-            print(f"✅ Successfully added {len(doc_ids)} document(s)")
+        if chunks:
+            print(f"📚 Adding {len(chunks)} chunks to knowledge base...")
+            embeddings = self.embedder.embed_chunks(chunks)
+            chunk_ids = self.vector_db.add_chunks(
+                chunks, embeddings, metadata)
+            print(f"✅ Successfully added {len(chunk_ids)} chunk(s)")
         else:
-            print("⚠️  No documents were processed")
+            print("⚠️  No chunks were processed")
             
     def _process_single_file(self, path: Path):
         """Process a single file and return content and metadata."""
         if path.suffix.lower() == '.pdf' and self.file_processor:
             try:
-                result = self.file_processor.process_pdf(path)
-                content = (result['content'] if isinstance(result, dict) 
-                          and 'content' in result else str(result))
+                chunks = self.file_processor.process_pdf(path)
+                if chunks and len(chunks) > 0:
+                    print(f"    ✓ Extracted {len(chunks)} chunks")
+                    documents = []
+                    metadatas = []
+                    
+                    for i, chunk in enumerate(chunks):
+                        chunk_text = self._extract_chunk_text(chunk)
+                        chunk_meta = self._extract_chunk_meta(chunk)
+                        
+                        documents.append(chunk_text)
+                        metadatas.append({
+                            'filename': path.name,
+                            'file_type': 'pdf',
+                            'source_path': str(path),
+                            'chunk_index': i,
+                            'total_chunks': len(chunks),
+                            'headings': chunk_meta.get('headings', []),
+                        })
+                    
+                    return documents, metadatas
+                else:
+                    content = f"PDF Document: {path.name}\n[No content extracted]"
             except Exception as e:
                 print(f"    ⚠️  PDF processing failed: {e}")
                 content = f"PDF Document: {path.name}\n[PDF processing failed: {e}]"

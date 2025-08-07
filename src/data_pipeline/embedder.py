@@ -36,17 +36,17 @@ class Embedder:
         embeddings = self.model.encode(text)
         return embeddings
 
-    def embed_documents(self, documents: List[str]) -> np.ndarray:
+    def embed_chunks(self, chunks: List[str]) -> np.ndarray:
         """
-        Generate embeddings for a list of documents.
+        Generate embeddings for a list of text chunks.
 
         Args:
-            documents: List of document texts to embed
+            chunks: List of chunk texts to embed
 
         Returns:
-            numpy array of shape (n_documents, embedding_dim)
+            numpy array of shape (n_chunks, embedding_dim)
         """
-        return self.embed_text(documents)
+        return self.embed_text(chunks)
 
     def get_embedding_dimension(self) -> int:
         """
