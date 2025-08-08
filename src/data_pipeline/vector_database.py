@@ -124,6 +124,10 @@ class VectorDatabase:
         if metadata is None:
             metadata = [{"text": text} for text in texts]
 
+        # Auto-create indexes for cloud mode
+        if self.storage_mode == "server" and metadata:
+            self._index_metadata(metadata[0])
+
         # Generate unique IDs for each chunk
         chunk_ids = [str(uuid.uuid4()) for _ in texts]
 
@@ -271,3 +275,24 @@ class VectorDatabase:
         except Exception as e:
             print(f"Error getting collection info: {e}")
             return {}
+
+    def _index_metadata(self, sample_metadata: Dict[str, Any]):
+        """Create indexes for metadata fields."""
+        try:
+            from qdrant_client.models import PayloadSchemaType
+            
+            for field_name in sample_metadata.keys():
+                if field_name == "text":
+                    continue  # Skip text field
+                
+                try:
+                    self.client.create_payload_index(
+                        collection_name=self.collection_name,
+                        field_name=field_name,
+                        field_schema=PayloadSchemaType.KEYWORD
+                    )
+                except Exception:
+                    pass  # Index already exists or failed - continue
+                    
+        except Exception:
+            pass  # Indexing failed - filtering won't work but that's ok
