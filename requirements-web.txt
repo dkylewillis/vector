@@ -1,0 +1,2 @@
+# Additional web dependencies
+gradio>=4.0.0
