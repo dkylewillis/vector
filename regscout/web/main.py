@@ -1,44 +1,35 @@
-"""
-Simple RegScout Web Interface using Gradio
-"""
+"""Web interface main entry point for RegScout."""
 
 import gradio as gr
 import sys
-from pathlib import Path
-import tempfile
 import io
-import os
+from pathlib import Path
 
-# Add src to path for imports
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-from src.cli.commands import RegScoutCommands
-from config import Config
-
-theme = gr.themes.Default().set(
-    checkbox_background_color='*checkbox_background_color_selected',
-    checkbox_background_color_dark='*checkbox_label_text_color',
-    checkbox_label_gap='*spacing_xxs',
-    checkbox_label_padding='*spacing_sm',
-    checkbox_label_text_size='*text_xxs'
-)
+from ..config import Config
+from ..cli.main import RegScoutCLI
 
 
-def create_regscout_app():
+def create_regscout_app() -> gr.Blocks:
     """Create the main Gradio application."""
     
-    # Initialize RegScout commands with config
+    # Initialize RegScout CLI
     config = Config()
-    regscout = RegScoutCommands(config)
+    regscout = RegScoutCLI(config)
     
-    # Load CSS from external file
-    def load_css():
-        css_path = Path(__file__).parent / "styles.css"
-        if css_path.exists():
-            return css_path.read_text(encoding='utf-8')
-        return ""
+    # Load CSS
+    css_path = Path(__file__).parent / "styles.css"
+    custom_css = ""
+    if css_path.exists():
+        custom_css = css_path.read_text(encoding='utf-8')
     
-    custom_css = load_css()
+    # Create Gradio theme
+    theme = gr.themes.Default().set(
+        checkbox_background_color='*checkbox_background_color_selected',
+        checkbox_background_color_dark='*checkbox_label_text_color',
+        checkbox_label_gap='*spacing_xxs',
+        checkbox_label_padding='*spacing_sm',
+        checkbox_label_text_size='*text_xxs'
+    )
     
     with gr.Blocks(title="RegScout - Document AI Assistant", theme=theme, css=custom_css) as app:
         
@@ -49,21 +40,29 @@ def create_regscout_app():
         </div>
         """)
         
-        # Collection selector (shared state)
+        # Collection selector
         def get_collections():
             """Get all available collections."""
             try:
-                # Create a temporary VectorDatabase instance to get collections
-                from src.data_pipeline.vector_database import VectorDatabase
-                temp_db = VectorDatabase()
-                collections = temp_db.get_all_collections()
-                return collections if collections else ["regscout_chunks"]
+                collections_result = regscout.execute_command('info', collection_name='all')
+                collections = []
+                if "Available Collections:" in collections_result:
+                    lines = collections_result.split('\n')
+                    for line in lines:
+                        if line.strip().startswith('•'):
+                            full_line = line.strip()[2:].strip()
+                            if '(' in full_line:
+                                collection_name = full_line.split('(')[0].strip()
+                            else:
+                                collection_name = full_line
+                            collections.append(collection_name)
+                return collections if collections else [config.default_collection]
             except Exception:
-                return ["regscout_chunks"]
+                return [config.default_collection]
         
         with gr.Row():
             available_collections = get_collections()
-            default_collection = available_collections[0] if available_collections else "regscout_chunks"
+            default_collection = available_collections[0] if available_collections else config.default_collection
             collection_dropdown = gr.Dropdown(
                 choices=available_collections,
                 value=default_collection,
@@ -76,19 +75,18 @@ def create_regscout_app():
         def get_metadata_options(collection):
             """Get available metadata options for filters."""
             try:
-                regscout.init_components(collection_name=collection, setup_collection=False)
-                summary = regscout.research_agent.vector_db.get_metadata_summary()
+                # Get raw metadata directly from agent instead of formatted CLI output
+                agent = regscout.get_agent(collection)
+                metadata_summary = agent.vector_db.get_metadata_summary()
                 
-                if "error" in summary:
-                    return [], [], []
-                
-                filenames = summary.get('filenames', [])
-                sources = summary.get('sources', [])
-                # Note: headings are extracted from 'headings' field in metadata
-                headings = summary.get('headings', [])
+                # Extract the raw lists directly
+                filenames = metadata_summary.get('filenames', [])
+                sources = metadata_summary.get('sources', [])
+                headings = metadata_summary.get('headings', [])
                 
                 return filenames, sources, headings
-            except Exception:
+            except Exception as e:
+                print(f"Error getting metadata options: {e}")
                 return [], [], []
 
         with gr.Tabs():
@@ -250,59 +248,35 @@ def create_regscout_app():
                 filters['source'] = [str(s) for s in selected_sources]
             
             if selected_headings:
-                # Convert to list of strings
-                filters['heading'] = [str(h) for h in selected_headings]
+                # Convert to list of strings - use 'headings' (plural) to match database field
+                filters['headings'] = [str(h) for h in selected_headings]
             
             return filters
-        
+
         def perform_search(query, top_k, collection, selected_filenames, selected_sources, selected_headings):
             try:
-                regscout.init_components(collection_name=collection, setup_collection=False)
-                
                 metadata_filter = build_metadata_filter(selected_filenames, selected_sources, selected_headings)
-                results = regscout.research_agent.search(
-                    query, 
+                
+                results = regscout.execute_command(
+                    'search',
+                    collection_name=collection,
+                    question=query,
                     top_k=int(top_k),
                     metadata_filter=metadata_filter
                 )
-                
-                if results:
-                    output = []
-                    for i, result in enumerate(results, 1):
-                        score = result['score']
-                        text = result['text'][:200] + "..." if len(result['text']) > 200 else result['text']
-                        metadata = result['metadata']
-                        filename = metadata.get('filename', 'Unknown')
-                        source = metadata.get('source', 'Unknown')
-                        heading = metadata.get('heading', 'None')
-                        
-                        output.append(f"📄 Result {i} (Score: {score:.3f})")
-                        output.append(f"📁 File: {filename}")
-                        output.append(f"📂 Source: {source}")
-                        output.append(f"📋 Heading: {heading}")
-                        output.append(f"📝 Content: {text}")
-                        output.append("-" * 50)
-                    
-                    return "\n".join(output)
-                else:
-                    return "No results found."
+                return results or "No results found."
             except Exception as e:
                 return f"Search error: {e}"
         
         def ask_ai(question, length, collection, selected_filenames, selected_sources, selected_headings):
-            print(f"DEBUG: ask_ai called with collection='{collection}'")  # Debug line
             try:
-                regscout.init_components(collection_name=collection, setup_collection=False)
-                
-                response_lengths = {"short": 200, "medium": 500, "long": 1000}
-                max_tokens = response_lengths.get(length, 500)
-                
                 metadata_filter = build_metadata_filter(selected_filenames, selected_sources, selected_headings)
                 
-                response = regscout.research_agent.ask(
-                    question,
-                    use_context=True,
-                    max_tokens=max_tokens,
+                response = regscout.execute_command(
+                    'ask',
+                    collection_name=collection,
+                    question=question,
+                    response_length=length,
                     metadata_filter=metadata_filter
                 )
                 
@@ -316,8 +290,8 @@ def create_regscout_app():
                     if 'source' in metadata_filter:
                         count = len(metadata_filter['source']) if isinstance(metadata_filter['source'], list) else 1
                         filter_parts.append(f"Sources: {count}")
-                    if 'heading' in metadata_filter:
-                        count = len(metadata_filter['heading']) if isinstance(metadata_filter['heading'], list) else 1
+                    if 'headings' in metadata_filter:
+                        count = len(metadata_filter['headings']) if isinstance(metadata_filter['headings'], list) else 1
                         filter_parts.append(f"Headings: {count}")
                     filter_info = f" [Filters: {', '.join(filter_parts)}]"
                 
@@ -330,9 +304,6 @@ def create_regscout_app():
                 return "No files selected."
             
             try:
-                regscout.init_components(collection_name=collection, setup_collection=True)
-                
-                # Convert source selection
                 source_value = None if source == "auto" else source
                 
                 # Capture output
@@ -340,10 +311,16 @@ def create_regscout_app():
                 sys.stdout = captured = io.StringIO()
                 
                 try:
-                    # Process each file
                     for file in files:
                         file_path = file.name
-                        regscout.process([file_path], force=force, collection_name=collection, source=source_value)
+                        result = regscout.execute_command(
+                            'process',
+                            collection_name=collection,
+                            files=[file_path],
+                            force=force,
+                            source=source_value
+                        )
+                        print(result)
                     
                     output = captured.getvalue()
                     return output or "✅ Processing completed successfully!"
@@ -355,51 +332,14 @@ def create_regscout_app():
                 return f"❌ Processing error: {e}"
         
         def get_info(collection):
-            print(f"DEBUG: get_info called with collection='{collection}'")  # Debug line
             try:
-                regscout.init_components(collection_name=collection, setup_collection=False)
-                info = regscout.research_agent.vector_db.get_collection_info()
-                
-                output = []
-                output.append(f"Collection: {collection}")
-                output.append(f"Points Count: {info.get('points_count', 'Unknown')}")
-                output.append(f"Storage Mode: {info.get('storage_mode', 'Unknown')}")
-                output.append(f"Vector Size: {info.get('vector_size', 'Unknown')}")
-                
-                return "\n".join(output)
+                return regscout.execute_command('info', collection_name=collection)
             except Exception as e:
                 return f"Error getting info: {e}"
         
         def get_metadata_summary(collection):
-            print(f"DEBUG: get_metadata_summary called with collection='{collection}'")  # Debug line
             try:
-                regscout.init_components(collection_name=collection, setup_collection=False)
-                summary = regscout.research_agent.vector_db.get_metadata_summary()
-                
-                if "error" in summary:
-                    return f"❌ {summary['error']}"
-                
-                output = []
-                output.append(f"📊 Collection: {collection}")
-                output.append(f"📈 Total chunks: {summary['total_chunks']}")
-                
-                output.append(f"\n📁 Files ({len(summary['filenames'])}):")
-                for filename in summary['filenames']:
-                    output.append(f"  • {filename}")
-                
-                output.append(f"\n📂 Sources ({len(summary['sources'])}):")
-                for source in summary['sources']:
-                    output.append(f"  • {source}")
-                
-                if summary['headings']:
-                    output.append(f"\n📋 Headings (showing first 10):")
-                    for heading in summary['headings'][:10]:
-                        output.append(f"  • {heading}")
-                    if len(summary['headings']) > 10:
-                        output.append(f"  ... and {len(summary['headings']) - 10} more")
-                
-                return "\n".join(output)
-                
+                return regscout.execute_command('metadata', collection_name=collection)
             except Exception as e:
                 return f"❌ Error: {e}"
         
@@ -413,11 +353,11 @@ def create_regscout_app():
                 gr.CheckboxGroup(choices=headings, value=[])
             )
         
-        # Connect events
         def refresh_collections():
             """Refresh the collections dropdown."""
             return gr.Dropdown(choices=get_collections())
         
+        # Connect events
         refresh_btn.click(
             fn=refresh_collections,
             outputs=collection_dropdown
@@ -468,7 +408,12 @@ def create_regscout_app():
     
     return app
 
-if __name__ == "__main__":
+
+def main():
+    """Main entry point for web interface."""
+    print("🚀 Starting RegScout Web Interface...")
+    print("📍 Navigate to: http://127.0.0.1:7860")
+    
     app = create_regscout_app()
     app.launch(
         server_name="127.0.0.1",

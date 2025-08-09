@@ -4,15 +4,15 @@ A powerful document processing and AI-powered analysis tool with both command-li
 
 ## Features
 
-- **Document Processing**: Supports PDF, DOCX, TXT, and Markdown files
+- **Document Processing**: Supports PDF, DOCX, TXT, and Markdown files with Docling converter
 - **Directory Processing**: Process entire directories recursively with duplicate detection
-- **Vector Search**: Fast semantic search using embeddings
-- **AI-Powered Q&A**: Get intelligent answers with document context
-- **Web Interface**: Modern web UI with Gradio for easy document interaction
+- **Vector Search**: Fast semantic search using cloud Qdrant vector database
+- **AI-Powered Q&A**: Get intelligent answers with document context using OpenAI GPT models
+- **Web Interface**: Modern web UI with Gradio and comprehensive metadata filtering
 - **Advanced Filtering**: Filter searches by filename, source, and document headings
 - **Multiple Collections**: Organize documents into separate collections
 - **Configurable Response Lengths**: Short, medium, or long AI responses
-- **Local Storage**: Works offline with local file-based vector database
+- **Cloud Storage**: Cloud-based vector database with local fallback support
 - **Professional Focus**: Specialized for civil engineering and regulatory documents
 
 ## Quick Start
@@ -22,18 +22,16 @@ A powerful document processing and AI-powered analysis tool with both command-li
 1. **Install dependencies:**
    ```cmd
    pip install -r requirements.txt
-   pip install -r requirements-web.txt
    ```
 
-2. **Set up OpenAI API key (for AI features):**
-   Create a `.env` file in the project root:
+2. **Set up OpenAI API key:**
    ```cmd
-   echo OPENAI_API_KEY=your_key_here > .env
+   set OPENAI_API_KEY=your_key_here
    ```
 
 3. **Launch the web interface:**
    ```cmd
-   python web_app.py
+   python regscout_web.py
    ```
    
    Navigate to: http://127.0.0.1:7860
@@ -45,11 +43,17 @@ A powerful document processing and AI-powered analysis tool with both command-li
    pip install -r requirements.txt
    ```
 
-2. **Set up OpenAI API key (for AI features):**
-   Create a `.env` file in the project root:
+2. **Set up OpenAI API key:**
    ```cmd
-   echo OPENAI_API_KEY=your_key_here > .env
+   set OPENAI_API_KEY=your_key_here
    ```
+
+3. **Run CLI commands:**
+   ```cmd
+   python -m regscout --help
+   ```
+
+**Note**: If you encounter permission errors when processing directories, try processing individual files or run the command as administrator.
 
 ## Usage
 
@@ -64,136 +68,141 @@ The web interface provides an intuitive way to interact with RegScout:
 - **Collection Management**: Switch between different document collections
 - **Real-time Processing**: Upload and process documents with progress tracking
 
-Launch with: `python web_app.py` and navigate to http://127.0.0.1:7860
+Launch with: `python regscout_web.py` and navigate to http://127.0.0.1:7860
 
 ### Command Line Interface
 
-**Main CLI:** Use `regscout.py`
+**Main CLI:** Use `python -m regscout`
 
 **Collection Management:**
 All commands support the `--collection` or `-c` flag to specify which collection to use.
 
 ```cmd
-# Process documents (supports PDF, DOCX, TXT, MD)
-python regscout.py process data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx
+# Process individual documents (supports PDF, DOCX, TXT, MD)
+python -m regscout process "data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
 
 # Process to specific collections
-python regscout.py --collection zoning process data\zoning\
-python regscout.py -c utilities process data\utilities\
+python -m regscout process "data\zoning\zoning_ordinance.docx" --collection zoning
+python -m regscout process "data\utilities\utility_standards.pdf" -c utilities
 
-# Process entire directories (skip duplicates automatically)
-python regscout.py process data\
-
-# Force reprocess files (including duplicates)
-python regscout.py process data\ --force
+# Process multiple files (use wildcards or specify each file)
+python -m regscout process "data\Coweta\ordinances\*.docx" -c coweta
 
 # Search documents using semantic search
-python regscout.py search "setback requirements"
-python regscout.py --collection zoning search "setback requirements"
-
-# Search with filename filtering
-python regscout.py search "parking" --filename "zoning_ordinance.pdf"
-python regscout.py -c fayette search "utilities" --filename "Chapter_28___UTILITIES.docx"
+python -m regscout search "setback requirements"
+python -m regscout search "setback requirements" --collection zoning
 
 # Ask AI questions with different response lengths
-python regscout.py ask "What are the parking regulations?"
-python regscout.py ask --short "What is a setback?"
-python regscout.py ask --long "Explain zoning regulations in detail"
-python regscout.py --collection drainage ask "What are pipe sizing requirements?"
-
-# Ask with context filtering
-python regscout.py ask "What are height limits?" --filename "zoning_ordinance.pdf"
+python -m regscout ask "What are the parking regulations?"
+python -m regscout ask "What is a setback?" --length short
+python -m regscout ask "Explain zoning regulations in detail" --length long
+python -m regscout ask "What are pipe sizing requirements?" --collection drainage
 
 # Show knowledge base status
-python regscout.py info
-python regscout.py --collection all info    # Show info for all collections
+python -m regscout info
+python -m regscout info --collection all    # Show info for all collections
+
+# Show metadata for collections
+python -m regscout metadata
+python -m regscout metadata --collection coweta
 
 # Clear knowledge base
-python regscout.py clear
-python regscout.py --collection temp clear  # Clear specific collection
+python -m regscout clear
+python -m regscout clear --collection temp  # Clear specific collection
 ```
+
+**Note**: If you encounter permission errors when processing directories, process individual files instead or run as administrator.
 
 ## Commands
 
 - **`--collection <name>`** - Global flag to specify collection (works with all commands)
 - **`process <files/dirs>`** - Add documents to knowledge base (supports directories)
-  - `--force` - Reprocess files even if already in knowledge base
 - **`search <query>`** - Search for relevant content using semantic similarity
-  - `--filename <name>` - Filter results by specific filename
 - **`ask <question>`** - Get AI-powered answers with document context
-  - `--short` - Brief answers (150 tokens)
-  - `--medium` - Balanced answers (500 tokens) [default]
-  - `--long` - Comprehensive answers (1500 tokens)
-  - `--filename <name>` - Filter context by specific filename
+  - `--length short|medium|long` - Response length (150/500/1500 tokens)
 - **`info`** - Show knowledge base information and statistics
   - Use `--collection all` to see all collections
+- **`metadata`** - Show document metadata and source information
 - **`clear`** - Clear all chunks from knowledge base
 
 ## Collection Examples by Use Case
 
 ```cmd
-# Separate by jurisdiction
-python regscout.py -c coweta process coweta_docs\
-python regscout.py -c fulton process fulton_docs\
+# Separate by jurisdiction (process individual files)
+python -m regscout process "coweta_docs\ordinance1.docx" -c coweta
+python -m regscout process "fulton_docs\zoning.pdf" -c fulton
 
 # Separate by topic
-python regscout.py -c zoning process zoning_ordinances\
-python regscout.py -c stormwater process drainage_manuals\
+python -m regscout process "zoning_ordinances\*.docx" -c zoning
+python -m regscout process "drainage_manuals\manual.pdf" -c stormwater
 
 # Separate by project
-python regscout.py -c project_alpha process project_alpha_docs\
-python regscout.py -c project_beta process project_beta_docs\
+python -m regscout process "project_alpha_docs\spec.pdf" -c project_alpha
+python -m regscout process "project_beta_docs\*.docx" -c project_beta
 
 # Query specific collections
-python regscout.py -c zoning search "setback requirements"
-python regscout.py -c utilities ask "What are easement requirements?"
+python -m regscout search "setback requirements" -c zoning
+python -m regscout ask "What are easement requirements?" -c utilities
 ```
 
 ## Configuration
 
-Edit `config/settings.yaml` to customize:
-- Embedding models
-- AI model settings
-- Vector database configuration
-- File processing options
+Edit `config.yaml` to customize:
+- Embedding models (sentence-transformers/all-MiniLM-L6-v2)
+- AI model settings (OpenAI GPT-4o-mini)
+- Vector database configuration (cloud Qdrant)
 - Response length presets
 
 ## Requirements
 
 - Python 3.8+
-- OpenAI API key (for AI features only)
+- OpenAI API key (for AI features)
 - Dependencies listed in `requirements.txt`
+- Cloud Qdrant database (with local fallback)
 
 ## Project Structure
 
 ```
 regscout/
-├── regscout.py          # Main CLI entry point
-├── web_app.py           # Web interface entry point
-├── config/
-│   └── settings.yaml    # Main configuration file
-├── src/
-│   ├── agents/          # AI research agents
-│   ├── ai_models/       # AI model implementations
-│   ├── data_pipeline/   # Document processing and embeddings
-│   └── web/             # Web interface components
-├── data/                # Document storage
-└── qdrant_db/          # Local vector database
+├── regscout_cli.py       # CLI entry point
+├── regscout_web.py       # Web interface entry point
+├── config.yaml           # Main configuration file
+├── regscout/             # Main package
+│   ├── __init__.py       # Package initialization
+│   ├── config.py         # Configuration management
+│   ├── exceptions.py     # Custom exceptions
+│   ├── interfaces.py     # Protocol definitions
+│   ├── cli/              # Command-line interface
+│   │   ├── main.py       # CLI coordinator
+│   │   └── parser.py     # Argument parsing
+│   ├── web/              # Web interface
+│   │   └── main.py       # Gradio web app
+│   ├── core/             # Core functionality
+│   │   ├── agent.py      # Research agent
+│   │   ├── database.py   # Vector database
+│   │   ├── embedder.py   # Text embeddings
+│   │   └── processor.py  # Document processing
+│   ├── ai/               # AI model implementations
+│   │   └── openai.py     # OpenAI integration
+│   └── utils/            # Utility functions
+│       └── formatting.py # Output formatting
+├── data/                 # Document storage
+└── qdrant_db/           # Local vector database (fallback)
 ```
 
 ## Key Features Explained
 
 ### Document Processing
-- Processes PDF, DOCX, TXT, and Markdown files
-- Automatic chunking for better search results
+- Processes PDF, DOCX, TXT, and Markdown files using Docling converter
+- Automatic hybrid chunking for better search results
 - Preserves document structure and headings
 - Duplicate detection prevents reprocessing
 
 ### Smart Search & Q&A
 - Semantic search finds relevant content even with different wording
-- Context-aware AI responses with source citations
-- Configurable response lengths for different use cases
-- Advanced metadata filtering (filename, source, headings)
+- Context-aware AI responses with source citations using OpenAI GPT models
+- Configurable response lengths for different use cases (short/medium/long)
+- Advanced metadata filtering in web interface
 - Professional civil engineering focus
 - Intelligent text chunking for optimal search results
 
@@ -205,4 +214,10 @@ regscout/
 - Scrollable filter lists for large document sets
 - Professional styling with Inter font
 
-The tool uses local file storage and works offline (except for AI features).
+### Cloud Infrastructure
+- Cloud Qdrant vector database for scalable storage
+- Local fallback support for offline usage
+- Environment-based configuration management
+- Modern Python packaging with proper imports
+
+The tool uses cloud vector database with local fallback and works with OpenAI for AI features.
