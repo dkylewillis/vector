@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Custom font application */
+.gradio-container {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+
+.gr-block label {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+
+.gr-button {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+
+.gr-textbox input, .gr-textbox textarea {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+
+.gr-markdown {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+
+/* Custom filter section styling - not controlled by themes */
+#filename_filters, #source_filters, #heading_filters {
+    max-height: 150px !important;
+    overflow-y: auto !important;
+    border: 1px solid var(--border-color-primary) !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    margin-top: 8px !important;
+}
+
+/* Custom scrollbar styling for filter boxes */
+#filename_filters::-webkit-scrollbar,
+#source_filters::-webkit-scrollbar,
+#heading_filters::-webkit-scrollbar {
+    width: 6px;
+}
+
+#filename_filters::-webkit-scrollbar-track,
+#source_filters::-webkit-scrollbar-track,
+#heading_filters::-webkit-scrollbar-track {
+    background: var(--background-fill-secondary);
+    border-radius: 3px;
+}
+
+#filename_filters::-webkit-scrollbar-thumb,
+#source_filters::-webkit-scrollbar-thumb,
+#heading_filters::-webkit-scrollbar-thumb {
+    background: var(--border-color-primary);
+    border-radius: 3px;
+}
+
+#filename_filters::-webkit-scrollbar-thumb:hover,
+#source_filters::-webkit-scrollbar-thumb:hover,
+#heading_filters::-webkit-scrollbar-thumb:hover {
+    background: var(--border-color-accent);
+}

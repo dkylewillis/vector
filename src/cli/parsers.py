@@ -24,6 +24,7 @@ def create_parser():
     _add_ask_parser(subparsers)
     _add_info_parser(subparsers)
     _add_clear_parser(subparsers)
+    _add_metadata_parser(subparsers)
 
     return parser
 
@@ -111,6 +112,15 @@ def _add_info_parser(subparsers):
 def _add_clear_parser(subparsers):
     """Add clear command parser."""
     subparsers.add_parser('clear', help='Clear the knowledge base')
+
+def _add_metadata_parser(subparsers):
+    """Add metadata command parser."""
+    parser = subparsers.add_parser('metadata', help='Show collection metadata summary')
+    parser.add_argument(
+        '-c', '--collection',
+        default='regscout_chunks',
+        help='Collection name (default: regscout_chunks)'
+    )
 
 
 def _get_examples_text():

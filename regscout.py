@@ -44,6 +44,8 @@ def main():
             commands.info(collection_name)
         elif args.command == 'clear':
             commands.clear(collection_name)
+        elif args.command == 'metadata':
+            commands.metadata_summary(collection_name)
 
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")

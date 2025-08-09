@@ -1,6 +1,6 @@
 # RegScout
 
-A command-line tool for processing regulatory documents and querying them with AI-powered search and analysis.
+A powerful document processing and AI-powered analysis tool with both command-line and web interfaces for regulatory and technical documents.
 
 ## Features
 
@@ -8,11 +8,37 @@ A command-line tool for processing regulatory documents and querying them with A
 - **Directory Processing**: Process entire directories recursively with duplicate detection
 - **Vector Search**: Fast semantic search using embeddings
 - **AI-Powered Q&A**: Get intelligent answers with document context
+- **Web Interface**: Modern web UI with Gradio for easy document interaction
+- **Advanced Filtering**: Filter searches by filename, source, and document headings
+- **Multiple Collections**: Organize documents into separate collections
 - **Configurable Response Lengths**: Short, medium, or long AI responses
 - **Local Storage**: Works offline with local file-based vector database
 - **Professional Focus**: Specialized for civil engineering and regulatory documents
 
 ## Quick Start
+
+### Web Interface (Recommended)
+
+1. **Install dependencies:**
+   ```cmd
+   pip install -r requirements.txt
+   pip install -r requirements-web.txt
+   ```
+
+2. **Set up OpenAI API key (for AI features):**
+   Create a `.env` file in the project root:
+   ```cmd
+   echo OPENAI_API_KEY=your_key_here > .env
+   ```
+
+3. **Launch the web interface:**
+   ```cmd
+   python web_app.py
+   ```
+   
+   Navigate to: http://127.0.0.1:7860
+
+### Command Line Interface
 
 1. **Install dependencies:**
    ```cmd
@@ -26,6 +52,21 @@ A command-line tool for processing regulatory documents and querying them with A
    ```
 
 ## Usage
+
+### Web Interface
+
+The web interface provides an intuitive way to interact with RegScout:
+
+- **Ask AI**: Get intelligent answers with customizable response lengths
+- **Search Documents**: Perform semantic search with result ranking
+- **Advanced Filters**: Filter by filename, source, and document headings
+- **Upload Documents**: Process new documents directly through the web UI
+- **Collection Management**: Switch between different document collections
+- **Real-time Processing**: Upload and process documents with progress tracking
+
+Launch with: `python web_app.py` and navigate to http://127.0.0.1:7860
+
+### Command Line Interface
 
 **Main CLI:** Use `regscout.py`
 
@@ -128,12 +169,14 @@ Edit `config/settings.yaml` to customize:
 ```
 regscout/
 ├── regscout.py          # Main CLI entry point
+├── web_app.py           # Web interface entry point
 ├── config/
 │   └── settings.yaml    # Main configuration file
 ├── src/
 │   ├── agents/          # AI research agents
 │   ├── ai_models/       # AI model implementations
-│   └── data_pipeline/   # Document processing and embeddings
+│   ├── data_pipeline/   # Document processing and embeddings
+│   └── web/             # Web interface components
 ├── data/                # Document storage
 └── qdrant_db/          # Local vector database
 ```
@@ -150,7 +193,16 @@ regscout/
 - Semantic search finds relevant content even with different wording
 - Context-aware AI responses with source citations
 - Configurable response lengths for different use cases
+- Advanced metadata filtering (filename, source, headings)
 - Professional civil engineering focus
 - Intelligent text chunking for optimal search results
+
+### Web Interface Features
+- Modern, responsive web UI built with Gradio
+- Real-time document upload and processing
+- Interactive filtering with multiple selection support
+- Collection management with visual feedback
+- Scrollable filter lists for large document sets
+- Professional styling with Inter font
 
 The tool uses local file storage and works offline (except for AI features).

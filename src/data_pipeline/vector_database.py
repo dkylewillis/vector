@@ -198,17 +198,43 @@ class VectorDatabase:
 
         # Add metadata filtering if provided
         if metadata_filter:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
             
             conditions = []
             for key, value in metadata_filter.items():
-                conditions.append(
-                    FieldCondition(
-                        key=key,
-                        match=MatchValue(value=value)
+                if isinstance(value, list) and len(value) > 1:
+                    # Multiple values - use MatchAny for OR logic within the same field
+                    # Ensure all values are simple types
+                    valid_values = [v for v in value if isinstance(v, (str, int, float, bool))]
+                    if valid_values:
+                        conditions.append(
+                            FieldCondition(
+                                key=key,
+                                match=MatchAny(any=valid_values)
+                            )
+                        )
+                elif isinstance(value, list) and len(value) == 1:
+                    # Single value in list
+                    if isinstance(value[0], (str, int, float, bool)):
+                        conditions.append(
+                            FieldCondition(
+                                key=key,
+                                match=MatchValue(value=value[0])
+                            )
+                        )
+                elif isinstance(value, (str, int, float, bool)):
+                    # Single value
+                    conditions.append(
+                        FieldCondition(
+                            key=key,
+                            match=MatchValue(value=value)
+                        )
                     )
-                )
-            search_params["query_filter"] = Filter(must=conditions)
+                else:
+                    print(f"⚠️  Skipping invalid filter value for {key}: {type(value)} - {value}")
+            
+            if conditions:  # Only add filter if we have valid conditions
+                search_params["query_filter"] = Filter(must=conditions)
 
         try:
             results = self.client.search(**search_params)
@@ -296,3 +322,63 @@ class VectorDatabase:
                     
         except Exception:
             pass  # Indexing failed - filtering won't work but that's ok
+
+    def get_metadata_summary(self) -> Dict[str, Any]:
+        """Get summary of all metadata in the collection."""
+        if not self.collection_exists():
+            return {"error": "Collection does not exist"}
+        
+        try:
+            # Get all points with metadata
+            result = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=10000,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            points = result[0]
+            
+            # Collect unique values
+            filenames = set()
+            sources = set()
+            file_types = set()
+            headings = set()
+            
+            for point in points:
+                payload = point.payload
+                
+                if 'filename' in payload:
+                    filenames.add(payload['filename'])
+                if 'source' in payload:
+                    sources.add(payload['source'])
+                if 'file_type' in payload:
+                    file_types.add(payload['file_type'])
+                if 'headings' in payload:
+                    heading_data = payload['headings']
+                    if isinstance(heading_data, list):
+                        for h in heading_data:
+                            if isinstance(h, str):
+                                headings.add(h)
+                            elif isinstance(h, dict) and 'text' in h:
+                                headings.add(h['text'])
+            
+            return {
+                "total_chunks": len(points),
+                "filenames": sorted(list(filenames)),
+                "sources": sorted(list(sources)),
+                "file_types": sorted(list(file_types)),
+                "headings": sorted(list(headings))
+            }
+            
+        except Exception as e:
+            return {"error": f"Failed to get metadata: {e}"}
+
+    def get_all_collections(self) -> List[str]:
+        """Get list of all collection names."""
+        try:
+            collections = self.client.get_collections().collections
+            return [col.name for col in collections]
+        except Exception as e:
+            print(f"Error getting collections: {e}")
+            return []

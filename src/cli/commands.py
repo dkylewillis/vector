@@ -24,10 +24,13 @@ class RegScoutCommands:
     def init_components(self, collection_name: str = "regscout_chunks",
                         setup_collection: bool = True):
         """Initialize research agent and components."""
-        if self.research_agent is not None:
-            return
+        # Check if we need to reinitialize with a different collection
+        if (self.research_agent is not None and 
+            hasattr(self.research_agent, 'collection_name') and
+            self.research_agent.collection_name == collection_name):
+            return  # Same collection, no need to reinitialize
 
-        print("🔧 Initializing RegScout...")
+        print(f"🔧 Initializing RegScout with collection '{collection_name}'...")
         self.research_agent = ResearchAgent(
             config=self.config,
             collection_name=collection_name
@@ -286,11 +289,16 @@ class RegScoutCommands:
                         chunk_text = self._extract_chunk_text(chunk)
                         chunk_meta = self._extract_chunk_meta(chunk)
                         
+                        # Extract source from path
+                        folder_name = path.parent.name
+                        source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+                        
                         documents.append(chunk_text)
                         metadatas.append({
                             'filename': path.name,
                             'file_type': 'pdf',
                             'source_path': str(path),
+                            'source': source,  # Add source field
                             'chunk_index': i,
                             'total_chunks': len(chunks),
                             'headings': chunk_meta.get('headings', []),
@@ -303,10 +311,15 @@ class RegScoutCommands:
                 print(f"    ⚠️  PDF processing failed: {e}")
                 content = f"PDF Document: {path.name}\n[PDF processing failed: {e}]"
             
+            # Extract source for fallback case
+            folder_name = path.parent.name
+            source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+            
             return content, {
                 'filename': path.name,
                 'file_type': 'pdf',
-                'source_path': str(path)
+                'source_path': str(path),
+                'source': source  # Add source field
             }
             
         elif path.suffix.lower() == '.docx' and self.file_processor:
@@ -321,11 +334,16 @@ class RegScoutCommands:
                         chunk_text = self._extract_chunk_text(chunk)
                         chunk_meta = self._extract_chunk_meta(chunk)
                         
+                        # Extract source from path
+                        folder_name = path.parent.name
+                        source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+                        
                         documents.append(chunk_text)
                         metadatas.append({
                             'filename': path.name,
                             'file_type': 'docx',
                             'source_path': str(path),
+                            'source': source,  # Add source field
                             'chunk_index': i,
                             'total_chunks': len(chunks),
                             'headings': chunk_meta.get('headings', []),
@@ -338,10 +356,15 @@ class RegScoutCommands:
                 print(f"    ⚠️  DOCX processing failed: {e}")
                 content = f"DOCX Document: {path.name}\n[DOCX processing failed: {e}]"
             
+            # Extract source for fallback case
+            folder_name = path.parent.name
+            source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+            
             return content, {
                 'filename': path.name,
                 'file_type': 'docx',
-                'source_path': str(path)
+                'source_path': str(path),
+                'source': source  # Add source field
             }
         else:
             # Text files or fallback
@@ -351,10 +374,15 @@ class RegScoutCommands:
             except Exception:
                 content = f"Document: {path.name}\n[Could not read file content]"
             
+            # Extract source from path
+            folder_name = path.parent.name
+            source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+            
             return content, {
                 'filename': path.name,
                 'file_type': path.suffix.lower().lstrip('.'),
-                'source_path': str(path)
+                'source_path': str(path),
+                'source': source  # Add source field
             }
     
     def _extract_chunk_text(self, chunk):
@@ -538,3 +566,31 @@ class RegScoutCommands:
                 print(f"  📁 {filename}: {text}")
         else:
             print("❌ No relevant documents found")
+
+    def metadata_summary(self, collection_name: str = "regscout_chunks"):
+        """Show metadata summary for a collection."""
+        self.init_components(collection_name=collection_name, setup_collection=False)
+        
+        print(f"📊 Getting metadata summary for '{collection_name}'...")
+        summary = self.research_agent.vector_db.get_metadata_summary()
+        
+        if "error" in summary:
+            print(f"❌ {summary['error']}")
+            return
+        
+        print(f"\n📈 Total chunks: {summary['total_chunks']}")
+        
+        print(f"\n📁 Files ({len(summary['filenames'])}):")
+        for filename in summary['filenames']:
+            print(f"  • {filename}")
+        
+        print(f"\n📂 Sources ({len(summary['sources'])}):")
+        for source in summary['sources']:
+            print(f"  • {source}")
+        
+        if summary['headings']:
+            print(f"\n📋 Headings (first 10):")
+            for heading in summary['headings'][:10]:
+                print(f"  • {heading}")
+            if len(summary['headings']) > 10:
+                print(f"  ... and {len(summary['headings']) - 10} more")

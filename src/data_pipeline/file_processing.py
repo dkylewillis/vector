@@ -55,15 +55,23 @@ class FileProcessor:
         for chunk in chunks:
             contextualized_text = self.chunker.contextualize(chunk=chunk)
             metadata = chunk.meta.export_json_dict()
-            folder = os.path.dirname(docx_path)
-            if folder not in ['ordinances', 'manuals', 'checklists']:
-                folder = 'other'
+            
+            # Fix: Extract just the folder name, not the full path
+            folder_path = os.path.dirname(docx_path)
+            folder_name = os.path.basename(folder_path) if folder_path else 'other'
+            
+            # Determine source category based on folder name
+            if folder_name in ['ordinances', 'manuals', 'checklists']:
+                source = folder_name
+            else:
+                source = 'other'
+                
             chunk_data = {
                 'text': contextualized_text,
                 'meta': {
                     "filename": metadata.get('origin', {}).get('filename', str(docx_path)),
                     "headings": metadata.get('headings', []),
-                    "source": folder
+                    "source": source
                 }}
             processed_chunks.append(chunk_data)
 
@@ -89,15 +97,23 @@ class FileProcessor:
         for chunk in chunks:
             contextualized_text = self.chunker.contextualize(chunk=chunk)
             metadata = chunk.meta.export_json_dict()
-            folder = os.path.dirname(pdf_path)
-            if folder not in ['ordinances', 'manuals', 'checklists']:
-                folder = 'other'
+            
+            # Fix: Extract just the folder name, not the full path
+            folder_path = os.path.dirname(pdf_path)
+            folder_name = os.path.basename(folder_path) if folder_path else 'other'
+            
+            # Determine source category based on folder name
+            if folder_name in ['ordinances', 'manuals', 'checklists']:
+                source = folder_name
+            else:
+                source = 'other'
+                
             chunk_data = {
                 'text': contextualized_text,
                 'meta': {
                     "filename": metadata.get('origin', {}).get('filename', str(pdf_path)),
                     "headings": metadata.get('headings', []),
-                    "source": folder
+                    "source": source
                 }}
             processed_chunks.append(chunk_data)
 
