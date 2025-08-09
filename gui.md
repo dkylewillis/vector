@@ -1,7 +1,0 @@
-# GUI 
-
-## Textbox
-
-## Filters
-
-## Output
