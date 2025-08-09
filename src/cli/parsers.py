@@ -46,6 +46,11 @@ def _add_process_parser(subparsers):
         action='store_true',
         help='Force reprocessing of files even if already in knowledge base'
     )
+    parser.add_argument(
+        '--source', 
+        choices=['ordinances', 'manuals', 'checklists', 'other'],
+        help='Override source category (default: auto-detect from folder name)'
+    )
 
 
 def _add_search_parser(subparsers):
@@ -130,6 +135,7 @@ def _get_examples_text():
         "  %(prog)s process ordinance.pdf rules.txt          # Process specific files\n"
         "  %(prog)s --collection zoning process data/        # Process to specific collection\n"
         "  %(prog)s -c utilities process utilities/          # Process to utilities collection\n"
+        "  %(prog)s process data/ --source ordinances        # Process with specific source category\n"
         "  %(prog)s process data/                             # Process all files in directory\n"
         "  %(prog)s process data/ --force                     # Process directory, include processed files\n"
         "  %(prog)s process data/ more_docs/                  # Process multiple directories\n"

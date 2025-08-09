@@ -35,7 +35,7 @@ def main():
     try:
         # Route to appropriate command
         if args.command == 'process':
-            commands.process(args.files, args.force, collection_name)
+            commands.process(args.files, args.force, collection_name, args.source)
         elif args.command == 'search':
             commands.search(args.question, args.top_k, collection_name, args.filename)
         elif args.command == 'ask':

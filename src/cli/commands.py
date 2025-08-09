@@ -55,7 +55,7 @@ class RegScoutCommands:
             print("✓ Ready (read-only mode)")
 
     def process(self, file_paths: List[str], force: bool = False, 
-                collection_name: str = "regscout_chunks"):
+                collection_name: str = "regscout_chunks", source: str = None):
         """Process files and add to knowledge base."""
         self.init_components(collection_name=collection_name, 
                            setup_collection=True)
@@ -74,7 +74,7 @@ class RegScoutCommands:
             return
             
         # Process and add files
-        self._process_and_add_files(files_to_process)
+        self._process_and_add_files(files_to_process, source)
 
     def search(self, question: str, top_k: int = 5, 
                collection_name: str = "regscout_chunks",
@@ -240,9 +240,11 @@ class RegScoutCommands:
         except Exception:
             return False
         
-    def _process_and_add_files(self, files: List[Path]):
+    def _process_and_add_files(self, files: List[Path], source: str = None):
         """Process files and add to database."""
         print(f"📁 Processing {len(files)} new file(s)...")
+        if source:
+            print(f"🏷️  Using source category: {source}")
         
         chunks = []
         metadata = []
@@ -253,7 +255,7 @@ class RegScoutCommands:
             print(f"  📄 {rel_path}")
 
             try:
-                content, file_metadata = self._process_single_file(path)
+                content, file_metadata = self._process_single_file(path, source)
                 if content:
                     if isinstance(content, list):
                         # Multiple chunks from DOCX
@@ -275,11 +277,11 @@ class RegScoutCommands:
         else:
             print("⚠️  No chunks were processed")
             
-    def _process_single_file(self, path: Path):
+    def _process_single_file(self, path: Path, source: str = None):
         """Process a single file and return content and metadata."""
         if path.suffix.lower() == '.pdf' and self.file_processor:
             try:
-                chunks = self.file_processor.process_pdf(path)
+                chunks = self.file_processor.process_pdf(path, source)
                 if chunks and len(chunks) > 0:
                     print(f"    ✓ Extracted {len(chunks)} chunks")
                     documents = []
@@ -289,16 +291,15 @@ class RegScoutCommands:
                         chunk_text = self._extract_chunk_text(chunk)
                         chunk_meta = self._extract_chunk_meta(chunk)
                         
-                        # Extract source from path
-                        folder_name = path.parent.name
-                        source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+                        # Use source from file processor (which handles the logic)
+                        processed_source = chunk_meta.get('source', 'other')
                         
                         documents.append(chunk_text)
                         metadatas.append({
                             'filename': path.name,
                             'file_type': 'pdf',
                             'source_path': str(path),
-                            'source': source,  # Add source field
+                            'source': processed_source,
                             'chunk_index': i,
                             'total_chunks': len(chunks),
                             'headings': chunk_meta.get('headings', []),
@@ -312,19 +313,22 @@ class RegScoutCommands:
                 content = f"PDF Document: {path.name}\n[PDF processing failed: {e}]"
             
             # Extract source for fallback case
-            folder_name = path.parent.name
-            source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+            if source:
+                fallback_source = source
+            else:
+                folder_name = path.parent.name
+                fallback_source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
             
             return content, {
                 'filename': path.name,
                 'file_type': 'pdf',
                 'source_path': str(path),
-                'source': source  # Add source field
+                'source': fallback_source,
             }
             
         elif path.suffix.lower() == '.docx' and self.file_processor:
             try:
-                chunks = self.file_processor.process_docx(path)
+                chunks = self.file_processor.process_docx(path, source)
                 if chunks and len(chunks) > 0:
                     print(f"    ✓ Extracted {len(chunks)} chunks")
                     documents = []
@@ -334,16 +338,15 @@ class RegScoutCommands:
                         chunk_text = self._extract_chunk_text(chunk)
                         chunk_meta = self._extract_chunk_meta(chunk)
                         
-                        # Extract source from path
-                        folder_name = path.parent.name
-                        source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+                        # Use source from file processor (which handles the logic)
+                        processed_source = chunk_meta.get('source', 'other')
                         
                         documents.append(chunk_text)
                         metadatas.append({
                             'filename': path.name,
                             'file_type': 'docx',
                             'source_path': str(path),
-                            'source': source,  # Add source field
+                            'source': processed_source,
                             'chunk_index': i,
                             'total_chunks': len(chunks),
                             'headings': chunk_meta.get('headings', []),
@@ -357,14 +360,17 @@ class RegScoutCommands:
                 content = f"DOCX Document: {path.name}\n[DOCX processing failed: {e}]"
             
             # Extract source for fallback case
-            folder_name = path.parent.name
-            source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+            if source:
+                fallback_source = source
+            else:
+                folder_name = path.parent.name
+                fallback_source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
             
             return content, {
                 'filename': path.name,
                 'file_type': 'docx',
                 'source_path': str(path),
-                'source': source  # Add source field
+                'source': fallback_source,
             }
         else:
             # Text files or fallback
@@ -374,15 +380,18 @@ class RegScoutCommands:
             except Exception:
                 content = f"Document: {path.name}\n[Could not read file content]"
             
-            # Extract source from path
-            folder_name = path.parent.name
-            source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
+            # Extract source for fallback case
+            if source:
+                fallback_source = source
+            else:
+                folder_name = path.parent.name
+                fallback_source = folder_name if folder_name in ['ordinances', 'manuals', 'checklists'] else 'other'
             
             return content, {
                 'filename': path.name,
                 'file_type': path.suffix.lower().lstrip('.'),
                 'source_path': str(path),
-                'source': source  # Add source field
+                'source': fallback_source,
             }
     
     def _extract_chunk_text(self, chunk):

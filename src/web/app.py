@@ -190,10 +190,20 @@ def create_regscout_app():
                 )
                 
                 with gr.Row():
+                    source_dropdown = gr.Dropdown(
+                        choices=["auto", "ordinances", "manuals", "checklists", "other"],
+                        value="auto",
+                        label="Source Category",
+                        info="Choose source or 'auto' to detect from folder name",
+                        scale=2
+                    )
                     force_reprocess = gr.Checkbox(
                         label="Force Reprocess",
-                        value=False
+                        value=False,
+                        scale=1
                     )
+                
+                with gr.Row():
                     process_btn = gr.Button("📚 Process Documents", variant="primary")
                 
                 processing_output = gr.Textbox(
@@ -315,12 +325,15 @@ def create_regscout_app():
             except Exception as e:
                 return f"AI error: {e}"
         
-        def process_files(files, collection, force):
+        def process_files(files, collection, source, force):
             if not files:
                 return "No files selected."
             
             try:
                 regscout.init_components(collection_name=collection, setup_collection=True)
+                
+                # Convert source selection
+                source_value = None if source == "auto" else source
                 
                 # Capture output
                 old_stdout = sys.stdout
@@ -330,7 +343,7 @@ def create_regscout_app():
                     # Process each file
                     for file in files:
                         file_path = file.name
-                        regscout.process([file_path], force=force, collection_name=collection)
+                        regscout.process([file_path], force=force, collection_name=collection, source=source_value)
                     
                     output = captured.getvalue()
                     return output or "✅ Processing completed successfully!"
@@ -437,7 +450,7 @@ def create_regscout_app():
         
         process_btn.click(
             fn=process_files,
-            inputs=[file_upload, collection_dropdown, force_reprocess],
+            inputs=[file_upload, collection_dropdown, source_dropdown, force_reprocess],
             outputs=processing_output
         )
         

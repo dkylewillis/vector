@@ -35,7 +35,7 @@ class FileProcessor:
 
         self.converter = DocumentConverter()
 
-    def process_docx(self, docx_path) -> list[dict[str, Any]]:
+    def process_docx(self, docx_path, source=None) -> list[dict[str, Any]]:
         """Process a single DOCX with Docling and return contextualized chunks."""
         print(f"Processing: {docx_path}")
 
@@ -56,28 +56,30 @@ class FileProcessor:
             contextualized_text = self.chunker.contextualize(chunk=chunk)
             metadata = chunk.meta.export_json_dict()
             
-            # Fix: Extract just the folder name, not the full path
+            # Extract just the folder name, not the full path
             folder_path = os.path.dirname(docx_path)
             folder_name = os.path.basename(folder_path) if folder_path else 'other'
             
-            # Determine source category based on folder name
-            if folder_name in ['ordinances', 'manuals', 'checklists']:
-                source = folder_name
+            # Determine source category based on folder name, unless source is provided
+            if source is not None:
+                source_val = source
+            elif folder_name in ['ordinances', 'manuals', 'checklists']:
+                source_val = folder_name
             else:
-                source = 'other'
+                source_val = 'other'
                 
             chunk_data = {
                 'text': contextualized_text,
                 'meta': {
                     "filename": metadata.get('origin', {}).get('filename', str(docx_path)),
                     "headings": metadata.get('headings', []),
-                    "source": source
+                    "source": source_val
                 }}
             processed_chunks.append(chunk_data)
 
         return processed_chunks
-    
-    def process_pdf(self, pdf_path) -> list[dict[str, Any]]:
+
+    def process_pdf(self, pdf_path, source=None) -> list[dict[str, Any]]:
         """Process a single PDF with Docling and return contextualized chunks."""
         print(f"Processing: {pdf_path}")
 
@@ -103,17 +105,19 @@ class FileProcessor:
             folder_name = os.path.basename(folder_path) if folder_path else 'other'
             
             # Determine source category based on folder name
-            if folder_name in ['ordinances', 'manuals', 'checklists']:
-                source = folder_name
+            if source is not None:
+                source_val = source
+            elif folder_name in ['ordinances', 'manuals', 'checklists']:
+                source_val = folder_name
             else:
-                source = 'other'
-                
+                source_val = 'other'
+
             chunk_data = {
                 'text': contextualized_text,
                 'meta': {
                     "filename": metadata.get('origin', {}).get('filename', str(pdf_path)),
                     "headings": metadata.get('headings', []),
-                    "source": source
+                    "source": source_val
                 }}
             processed_chunks.append(chunk_data)
 
