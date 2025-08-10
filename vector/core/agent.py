@@ -1,10 +1,10 @@
-"""Simplified Research Agent for RegScout."""
+"""Simplified Research Agent for Vector."""
 
 import warnings
 from typing import List, Dict, Any, Optional
 
 from ..config import Config
-from ..exceptions import RegScoutError, AIServiceError, DatabaseError
+from ..exceptions import VectorError, AIServiceError, DatabaseError
 from ..interfaces import SearchResult
 from .embedder import Embedder
 from .database import VectorDatabase
@@ -60,7 +60,7 @@ class ResearchAgent:
         """
         try:
             if not query.strip():
-                raise RegScoutError("Search query cannot be empty")
+                raise VectorError("Search query cannot be empty")
             
             # Embed the query
             query_vector = self.embedder.embed_text(query)
@@ -72,7 +72,7 @@ class ResearchAgent:
             return self.formatter.format_search_results(results)
             
         except Exception as e:
-            raise RegScoutError(f"Search failed: {e}")
+            raise VectorError(f"Search failed: {e}")
 
     def ask(self, question: str, response_length: str = 'medium', 
             metadata_filter: Optional[Dict] = None) -> str:
@@ -88,7 +88,7 @@ class ResearchAgent:
         """
         try:
             if not question.strip():
-                raise RegScoutError("Question cannot be empty")
+                raise VectorError("Question cannot be empty")
             
             # First search for relevant context
 
@@ -129,7 +129,7 @@ class ResearchAgent:
         except AIServiceError:
             raise  # Re-raise AI service errors
         except Exception as e:
-            raise RegScoutError(f"AI query failed: {e}")
+            raise VectorError(f"AI query failed: {e}")
 
     def process_files(self, files: List[str], force: bool = False, 
                      source: Optional[str] = None) -> str:
@@ -180,7 +180,7 @@ class ResearchAgent:
             return f"✅ Processed {total_processed} chunks from {processed_paths} path(s)"
             
         except Exception as e:
-            raise RegScoutError(f"File processing failed: {e}")
+            raise VectorError(f"File processing failed: {e}")
 
     def get_info(self) -> str:
         """Get collection information."""
@@ -188,7 +188,7 @@ class ResearchAgent:
             info = self.vector_db.get_collection_info()
             return self.formatter.format_info(info)
         except Exception as e:
-            raise RegScoutError(f"Failed to get collection info: {e}")
+            raise VectorError(f"Failed to get collection info: {e}")
 
     def get_metadata_summary(self) -> str:
         """Get metadata summary."""
@@ -196,7 +196,7 @@ class ResearchAgent:
             summary = self.vector_db.get_metadata_summary()
             return self.formatter.format_metadata_summary(summary)
         except Exception as e:
-            raise RegScoutError(f"Failed to get metadata summary: {e}")
+            raise VectorError(f"Failed to get metadata summary: {e}")
 
     def clear_collection(self) -> str:
         """Clear the collection."""
@@ -204,7 +204,7 @@ class ResearchAgent:
             self.vector_db.clear_collection()
             return f"✅ Collection '{self.collection_name}' cleared successfully"
         except Exception as e:
-            raise RegScoutError(f"Failed to clear collection: {e}")
+            raise VectorError(f"Failed to clear collection: {e}")
 
     def _build_context(self, search_results: List[SearchResult]) -> str:
         """Build context string from search results."""

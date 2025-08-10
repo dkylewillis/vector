@@ -1,4 +1,4 @@
-# RegScout
+# Vector
 
 A powerful document processing and AI-powered analysis tool with both command-line and web interfaces for regulatory and technical documents.
 
@@ -31,7 +31,7 @@ A powerful document processing and AI-powered analysis tool with both command-li
 
 3. **Launch the web interface:**
    ```cmd
-   python regscout_web.py
+   python vector_web.py
    ```
    
    Navigate to: http://127.0.0.1:7860
@@ -50,7 +50,7 @@ A powerful document processing and AI-powered analysis tool with both command-li
 
 3. **Run CLI commands:**
    ```cmd
-   python -m regscout --help
+   python -m vector --help
    ```
 
 **Note**: If you encounter permission errors when processing directories, try processing individual files or run the command as administrator.
@@ -59,7 +59,7 @@ A powerful document processing and AI-powered analysis tool with both command-li
 
 ### Web Interface
 
-The web interface provides an intuitive way to interact with RegScout:
+The web interface provides an intuitive way to interact with Vector:
 
 - **Ask AI**: Get intelligent answers with customizable response lengths
 - **Search Documents**: Perform semantic search with result ranking
@@ -68,46 +68,46 @@ The web interface provides an intuitive way to interact with RegScout:
 - **Collection Management**: Switch between different document collections
 - **Real-time Processing**: Upload and process documents with progress tracking
 
-Launch with: `python regscout_web.py` and navigate to http://127.0.0.1:7860
+Launch with: `python vector_web.py` and navigate to http://127.0.0.1:7860
 
 ### Command Line Interface
 
-**Main CLI:** Use `python -m regscout`
+**Main CLI:** Use `python -m vector`
 
 **Collection Management:**
 All commands support the `--collection` or `-c` flag to specify which collection to use.
 
 ```cmd
 # Process individual documents (supports PDF, DOCX, TXT, MD)
-python -m regscout process "data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
+python -m vector process "data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
 
 # Process to specific collections
-python -m regscout process "data\zoning\zoning_ordinance.docx" --collection zoning
-python -m regscout process "data\utilities\utility_standards.pdf" -c utilities
+python -m vector process "data\zoning\zoning_ordinance.docx" --collection zoning
+python -m vector process "data\utilities\utility_standards.pdf" -c utilities
 
 # Process multiple files (use wildcards or specify each file)
-python -m regscout process "data\Coweta\ordinances\*.docx" -c coweta
+python -m vector process "data\Coweta\ordinances\*.docx" -c coweta
 
 # Search documents using semantic search
-python -m regscout search "setback requirements"
-python -m regscout search "setback requirements" --collection zoning
+python -m vector search "setback requirements"
+python -m vector search "setback requirements" --collection zoning
 
 # Ask AI questions with different response lengths
-python -m regscout ask "What are the parking regulations?"
-python -m regscout ask "What is a setback?" --length short
-python -m regscout ask "Explain zoning regulations in detail" --length long
-python -m regscout ask "What are pipe sizing requirements?" --collection drainage
+python -m vector ask "What are the parking regulations?"
+python -m vector ask "What is a setback?" --length short
+python -m vector ask "Explain zoning regulations in detail" --length long
+python -m vector ask "What are pipe sizing requirements?" --collection drainage
 
 # Show knowledge base status
-python -m regscout info
-python -m regscout info --collection all    # Show info for all collections
+python -m vector info
+python -m vector info --collection all    # Show info for all collections
 
 # Show metadata for collections
-python -m regscout metadata
-python -m regscout metadata --collection coweta
+python -m vector metadata
+python -m vector metadata --collection coweta
 
 # Clear knowledge base
-python -m regscout clear
+python -m vector clear
 python -m regscout clear --collection temp  # Clear specific collection
 ```
 

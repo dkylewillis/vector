@@ -1,4 +1,4 @@
-"""Web interface main entry point for RegScout."""
+"""Web interface main entry point for Vector."""
 
 import gradio as gr
 import sys
@@ -6,15 +6,15 @@ import io
 from pathlib import Path
 
 from ..config import Config
-from ..cli.main import RegScoutCLI
+from ..cli.main import VectorCLI
 
 
-def create_regscout_app() -> gr.Blocks:
+def create_vector_app() -> gr.Blocks:
     """Create the main Gradio application."""
     
-    # Initialize RegScout CLI
+    # Initialize Vector CLI
     config = Config()
-    regscout = RegScoutCLI(config)
+    vector = VectorCLI(config)
     
     # Load CSS
     css_path = Path(__file__).parent / "styles.css"
@@ -31,11 +31,11 @@ def create_regscout_app() -> gr.Blocks:
         checkbox_label_text_size='*text_xxs'
     )
     
-    with gr.Blocks(title="RegScout - Document AI Assistant", theme=theme, css=custom_css) as app:
+    with gr.Blocks(title="Vector - Document AI Assistant", theme=theme, css=custom_css) as app:
         
         gr.HTML("""
         <div style="text-align: center; padding: 20px;">
-            <h1>🔍 RegScout</h1>
+            <h1>🔍 Vector</h1>
             <p>AI-Powered Document Processing & Search</p>
         </div>
         """)
@@ -44,7 +44,7 @@ def create_regscout_app() -> gr.Blocks:
         def get_collections():
             """Get all available collections."""
             try:
-                collections_result = regscout.execute_command('info', collection_name='all')
+                collections_result = vector.execute_command('info', collection_name='all')
                 collections = []
                 if "Available Collections:" in collections_result:
                     lines = collections_result.split('\n')
@@ -76,7 +76,7 @@ def create_regscout_app() -> gr.Blocks:
             """Get available metadata options for filters."""
             try:
                 # Get raw metadata directly from agent instead of formatted CLI output
-                agent = regscout.get_agent(collection)
+                agent = vector.get_agent(collection)
                 metadata_summary = agent.vector_db.get_metadata_summary()
                 
                 # Extract the raw lists directly
@@ -283,7 +283,7 @@ def create_regscout_app() -> gr.Blocks:
             try:
                 metadata_filter = build_metadata_filter(selected_filenames, selected_sources, selected_headings)
                 
-                results = regscout.execute_command(
+                results = vector.execute_command(
                     'search',
                     collection_name=collection,
                     question=query,
@@ -298,7 +298,7 @@ def create_regscout_app() -> gr.Blocks:
             try:
                 metadata_filter = build_metadata_filter(selected_filenames, selected_sources, selected_headings)
                 
-                response = regscout.execute_command(
+                response = vector.execute_command(
                     'ask',
                     collection_name=collection,
                     question=question,
@@ -354,7 +354,7 @@ def create_regscout_app() -> gr.Blocks:
                     
                     for file in files:
                         file_path = file.name
-                        result = regscout.execute_command(
+                        result = vector.execute_command(
                             'process',
                             collection_name=collection_name,
                             files=[file_path],
@@ -381,13 +381,13 @@ def create_regscout_app() -> gr.Blocks:
         
         def get_info(collection):
             try:
-                return regscout.execute_command('info', collection_name=collection)
+                return vector.execute_command('info', collection_name=collection)
             except Exception as e:
                 return f"Error getting info: {e}"
         
         def get_metadata_summary(collection):
             try:
-                return regscout.execute_command('metadata', collection_name=collection)
+                return vector.execute_command('metadata', collection_name=collection)
             except Exception as e:
                 return f"❌ Error: {e}"
         
@@ -479,10 +479,10 @@ def create_regscout_app() -> gr.Blocks:
 
 def main():
     """Main entry point for web interface."""
-    print("🚀 Starting RegScout Web Interface...")
+    print("🚀 Starting Vector Web Interface...")
     print("📍 Navigate to: http://127.0.0.1:7860")
     
-    app = create_regscout_app()
+    app = create_vector_app()
     app.launch(
         server_name="127.0.0.1",
         server_port=7860,

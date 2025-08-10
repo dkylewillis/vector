@@ -1,4 +1,4 @@
-"""File utilities for RegScout."""
+"""File utilities for Vector."""
 
 import os
 from pathlib import Path

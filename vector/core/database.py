@@ -1,4 +1,4 @@
-"""Simplified vector database for RegScout."""
+"""Simplified vector database for Vector."""
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (Distance, VectorParams, PointStruct, Filter, 

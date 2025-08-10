@@ -1,18 +1,18 @@
-"""Main CLI entry point for RegScout."""
+"""Main CLI entry point for Vector."""
 
 import argparse
 import sys
 from typing import Optional
 
 from ..config import Config
-from ..exceptions import RegScoutError, ValidationError, AIServiceError
+from ..exceptions import VectorError, ValidationError, AIServiceError
 from .parser import create_parser
 from ..core.agent import ResearchAgent
 from ..utils.formatting import CLIFormatter
 
 
-class RegScoutCLI:
-    """Main CLI coordinator for RegScout."""
+class VectorCLI:
+    """Main CLI coordinator for Vector."""
     
     def __init__(self, config: Optional[Config] = None):
         """Initialize CLI with configuration."""
@@ -66,7 +66,7 @@ class RegScoutCLI:
             return self._show_api_key_help()
         except ValidationError as e:
             return f"❌ {e}"
-        except RegScoutError as e:
+        except VectorError as e:
             return f"❌ {e}"
         except Exception as e:
             return f"❌ Unexpected error: {e}"
@@ -104,7 +104,7 @@ def main() -> int:
 
         # Initialize CLI
         config = Config()
-        cli = RegScoutCLI(config)
+        cli = VectorCLI(config)
 
         # Execute command
         args_dict = vars(args)

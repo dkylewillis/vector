@@ -1,4 +1,4 @@
-"""Core interfaces and base classes for RegScout."""
+"""Core interfaces and base classes for Vector."""
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Protocol

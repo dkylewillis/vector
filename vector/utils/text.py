@@ -1,4 +1,4 @@
-"""Text processing utilities for RegScout."""
+"""Text processing utilities for Vector."""
 
 import re
 from typing import List, Optional

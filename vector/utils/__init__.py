@@ -1,4 +1,4 @@
-"""Utility modules for RegScout."""
+"""Utility modules for Vector."""
 
 from .formatting import CLIFormatter
 from .files import find_files, ensure_directory, get_file_size, is_file_readable

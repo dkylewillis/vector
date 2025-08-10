@@ -1,4 +1,4 @@
-"""Formatting utilities for RegScout."""
+"""Formatting utilities for Vector."""
 
 from typing import List, Dict, Any
 

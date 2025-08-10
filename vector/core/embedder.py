@@ -1,4 +1,4 @@
-"""Simplified text embedder for RegScout."""
+"""Simplified text embedder for Vector."""
 
 from sentence_transformers import SentenceTransformer
 import numpy as np

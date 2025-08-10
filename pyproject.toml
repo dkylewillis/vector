@@ -3,25 +3,24 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "regscout"
+name = "vector"
 version = "2.0.0"
-description = "AI-Powered Document Processing & Search for Municipal Documents"
+description = "AI-Powered Document Processing & Search"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "RegScout Team"}
+    {name = "Vector Team"}
 ]
-keywords = ["ai", "documents", "search", "municipal", "regulations", "ordinances"]
+keywords = ["ai", "documents", "search", "vector", "embeddings"]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Intended Audience :: Government",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Office/Business :: Government",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.9"
@@ -49,16 +48,16 @@ dev = [
 ]
 
 [project.scripts]
-regscout = "regscout.cli.main:main"
-regscout-web = "regscout.web.main:main"
+vector = "vector.cli.main:main"
+vector-web = "vector.web.main:main"
 
 [project.urls]
-Homepage = "https://github.com/dkylewillis/regscout"
-Repository = "https://github.com/dkylewillis/regscout.git"
-Issues = "https://github.com/dkylewillis/regscout/issues"
+Homepage = "https://github.com/yourusername/vector"
+Repository = "https://github.com/yourusername/vector.git"
+Issues = "https://github.com/yourusername/vector/issues"
 
 [tool.setuptools.packages.find]
-include = ["regscout*"]
+include = ["vector*"]
 
 [tool.black]
 line-length = 100

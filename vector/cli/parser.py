@@ -1,21 +1,21 @@
-"""Command line argument parser for RegScout."""
+"""Command line argument parser for Vector."""
 
 import argparse
 from typing import List
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create the main argument parser for RegScout CLI."""
+    """Create the main argument parser for Vector CLI."""
     parser = argparse.ArgumentParser(
-        prog='regscout',
-        description='RegScout - AI-Powered Document Processing & Search',
+        prog='vector',
+        description='Vector - AI-Powered Document Processing & Search',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  regscout search "zoning requirements" --collection coweta
-  regscout ask "What are the fire safety requirements?" --length long
-  regscout process documents/*.pdf --source ordinances
-  regscout info --collection all
+  vector search "zoning requirements" --collection documents
+  vector ask "What are the fire safety requirements?" --length long
+  vector process documents/*.pdf --source manuals
+  vector info --collection all
         """
     )
     

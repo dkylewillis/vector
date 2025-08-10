@@ -1,4 +1,4 @@
-"""Simplified document processor for RegScout."""
+"""Simplified document processor for Vector."""
 
 import os
 import hashlib

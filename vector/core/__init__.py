@@ -1,4 +1,4 @@
-"""Core business logic modules for RegScout."""
+"""Core business logic modules for Vector."""
 
 from .agent import ResearchAgent
 from .embedder import Embedder

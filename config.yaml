@@ -1,4 +1,4 @@
-# RegScout Configuration
+# Vector Configuration
 
 # Embedding Model Settings
 embedder:
@@ -6,7 +6,7 @@ embedder:
 
 # AI Model Settings
 ai_model:
-  name: "gpt-4.1"               # OpenAI model name
+  name: "gpt-4o-mini"               # OpenAI model name
   max_tokens: 4000                  # Maximum tokens in AI response
   temperature: 0.1                  # Temperature for AI responses
   provider: "openai"                # AI provider
@@ -22,7 +22,7 @@ vector_database:
   # Use cloud Qdrant instance
   url: "https://74f6dd7e-d502-40f1-974b-bd7898518e89.us-east4-0.gcp.cloud.qdrant.io:6333"
   api_key: null                     # Set QDRANT_API_KEY environment variable
-  collection_name: "regscout_documents"  # Default collection name
+  collection_name: "vector_documents"  # Default collection name
   
   # Legacy local storage (deprecated)
   local_path: "./qdrant_db"         # Path for local file storage
