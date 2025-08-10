@@ -91,9 +91,20 @@ class ResearchAgent:
                 raise RegScoutError("Question cannot be empty")
             
             # First search for relevant context
-            query_vector = self.embedder.embed_text(question)
-            search_results = self.vector_db.search(query_vector, 5, metadata_filter)
+
+            # Generate context search prompt
+            preprocess_prompt = (
+            "Given a user question, rephrase or expand it into a list "
+            "of key terms and related concepts that are likely to appear "
+            "in regulatory or ordinance text."
+            )
+
+            context_search_prompt = self.ai_model.generate_response(
+                question, preprocess_prompt, 512)
             
+            query_vector = self.embedder.embed_text(context_search_prompt)
+            search_results = self.vector_db.search(query_vector, 40, metadata_filter)
+
             if not search_results:
                 return "No relevant documents found to answer your question."
             

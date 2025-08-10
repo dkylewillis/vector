@@ -6,7 +6,7 @@ embedder:
 
 # AI Model Settings
 ai_model:
-  name: "gpt-4o-mini"               # OpenAI model name
+  name: "gpt-4.1"               # OpenAI model name
   max_tokens: 4000                  # Maximum tokens in AI response
   temperature: 0.1                  # Temperature for AI responses
   provider: "openai"                # AI provider

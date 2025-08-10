@@ -187,6 +187,32 @@ def create_regscout_app() -> gr.Blocks:
                     file_count="multiple"
                 )
                 
+                # Collection selection for upload
+                gr.Markdown("### 📚 Collection")
+                with gr.Row():
+                    collection_mode = gr.Radio(
+                        choices=["existing", "new"],
+                        value="existing",
+                        label="Collection Mode",
+                        info="Use existing collection or create a new one",
+                        scale=1
+                    )
+                
+                with gr.Row():
+                    existing_collection_dropdown = gr.Dropdown(
+                        choices=get_collections(),
+                        value=default_collection,
+                        label="Existing Collection",
+                        visible=True,
+                        scale=2
+                    )
+                    new_collection_name = gr.Textbox(
+                        label="New Collection Name",
+                        placeholder="Enter name for new collection...",
+                        visible=False,
+                        scale=2
+                    )
+                
                 with gr.Row():
                     source_dropdown = gr.Dropdown(
                         choices=["auto", "ordinances", "manuals", "checklists", "other"],
@@ -299,9 +325,20 @@ def create_regscout_app() -> gr.Blocks:
             except Exception as e:
                 return f"AI error: {e}"
         
-        def process_files(files, collection, source, force):
+        def process_files(files, collection_mode, existing_collection, new_collection, source, force):
             if not files:
                 return "No files selected."
+            
+            # Determine which collection to use
+            if collection_mode == "new":
+                if not new_collection or not new_collection.strip():
+                    return "❌ Please enter a name for the new collection."
+                collection_name = new_collection.strip().lower()
+                # Validate collection name (basic validation)
+                if not collection_name.replace('_', '').replace('-', '').isalnum():
+                    return "❌ Collection name can only contain letters, numbers, hyphens, and underscores."
+            else:
+                collection_name = existing_collection
             
             try:
                 source_value = None if source == "auto" else source
@@ -311,11 +348,15 @@ def create_regscout_app() -> gr.Blocks:
                 sys.stdout = captured = io.StringIO()
                 
                 try:
+                    # If creating a new collection, show a message
+                    if collection_mode == "new":
+                        print(f"🆕 Creating new collection: {collection_name}")
+                    
                     for file in files:
                         file_path = file.name
                         result = regscout.execute_command(
                             'process',
-                            collection_name=collection,
+                            collection_name=collection_name,
                             files=[file_path],
                             force=force,
                             source=source_value
@@ -323,7 +364,14 @@ def create_regscout_app() -> gr.Blocks:
                         print(result)
                     
                     output = captured.getvalue()
-                    return output or "✅ Processing completed successfully!"
+                    
+                    # Add success message with collection info
+                    if collection_mode == "new":
+                        success_msg = f"✅ Documents processed successfully in new collection '{collection_name}'!"
+                    else:
+                        success_msg = f"✅ Documents processed successfully in collection '{collection_name}'!"
+                    
+                    return output + "\n" + success_msg if output else success_msg
                 
                 finally:
                     sys.stdout = old_stdout
@@ -353,6 +401,19 @@ def create_regscout_app() -> gr.Blocks:
                 gr.CheckboxGroup(choices=headings, value=[])
             )
         
+        def toggle_collection_mode(mode):
+            """Toggle visibility of collection inputs based on mode."""
+            if mode == "new":
+                return (
+                    gr.Dropdown(visible=False),  # existing_collection_dropdown
+                    gr.Textbox(visible=True)     # new_collection_name
+                )
+            else:
+                return (
+                    gr.Dropdown(visible=True),   # existing_collection_dropdown
+                    gr.Textbox(visible=False)    # new_collection_name
+                )
+        
         def refresh_collections():
             """Refresh the collections dropdown."""
             return gr.Dropdown(choices=get_collections())
@@ -361,6 +422,13 @@ def create_regscout_app() -> gr.Blocks:
         refresh_btn.click(
             fn=refresh_collections,
             outputs=collection_dropdown
+        )
+        
+        # Toggle collection mode visibility
+        collection_mode.change(
+            fn=toggle_collection_mode,
+            inputs=[collection_mode],
+            outputs=[existing_collection_dropdown, new_collection_name]
         )
         
         # Update filters when collection changes or when update button is clicked
@@ -390,7 +458,7 @@ def create_regscout_app() -> gr.Blocks:
         
         process_btn.click(
             fn=process_files,
-            inputs=[file_upload, collection_dropdown, source_dropdown, force_reprocess],
+            inputs=[file_upload, collection_mode, existing_collection_dropdown, new_collection_name, source_dropdown, force_reprocess],
             outputs=processing_output
         )
         
