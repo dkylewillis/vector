@@ -36,6 +36,8 @@ class VectorCLI:
             # Handle special cases that don't need agent initialization
             if command == 'info' and collection_name == 'all':
                 return self._list_all_collections()
+            elif command == 'models':
+                return self._list_available_models(kwargs.get('provider', 'openai'))
             
             # Get agent for collection
             agent = self.get_agent(collection_name)
@@ -80,6 +82,37 @@ class VectorCLI:
         except Exception as e:
             return f"❌ Error listing collections: {e}"
     
+    def _list_available_models(self, provider: str) -> str:
+        """List available models for the specified provider."""
+        try:
+            from ..ai.factory import AIModelFactory
+            
+            # Check if provider is supported
+            available_providers = AIModelFactory.get_available_providers()
+            if provider not in available_providers:
+                return f"❌ Unsupported provider: {provider}. Available providers: {', '.join(available_providers)}"
+            
+            # Create a model instance to get available models
+            model = AIModelFactory.create_model(self.config, 'search')
+            available_models = model.get_available_models()
+            
+            if not available_models:
+                return f"📝 No models available for provider: {provider}"
+            
+            # Format the output
+            result = f"🤖 Available models for {provider.upper()}:\n"
+            for i, model_name in enumerate(available_models, 1):
+                result += f"   {i:2d}. {model_name}\n"
+            
+            return result.rstrip()
+            
+        except AIServiceError as e:
+            if "API key" in str(e):
+                return self._show_api_key_help()
+            return f"❌ Error accessing {provider} models: {e}"
+        except Exception as e:
+            return f"❌ Error listing models: {e}"
+    
     def _show_api_key_help(self) -> str:
         """Show API key setup instructions."""
         return (
@@ -90,6 +123,7 @@ class VectorCLI:
             "   3. Add api_key to config.yaml under ai_model section\n"
             "   Get your API key from: https://platform.openai.com/api-keys"
         )
+    
 
 
 def main() -> int:

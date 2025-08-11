@@ -1,7 +1,7 @@
 """AI model implementations for RegScout."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class BaseAIModel(ABC):
@@ -39,3 +39,22 @@ class BaseAIModel(ABC):
             True if model is available, False otherwise
         """
         pass
+
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get information about the current model configuration.
+        
+        Returns:
+            Dictionary with model information
+        """
+        return {
+            "model_name": self.model_name,
+            "provider": getattr(self, 'provider', 'unknown'),
+            "configured_max_tokens": getattr(self, 'max_tokens', 'unknown'),
+            "configured_temperature": getattr(self, 'temperature', 'unknown')
+        }
+    @abstractmethod
+    def get_available_models(self):
+        """Get a list of available models and their configurations.
+        """
+        pass
+

@@ -9,7 +9,7 @@ from ..interfaces import SearchResult
 from .embedder import Embedder
 from .database import VectorDatabase
 from .processor import DocumentProcessor
-from ..ai.openai import OpenAIModel
+from ..ai.factory import AIModelFactory
 from ..utils.formatting import CLIFormatter
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modules.module")
@@ -34,7 +34,11 @@ class ResearchAgent:
         self.embedder = Embedder(config)
         self.vector_db = VectorDatabase(collection_name, config)
         self.processor = DocumentProcessor(config)
-        self.ai_model = OpenAIModel(config)
+        
+        # Initialize AI models using factory
+        self.search_ai_model = AIModelFactory.create_model(config, 'search')
+        self.answer_ai_model = AIModelFactory.create_model(config, 'answer')
+        
         self.formatter = CLIFormatter()
 
     def setup_collection(self) -> int:
@@ -92,15 +96,18 @@ class ResearchAgent:
             
             # First search for relevant context
 
-            # Generate context search prompt
+            # Generate context search prompt using search model
             preprocess_prompt = (
-            "Given a user question, rephrase or expand it into a list "
-            "of key terms and related concepts that are likely to appear "
-            "in regulatory or ordinance text."
+                "Given a user question, rephrase or expand it into a list of concise key terms, phrases,"
+                "and related concepts that are likely to appear in regulatory or ordinance text."
+                "• Include synonyms, common legal/regulatory wording, and technical terminology."
+                "• Focus on the underlying intent of the question, not just the exact words used."
+                "• Avoid filler words and unrelated concepts."
+                "• Output as a comma-separated list, in order of relevance."
             )
 
-            context_search_prompt = self.ai_model.generate_response(
-                question, preprocess_prompt, 512)
+            context_search_prompt = self.search_ai_model.generate_response(
+                question, preprocess_prompt, max_tokens=self.config.ai_search_max_tokens)
             
             query_vector = self.embedder.embed_text(context_search_prompt)
             search_results = self.vector_db.search(query_vector, 40, metadata_filter)
@@ -112,13 +119,13 @@ class ResearchAgent:
             context = self._build_context(search_results)
             
             # Get response length settings
-            max_tokens = self.config.response_lengths.get(response_length, 500)
+            max_tokens = self.config.response_lengths.get(response_length, 1000)
             
-            # Generate AI response
+            # Generate AI response using answer model
             system_prompt = self._get_system_prompt()
             user_prompt = f"Question: {question}\n\nContext:\n{context}"
             
-            response = self.ai_model.generate_response(
+            response = self.answer_ai_model.generate_response(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
                 max_tokens=max_tokens
@@ -205,6 +212,27 @@ class ResearchAgent:
             return f"✅ Collection '{self.collection_name}' cleared successfully"
         except Exception as e:
             raise VectorError(f"Failed to clear collection: {e}")
+
+    def get_model_info(self) -> str:
+        """Get information about configured models."""
+        try:
+            search_info = self.search_ai_model.get_model_info()
+            answer_info = self.answer_ai_model.get_model_info()
+            
+            if self.search_ai_model == self.answer_ai_model:
+                return f"🤖 Single Model: {search_info['model_name']} ({search_info.get('provider', 'unknown')})"
+            
+            return (
+                f"🔍 Search Model: {search_info['model_name']} ({search_info.get('provider', 'unknown')})\n"
+                f"   Max Tokens: {search_info['configured_max_tokens']}\n"
+                f"   Temperature: {search_info['configured_temperature']}\n\n"
+                f"💬 Answer Model: {answer_info['model_name']} ({answer_info.get('provider', 'unknown')})\n"
+                f"   Max Tokens: {answer_info['configured_max_tokens']}\n"
+                f"   Temperature: {answer_info['configured_temperature']}\n\n"
+                f"📋 Available Providers: {', '.join(AIModelFactory.get_available_providers())}"
+            )
+        except Exception as e:
+            return f"⚠️  Error getting model info: {e}"
 
     def _build_context(self, search_results: List[SearchResult]) -> str:
         """Build context string from search results."""

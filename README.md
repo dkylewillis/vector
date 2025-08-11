@@ -106,6 +106,11 @@ python -m vector info --collection all    # Show info for all collections
 python -m vector metadata
 python -m vector metadata --collection coweta
 
+# List available AI models
+python -m vector models
+python -m vector models --provider openai
+python -m vector models -p openai
+
 # Clear knowledge base
 python -m vector clear
 python -m regscout clear --collection temp  # Clear specific collection
@@ -123,6 +128,8 @@ python -m regscout clear --collection temp  # Clear specific collection
 - **`info`** - Show knowledge base information and statistics
   - Use `--collection all` to see all collections
 - **`metadata`** - Show document metadata and source information
+- **`models`** - List available AI models for the specified provider
+  - `--provider openai` - Specify AI provider (currently supports: openai)
 - **`clear`** - Clear all chunks from knowledge base
 
 ## Collection Examples by Use Case

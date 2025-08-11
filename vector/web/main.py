@@ -21,11 +21,13 @@ def create_vector_app() -> gr.Blocks:
     custom_css = ""
     if css_path.exists():
         custom_css = css_path.read_text(encoding='utf-8')
-    
+
     # Create Gradio theme
-    theme = gr.themes.Default().set(
-        checkbox_background_color='*checkbox_background_color_selected',
-        checkbox_background_color_dark='*checkbox_label_text_color',
+    theme = gr.themes.Base().set(
+        background_fill_primary='*primary_50',
+        block_background_fill_dark='*body_background_fill',
+        block_border_color='*background_fill_primary',
+        block_border_color_dark='*background_fill_primary',
         checkbox_label_gap='*spacing_xxs',
         checkbox_label_padding='*spacing_sm',
         checkbox_label_text_size='*text_xxs'
@@ -35,7 +37,10 @@ def create_vector_app() -> gr.Blocks:
         
         gr.HTML("""
         <div style="text-align: center; padding: 20px;">
-            <h1>🔍 Vector</h1>
+            <h1>
+            <span style="color:#3b82f6; font-size:50px; position:relative; top:4px;">●</span>
+            Vector
+            </h1>
             <p>AI-Powered Document Processing & Search</p>
         </div>
         """)
@@ -60,16 +65,21 @@ def create_vector_app() -> gr.Blocks:
             except Exception:
                 return [config.default_collection]
         
-        with gr.Row():
-            available_collections = get_collections()
-            default_collection = available_collections[0] if available_collections else config.default_collection
-            collection_dropdown = gr.Dropdown(
-                choices=available_collections,
-                value=default_collection,
-                label="Collection",
-                scale=3
-            )
-            refresh_btn = gr.Button("🔄 Refresh Collections", size="sm", scale=1)
+        with gr.Column(elem_id="collection_column"):
+            with gr.Row(elem_id="collection_selector_top"):
+                gr.Markdown("**Collection**", elem_id="bottom_md")
+                with gr.Column(scale=3):
+                    pass  # empty column acts as spacer
+                refresh_btn = gr.Button("Refresh Collections", size="sm", scale=1, elem_id="refresh_btn")
+            with gr.Row():
+                available_collections = get_collections()
+                default_collection = available_collections[0] if available_collections else config.default_collection
+                collection_dropdown = gr.Dropdown(
+                    choices=available_collections,
+                    value=default_collection,
+                    show_label=False,
+                    scale=3
+                )
         
         # Add function to get metadata for filters
         def get_metadata_options(collection):
@@ -100,30 +110,33 @@ def create_vector_app() -> gr.Blocks:
                     update_filters_btn = gr.Button("🔄 Update Filters", variant="secondary", size="sm")
                 
                 with gr.Row():
-                    with gr.Column(scale=1):
+                    with gr.Column(scale=1, min_width=50):
                         gr.Markdown("**📁 Files**")
-                        filename_checkboxes = gr.CheckboxGroup(
+                        filename_checkboxes = gr.Dropdown(
                             choices=[],
+                            multiselect=True,
                             label="Select Files",
                             info="Leave empty for all files",
                             interactive=True,
                             elem_id="filename_filters"
                         )
                     
-                    with gr.Column(scale=1):
+                    with gr.Column(scale=1, min_width=50):
                         gr.Markdown("**📂 Sources**")
-                        source_checkboxes = gr.CheckboxGroup(
+                        source_checkboxes = gr.Dropdown(
                             choices=[],
+                            multiselect=True,
                             label="Select Sources", 
                             info="Leave empty for all sources",
                             interactive=True,
                             elem_id="source_filters"
                         )
                     
-                    with gr.Column(scale=1):
+                    with gr.Column(scale=1, min_width=50):
                         gr.Markdown("**📋 Headings**")
-                        heading_checkboxes = gr.CheckboxGroup(
+                        heading_checkboxes = gr.Dropdown(
                             choices=[],
+                            multiselect=True,
                             label="Select Headings",
                             info="Leave empty for all headings",
                             interactive=True,

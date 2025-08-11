@@ -16,6 +16,7 @@ Examples:
   vector ask "What are the fire safety requirements?" --length long
   vector process documents/*.pdf --source manuals
   vector info --collection all
+  vector models --provider openai
         """
     )
     
@@ -169,5 +170,23 @@ Examples:
         action='store_true',
         help='Enable verbose output'
     )
+    
+    # Models command
+    models_parser = subparsers.add_parser(
+        'models',
+        help='List available AI models'
+    )
+    models_parser.add_argument(
+        '--provider', '-p',
+        choices=['openai'],
+        default='openai',
+        help='AI provider to list models for (default: openai)'
+    )
+    models_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
     
     return parser

@@ -4,25 +4,34 @@
 embedder:
   model_name: "sentence-transformers/all-MiniLM-L6-v2"  # Sentence transformer model
 
-# AI Model Settings
-ai_model:
-  name: "gpt-4o-mini"               # OpenAI model name
-  max_tokens: 4000                  # Maximum tokens in AI response
-  temperature: 0.1                  # Temperature for AI responses
-  provider: "openai"                # AI provider
+# AI Model Settings - Multiple Models Support
+ai_models:
+  # Search model - optimized for generating search terms
+  search:
+    name: "gpt-5-nano"              # Model name
+    max_tokens: 4000                # Lower token limit for search queries
+    temperature: 1                  # Lower temperature for more focused results
+    provider: "openai"              # AI provider (openai, anthropic, google, etc.)
+  
+  # Answer model - optimized for comprehensive responses
+  answer:
+    name: "gpt-5"                   # Model name
+    max_tokens: 15000               # Higher token limit for detailed responses
+    temperature: 1                  # Temperature for AI responses
+    provider: "openai"              # AI provider
 
-  # Response length presets
-  response_lengths:
-    short: 150      # Brief, concise answers
-    medium: 500     # Balanced detail level
-    long: 1500      # Comprehensive answers
+# Response length presets
+response_lengths:
+  short: 4000      # Brief, concise answers
+  medium: 8000     # Balanced detail level
+  long: 15000      # Comprehensive answers
 
 # Vector Database Settings
 vector_database:
   # Use cloud Qdrant instance
   url: "https://74f6dd7e-d502-40f1-974b-bd7898518e89.us-east4-0.gcp.cloud.qdrant.io:6333"
   api_key: null                     # Set QDRANT_API_KEY environment variable
-  collection_name: "vector_documents"  # Default collection name
+  collection_name: "default"  # Default collection name
   
   # Legacy local storage (deprecated)
   local_path: "./qdrant_db"         # Path for local file storage

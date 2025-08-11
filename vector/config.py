@@ -31,11 +31,6 @@ class Config:
             if config_file.exists():
                 return str(config_file)
         
-        # Fallback to old location
-        old_config = Path("config/settings.yaml")
-        if old_config.exists():
-            return str(old_config)
-        
         raise FileNotFoundError("No config.yaml file found")
     
     def _load_config(self) -> Dict[str, Any]:
@@ -76,20 +71,46 @@ class Config:
         """Get embedder model name."""
         return self.get('embedder.model_name', 'sentence-transformers/all-MiniLM-L6-v2')
     
+    # AI Model properties - Multi-model support only
     @property
-    def ai_model_name(self) -> str:
-        """Get AI model name."""
-        return self.get('ai_model.name', 'gpt-4o-mini')
+    def ai_search_model_name(self) -> str:
+        """Get search model name."""
+        return self.get('ai_models.search.name', 'gpt-4o-mini')
     
     @property
-    def ai_max_tokens(self) -> int:
-        """Get AI model max tokens."""
-        return self.get('ai_model.max_tokens', 4000)
+    def ai_search_max_tokens(self) -> int:
+        """Get search model max tokens."""
+        return self.get('ai_models.search.max_tokens', 1000)
     
     @property
-    def ai_temperature(self) -> float:
-        """Get AI model temperature."""
-        return self.get('ai_model.temperature', 0.1)
+    def ai_search_temperature(self) -> float:
+        """Get search model temperature."""
+        return self.get('ai_models.search.temperature', 0.3)
+    
+    @property
+    def ai_search_provider(self) -> str:
+        """Get search model provider."""
+        return self.get('ai_models.search.provider', 'openai')
+    
+    @property
+    def ai_answer_model_name(self) -> str:
+        """Get answer model name."""
+        return self.get('ai_models.answer.name', 'gpt-4o-mini')
+    
+    @property
+    def ai_answer_max_tokens(self) -> int:
+        """Get answer model max tokens."""
+        return self.get('ai_models.answer.max_tokens', 4000)
+    
+    @property
+    def ai_answer_temperature(self) -> float:
+        """Get answer model temperature."""
+        return self.get('ai_models.answer.temperature', 0.3)
+    
+    @property
+    def ai_answer_provider(self) -> str:
+        """Get answer model provider."""
+        return self.get('ai_models.answer.provider', 'openai')
     
     @property
     def openai_api_key(self) -> Optional[str]:
@@ -139,10 +160,10 @@ class Config:
     @property
     def response_lengths(self) -> Dict[str, int]:
         """Get response length presets."""
-        return self.get('ai_model.response_lengths', {
-            'short': 150,
-            'medium': 500, 
-            'long': 1500
+        return self.get('response_lengths', {
+            'short': 4000,
+            'medium': 8000, 
+            'long': 15000
         })
     
     def __getitem__(self, key: str) -> Any:
