@@ -28,14 +28,15 @@ def create_vector_app() -> gr.Blocks:
         block_background_fill_dark='*body_background_fill',
         block_border_color='*background_fill_primary',
         block_border_color_dark='*background_fill_primary',
-        checkbox_label_gap='*spacing_xxs',
-        checkbox_label_padding='*spacing_sm',
-        checkbox_label_text_size='*text_xxs'
     )
     
-    with gr.Blocks(title="Vector - Document AI Assistant", theme=theme, css=custom_css) as app:
+    with gr.Blocks(title="Vector - Document AI Assistant", 
+                   theme=theme, 
+                   css=custom_css
+                   ) as app:
         
         gr.HTML("""
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
         <div style="text-align: center; padding: 20px;">
             <h1>
             <span style="color:#3b82f6; font-size:50px; position:relative; top:4px;">●</span>
@@ -65,7 +66,7 @@ def create_vector_app() -> gr.Blocks:
             except Exception:
                 return [config.default_collection]
         
-        with gr.Column(elem_id="collection_column"):
+        with gr.Column(elem_id="dropdown_column"):
             with gr.Row(elem_id="collection_selector_top"):
                 gr.Markdown("**Collection**", elem_id="bottom_md")
                 with gr.Column(scale=3):
@@ -99,48 +100,49 @@ def create_vector_app() -> gr.Blocks:
                 print(f"Error getting metadata options: {e}")
                 return [], [], []
 
-        with gr.Tabs():
+        with gr.Tabs(): # Search and Ask
             
             # Tab 1: Search & Ask
             with gr.TabItem("🔍 Search & Ask"):
                 
                 # Metadata Filters Section (shared by both Search and Ask)
-                gr.Markdown("### 🔧 Filters")
                 with gr.Row():
-                    update_filters_btn = gr.Button("🔄 Update Filters", variant="secondary", size="sm")
+                    with gr.Column(scale=0):
+                        with gr.Row():
+                            gr.Markdown("### <span class='material-icons' " \
+                            "style='font-size:20px; margin-top:4px; position:relative; top:4px;'>menu</span> " \
+                            "Filters")
+                            update_filters_btn = gr.Button("🔄 Update Filters", variant="secondary", size="sm", elem_id="filter_update_btn")
                 
                 with gr.Row():
-                    with gr.Column(scale=1, min_width=50):
-                        gr.Markdown("**📁 Files**")
-                        filename_checkboxes = gr.Dropdown(
+                    with gr.Column(scale=1, min_width=50, elem_classes="dropdown_column"):
+                        gr.Markdown("**Files**", elem_classes="filter_label")
+                        filename_filter_dropdown = gr.Dropdown(
                             choices=[],
                             multiselect=True,
-                            label="Select Files",
-                            info="Leave empty for all files",
+                            show_label=False,
                             interactive=True,
-                            elem_id="filename_filters"
+                            elem_classes="vector-dropdown"
                         )
                     
-                    with gr.Column(scale=1, min_width=50):
-                        gr.Markdown("**📂 Sources**")
-                        source_checkboxes = gr.Dropdown(
+                    with gr.Column(scale=1, min_width=50, elem_classes="dropdown_column"):
+                        gr.Markdown("**Sources**", elem_classes="filter_label")
+                        source_filter_dropdown = gr.Dropdown(
                             choices=[],
                             multiselect=True,
-                            label="Select Sources", 
-                            info="Leave empty for all sources",
+                            show_label=False,
                             interactive=True,
-                            elem_id="source_filters"
+                            elem_classes="vector-dropdown"
                         )
                     
-                    with gr.Column(scale=1, min_width=50):
-                        gr.Markdown("**📋 Headings**")
-                        heading_checkboxes = gr.Dropdown(
+                    with gr.Column(scale=1, min_width=50, elem_classes="dropdown_column"):
+                        gr.Markdown("**Headings**", elem_classes="filter_label")
+                        heading_filter_dropdown = gr.Dropdown( 
                             choices=[],
                             multiselect=True,
-                            label="Select Headings",
-                            info="Leave empty for all headings",
+                            show_label=False,
                             interactive=True,
-                            elem_id="heading_filters"
+                            elem_classes="vector-dropdown"
                         )
                 
                 # Sub-tabs for Ask AI and Search
@@ -154,7 +156,7 @@ def create_vector_app() -> gr.Blocks:
                                 placeholder="Ask a question about your documents...",
                                 scale=3
                             )
-                            ask_btn = gr.Button("Ask AI", variant="secondary", scale=1)
+                            ask_btn = gr.Button("Ask AI", variant="primary", scale=1, elem_id="ask_btn")
                         
                         with gr.Row():
                             response_length = gr.Radio(
@@ -448,24 +450,24 @@ def create_vector_app() -> gr.Blocks:
         collection_dropdown.change(
             fn=update_metadata_filters,
             inputs=[collection_dropdown],
-            outputs=[filename_checkboxes, source_checkboxes, heading_checkboxes]
+            outputs=[filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown]
         )
         
         update_filters_btn.click(
             fn=update_metadata_filters,
             inputs=[collection_dropdown],
-            outputs=[filename_checkboxes, source_checkboxes, heading_checkboxes]
+            outputs=[filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown]
         )
         
         search_btn.click(
             fn=perform_search,
-            inputs=[search_query, num_results, collection_dropdown, filename_checkboxes, source_checkboxes, heading_checkboxes],
+            inputs=[search_query, num_results, collection_dropdown, filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown],
             outputs=search_results
         )
         
         ask_btn.click(
             fn=ask_ai,
-            inputs=[ask_query, response_length, collection_dropdown, filename_checkboxes, source_checkboxes, heading_checkboxes],
+            inputs=[ask_query, response_length, collection_dropdown, filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown],
             outputs=ai_response
         )
         
