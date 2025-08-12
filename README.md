@@ -106,6 +106,11 @@ python -m vector info --collection all    # Show info for all collections
 python -m vector metadata
 python -m vector metadata --collection coweta
 
+# Delete specific documents based on metadata
+python -m vector delete filename "old_document.pdf"
+python -m vector delete source "outdated_manuals" --collection coweta
+python -m vector delete heading "Chapter 1" --collection zoning
+
 # List available AI models
 python -m vector models
 python -m vector models --provider openai
@@ -128,6 +133,9 @@ python -m regscout clear --collection temp  # Clear specific collection
 - **`info`** - Show knowledge base information and statistics
   - Use `--collection all` to see all collections
 - **`metadata`** - Show document metadata and source information
+- **`delete <key> <value>`** - Delete documents matching metadata filter
+  - `<key>` - Metadata field to filter by (filename, source, heading, etc.)
+  - `<value>` - Value to match for deletion
 - **`models`** - List available AI models for the specified provider
   - `--provider openai` - Specify AI provider (currently supports: openai)
 - **`clear`** - Clear all chunks from knowledge base
@@ -150,6 +158,10 @@ python -m regscout process "project_beta_docs\*.docx" -c project_beta
 # Query specific collections
 python -m regscout search "setback requirements" -c zoning
 python -m regscout ask "What are easement requirements?" -c utilities
+
+# Remove outdated documents
+python -m regscout delete source "old_manual_v1" -c utilities
+python -m regscout delete filename "deprecated_spec.pdf" -c project_alpha
 ```
 
 ## Configuration

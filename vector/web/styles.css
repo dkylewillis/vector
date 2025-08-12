@@ -2,12 +2,6 @@
 
 
 
-#refresh_btn::before {
-    content: "⟳"; /* or any Unicode char */
-    font-size: 16px;
-    color: #9ca3af;
-    margin-right: 6px;
-}
 
 #collection_selector_top {
     padding-left: 12px;
@@ -24,29 +18,71 @@
     margin-top: auto; /* remove default margin */
 }
 
-#ask_btn {
+.vector-button-1 {
     margin-top: 38px;
 }
 
-#filter_update_btn {
-    padding: 4px 0px;
-    margin-top: 4px;
-}
 
 .filter_label {
     margin-left: 12px;
     margin-bottom: 0px;
 }
-
+/* 
 .gradio-container {
     max-width: 900px;
-    margin: 0 auto; /* center horizontally */
+    margin: 0 auto; 
+}
+ */
+
+/* Remove margin from the tab headers */
+.tabs.svelte-wv8on1 {
+    margin: 0 !important;
 }
 
-.vector-dropdown select {
-    font-size: 5px !important;
+/* Remove margin from tab content */
+.tabitem.svelte-wv8on1{
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-.vector-dropdown select option {
-    font-size: 5px !important;
+.svelte-1scun43 {
+    /* Add any speci
+    fic styles for this component here */
+    font-size: 10px;
 }
+
+/* Target the main outer app container */
+#root, .gradio-container {
+    max-width: 900px;       /* cap the width */
+    margin-inline: auto;    /* center it horizontally */
+    width: 100%;            /* still responsive */
+    display: flex;          /* keep flex layout */
+    flex-direction: column; /* normal stacking */
+}
+
+
+.vector-button-1 {
+    margin-top: 38px;
+}
+
+/* Shared icon button style */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+/* Add icon before text */
+.icon-btn::before {
+  font-family: 'Material Symbols Outlined';
+  content: var(--icon-name);
+  font-size: 20px;
+  line-height: 1;
+  font-variation-settings:
+    'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Per-button overrides: only change the icon name */
+#refresh_btn { --icon-name: 'refresh'; }
+#upload_btn  { --icon-name: 'upload'; }
+#update_btn  { --icon-name: 'update'; }

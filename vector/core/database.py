@@ -126,6 +126,40 @@ class VectorDatabase:
         except Exception as e:
             raise DatabaseError(f"Failed to add documents: {e}")
 
+    def delete_documents(self, metadata_filter: Dict[str, Any]) -> int:
+        """Delete documents from the collection based on metadata filter.
+
+        Args:
+            metadata_filter: Metadata filter to identify documents to delete
+
+        Returns:
+            Number of documents deleted
+
+        Raises:
+            DatabaseError: If deletion fails
+        """
+        if not metadata_filter:
+            raise ValueError("metadata_filter cannot be empty for safety")
+
+        try:
+            filter_conditions = self._build_filter(metadata_filter)
+            
+            if filter_conditions is None:
+                raise ValueError("Invalid metadata filter")
+
+            # Delete points matching the filter
+            result = self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=filter_conditions
+            )
+            
+            # Return the operation status - Qdrant returns an UpdateResult
+            return getattr(result, 'operation_id', 0)
+            
+        except Exception as e:
+            raise DatabaseError(f"Failed to delete documents: {e}")
+
+
     def search(self, query_vector: List[float], top_k: int = 5, 
                metadata_filter: Optional[Dict] = None) -> List[SearchResult]:
         """Search for similar vectors.
@@ -260,3 +294,5 @@ class VectorDatabase:
             self.client.close()
         except Exception:
             pass
+
+

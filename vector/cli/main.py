@@ -61,6 +61,9 @@ class VectorCLI:
                 return agent.get_metadata_summary()
             elif command == 'clear':
                 return agent.clear_collection()
+            elif command == 'delete':
+                metadata_filter = {kwargs.get('key'): kwargs.get('value')}
+                return agent.delete_documents(metadata_filter)
             else:
                 raise ValidationError(f"Unknown command: {command}")
                 

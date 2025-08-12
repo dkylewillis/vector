@@ -15,6 +15,8 @@ Examples:
   vector search "zoning requirements" --collection documents
   vector ask "What are the fire safety requirements?" --length long
   vector process documents/*.pdf --source manuals
+  vector delete filename "old_document.pdf" --collection documents
+  vector delete source "outdated_manuals" --collection documents
   vector info --collection all
   vector models --provider openai
         """
@@ -145,6 +147,30 @@ Examples:
         default=None
     )
     metadata_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
+    # Delete command
+    delete_parser = subparsers.add_parser(
+        'delete',
+        help='Delete documents matching metadata filter'
+    )
+    delete_parser.add_argument(
+        'key',
+        help='Metadata key to filter by (e.g., filename, source)'
+    )
+    delete_parser.add_argument(
+        'value',
+        help='Metadata value to match'
+    )
+    delete_parser.add_argument(
+        '--collection', '-c',
+        help='Collection name (default: from config)',
+        default=None
+    )
+    delete_parser.add_argument(
         '--verbose', '-v',
         action='store_true',
         help='Enable verbose output'

@@ -36,7 +36,7 @@ def create_vector_app() -> gr.Blocks:
                    ) as app:
         
         gr.HTML("""
-        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
         <div style="text-align: center; padding: 20px;">
             <h1>
             <span style="color:#3b82f6; font-size:50px; position:relative; top:4px;">●</span>
@@ -71,7 +71,7 @@ def create_vector_app() -> gr.Blocks:
                 gr.Markdown("**Collection**", elem_id="bottom_md")
                 with gr.Column(scale=3):
                     pass  # empty column acts as spacer
-                refresh_btn = gr.Button("Refresh Collections", size="sm", scale=1, elem_id="refresh_btn")
+                refresh_btn = gr.Button("Refresh Collections", size="sm", scale=1, elem_classes="icon-btn", elem_id="refresh_btn")
             with gr.Row():
                 available_collections = get_collections()
                 default_collection = available_collections[0] if available_collections else config.default_collection
@@ -100,8 +100,8 @@ def create_vector_app() -> gr.Blocks:
                 print(f"Error getting metadata options: {e}")
                 return [], [], []
 
-        with gr.Tabs(): # Search and Ask
-            
+        with gr.Tabs(elem_id="search_ask_tabs"): # Search and Ask
+
             # Tab 1: Search & Ask
             with gr.TabItem("🔍 Search & Ask"):
                 
@@ -109,11 +109,11 @@ def create_vector_app() -> gr.Blocks:
                 with gr.Row():
                     with gr.Column(scale=0):
                         with gr.Row():
-                            gr.Markdown("### <span class='material-icons' " \
+                            gr.Markdown("### <span class='material-symbols-outlined' " \
                             "style='font-size:20px; margin-top:4px; position:relative; top:4px;'>menu</span> " \
                             "Filters")
-                            update_filters_btn = gr.Button("🔄 Update Filters", variant="secondary", size="sm", elem_id="filter_update_btn")
-                
+                            update_filters_btn = gr.Button("Update Filters", variant="secondary", size="sm", elem_classes="icon-btn", elem_id="update_btn")
+
                 with gr.Row():
                     with gr.Column(scale=1, min_width=50, elem_classes="dropdown_column"):
                         gr.Markdown("**Files**", elem_classes="filter_label")
@@ -156,8 +156,8 @@ def create_vector_app() -> gr.Blocks:
                                 placeholder="Ask a question about your documents...",
                                 scale=3
                             )
-                            ask_btn = gr.Button("Ask AI", variant="primary", scale=1, elem_id="ask_btn")
-                        
+                            ask_btn = gr.Button("Ask AI", variant="primary", scale=1, elem_classes="vector-button-1")
+
                         with gr.Row():
                             response_length = gr.Radio(
                                 choices=["short", "medium", "long"],
@@ -179,7 +179,7 @@ def create_vector_app() -> gr.Blocks:
                                 placeholder="Enter search terms...",
                                 scale=3
                             )
-                            search_btn = gr.Button("Search", variant="primary", scale=1)
+                            search_btn = gr.Button("Search", variant="primary", scale=1, elem_classes="vector-button-1")
                         
                         with gr.Row():
                             num_results = gr.Slider(
@@ -214,13 +214,6 @@ def create_vector_app() -> gr.Blocks:
                     )
                 
                 with gr.Row():
-                    existing_collection_dropdown = gr.Dropdown(
-                        choices=get_collections(),
-                        value=default_collection,
-                        label="Existing Collection",
-                        visible=True,
-                        scale=2
-                    )
                     new_collection_name = gr.Textbox(
                         label="New Collection Name",
                         placeholder="Enter name for new collection...",
@@ -268,6 +261,38 @@ def create_vector_app() -> gr.Blocks:
                     label="Metadata Summary",
                     lines=20,
                     interactive=False
+                )
+            
+            # Tab 4: Delete Documents
+            with gr.TabItem("🗑️ Delete Documents"):
+                
+                gr.Markdown("### ⚠️ Delete Documents")
+                gr.Markdown("**Warning:** This action cannot be undone. Please select files carefully.")
+                
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("**Select Files to Delete**")
+                        delete_filename_dropdown = gr.Dropdown(
+                            choices=[],
+                            multiselect=True,
+                            show_label=False,
+                            interactive=True,
+                            elem_classes="vector-dropdown",
+                            info="Select one or more files to delete from the collection"
+                        )
+                    
+                    with gr.Column(scale=1):
+                        gr.Markdown("**Actions**")
+                        with gr.Row():
+                            refresh_delete_btn = gr.Button("🔄 Refresh Files", variant="secondary", size="sm")
+                        with gr.Row():
+                            delete_btn = gr.Button("🗑️ Delete Selected Files", variant="stop", scale=1)
+                
+                delete_output = gr.Textbox(
+                    label="Deletion Log",
+                    lines=8,
+                    interactive=False,
+                    placeholder="Deletion results will appear here..."
                 )
         
         # Event handlers
@@ -340,7 +365,7 @@ def create_vector_app() -> gr.Blocks:
             except Exception as e:
                 return f"AI error: {e}"
         
-        def process_files(files, collection_mode, existing_collection, new_collection, source, force):
+        def process_files(files, collection_mode, current_collection, new_collection, source, force):
             if not files:
                 return "No files selected."
             
@@ -353,7 +378,7 @@ def create_vector_app() -> gr.Blocks:
                 if not collection_name.replace('_', '').replace('-', '').isalnum():
                     return "❌ Collection name can only contain letters, numbers, hyphens, and underscores."
             else:
-                collection_name = existing_collection
+                collection_name = current_collection
             
             try:
                 source_value = None if source == "auto" else source
@@ -406,28 +431,56 @@ def create_vector_app() -> gr.Blocks:
             except Exception as e:
                 return f"❌ Error: {e}"
         
+        def delete_documents(selected_files, collection):
+            """Delete selected documents from the collection."""
+            if not selected_files:
+                return "❌ No files selected for deletion."
+            
+            try:
+                deleted_count = 0
+                results = []
+                
+                for filename in selected_files:
+                    try:
+                        result = vector.execute_command(
+                            'delete',
+                            collection_name=collection,
+                            key='filename',
+                            value=filename
+                        )
+                        results.append(f"✅ {filename}: {result}")
+                        deleted_count += 1
+                    except Exception as e:
+                        results.append(f"❌ {filename}: Error - {e}")
+                
+                summary = f"📊 Summary: {deleted_count}/{len(selected_files)} files deleted successfully\n\n"
+                return summary + "\n".join(results)
+                
+            except Exception as e:
+                return f"❌ Deletion error: {e}"
+        
+        def refresh_delete_files(collection):
+            """Refresh the files list for deletion dropdown."""
+            filenames, _, _ = get_metadata_options(collection)
+            return gr.Dropdown(choices=filenames, value=[])
+        
         def update_metadata_filters(collection):
             """Update the filter options based on selected collection."""
             filenames, sources, headings = get_metadata_options(collection)
             
             return (
-                gr.CheckboxGroup(choices=filenames, value=[]),
-                gr.CheckboxGroup(choices=sources, value=[]),
-                gr.CheckboxGroup(choices=headings, value=[])
+                gr.Dropdown(choices=filenames, value=[]),  # filename_filter_dropdown
+                gr.Dropdown(choices=sources, value=[]),    # source_filter_dropdown  
+                gr.Dropdown(choices=headings, value=[]),   # heading_filter_dropdown
+                gr.Dropdown(choices=filenames, value=[])   # delete_filename_dropdown
             )
         
         def toggle_collection_mode(mode):
             """Toggle visibility of collection inputs based on mode."""
             if mode == "new":
-                return (
-                    gr.Dropdown(visible=False),  # existing_collection_dropdown
-                    gr.Textbox(visible=True)     # new_collection_name
-                )
+                return gr.Textbox(visible=True)     # new_collection_name
             else:
-                return (
-                    gr.Dropdown(visible=True),   # existing_collection_dropdown
-                    gr.Textbox(visible=False)    # new_collection_name
-                )
+                return gr.Textbox(visible=False)    # new_collection_name
         
         def refresh_collections():
             """Refresh the collections dropdown."""
@@ -443,20 +496,20 @@ def create_vector_app() -> gr.Blocks:
         collection_mode.change(
             fn=toggle_collection_mode,
             inputs=[collection_mode],
-            outputs=[existing_collection_dropdown, new_collection_name]
+            outputs=[new_collection_name]
         )
         
         # Update filters when collection changes or when update button is clicked
         collection_dropdown.change(
             fn=update_metadata_filters,
             inputs=[collection_dropdown],
-            outputs=[filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown]
+            outputs=[filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown, delete_filename_dropdown]
         )
         
         update_filters_btn.click(
             fn=update_metadata_filters,
             inputs=[collection_dropdown],
-            outputs=[filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown]
+            outputs=[filename_filter_dropdown, source_filter_dropdown, heading_filter_dropdown, delete_filename_dropdown]
         )
         
         search_btn.click(
@@ -473,7 +526,7 @@ def create_vector_app() -> gr.Blocks:
         
         process_btn.click(
             fn=process_files,
-            inputs=[file_upload, collection_mode, existing_collection_dropdown, new_collection_name, source_dropdown, force_reprocess],
+            inputs=[file_upload, collection_mode, collection_dropdown, new_collection_name, source_dropdown, force_reprocess],
             outputs=processing_output
         )
         
@@ -487,6 +540,19 @@ def create_vector_app() -> gr.Blocks:
             fn=get_metadata_summary,
             inputs=[collection_dropdown],
             outputs=metadata_summary
+        )
+        
+        # Delete documents handlers
+        delete_btn.click(
+            fn=delete_documents,
+            inputs=[delete_filename_dropdown, collection_dropdown],
+            outputs=delete_output
+        )
+        
+        refresh_delete_btn.click(
+            fn=refresh_delete_files,
+            inputs=[collection_dropdown],
+            outputs=delete_filename_dropdown
         )
     
     return app

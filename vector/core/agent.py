@@ -205,6 +205,30 @@ class ResearchAgent:
         except Exception as e:
             raise VectorError(f"Failed to get metadata summary: {e}")
 
+    def delete_documents(self, metadata_filter: Dict[str, Any]) -> str:
+        """Delete documents from the collection based on metadata filter.
+        
+        Args:
+            metadata_filter: Metadata filter to identify documents to delete
+            
+        Returns:
+            Deletion status message
+        """
+        try:
+            if not metadata_filter:
+                raise VectorError("Metadata filter cannot be empty for safety")
+            
+            # Delete documents
+            result = self.vector_db.delete_documents(metadata_filter)
+            
+            # Format filter for display
+            filter_display = ", ".join([f"{k}={v}" for k, v in metadata_filter.items()])
+            
+            return f"✅ Deleted documents matching filter: {filter_display}"
+            
+        except Exception as e:
+            raise VectorError(f"Failed to delete documents: {e}")
+
     def clear_collection(self) -> str:
         """Clear the collection."""
         try:
