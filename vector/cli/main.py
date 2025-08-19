@@ -8,6 +8,8 @@ from ..config import Config
 from ..exceptions import VectorError, ValidationError, AIServiceError
 from .parser import create_parser
 from ..core.agent import ResearchAgent
+from ..core.processor import DocumentProcessor
+from ..core.database import VectorDatabase
 from ..utils.formatting import CLIFormatter
 
 
@@ -19,6 +21,8 @@ class VectorCLI:
         self.config = config or Config()
         self.formatter = CLIFormatter()
         self._agent = None
+        self._document_processor = None
+        self._database = None
         self._current_collection = None
     
     def get_agent(self, collection_name: str) -> ResearchAgent:
@@ -27,6 +31,20 @@ class VectorCLI:
             self._agent = ResearchAgent(self.config, collection_name)
             self._current_collection = collection_name
         return self._agent
+    
+    def get_document_processor(self, collection_name: str) -> DocumentProcessor:
+        """Get or create document processor for collection."""
+        if self._document_processor is None or self._current_collection != collection_name:
+            self._document_processor = DocumentProcessor(self.config, collection_name)
+            self._current_collection = collection_name
+        return self._document_processor
+    
+    def get_database(self, collection_name: str) -> VectorDatabase:
+        """Get or create database for collection."""
+        if self._database is None or self._current_collection != collection_name:
+            self._database = VectorDatabase(collection_name, self.config)
+            self._current_collection = collection_name
+        return self._database
     
     def execute_command(self, command: str, collection_name: str = None, **kwargs) -> str:
         """Execute a command with automatic initialization."""
@@ -42,28 +60,42 @@ class VectorCLI:
             # Get agent for collection
             agent = self.get_agent(collection_name)
             
-            # Execute command through agent
+            # Execute command through appropriate service
             if command == 'search':
+                agent = self.get_agent(collection_name)
                 return agent.search(kwargs.get('question', ''), 
                                   kwargs.get('top_k', 5),
                                   kwargs.get('metadata_filter'))
             elif command == 'ask':
+                agent = self.get_agent(collection_name)
                 return agent.ask(kwargs.get('question', ''),
                                kwargs.get('response_length', 'medium'),
                                kwargs.get('metadata_filter'))
             elif command == 'process':
-                return agent.process_files(kwargs.get('files', []),
+                doc_processor = self.get_document_processor(collection_name)
+                return doc_processor.process_and_index_files(kwargs.get('files', []),
                                          kwargs.get('force', False),
                                          kwargs.get('source'))
             elif command == 'info':
-                return agent.get_info()
+                database = self.get_database(collection_name)
+                info = database.get_collection_info()
+                return self.formatter.format_info(info)
             elif command == 'metadata':
-                return agent.get_metadata_summary()
+                database = self.get_database(collection_name)
+                summary = database.get_metadata_summary()
+                return self.formatter.format_metadata_summary(summary)
             elif command == 'clear':
-                return agent.clear_collection()
+                database = self.get_database(collection_name)
+                database.clear_collection()
+                return f"✅ Collection '{collection_name}' cleared successfully"
             elif command == 'delete':
+                database = self.get_database(collection_name)
                 metadata_filter = {kwargs.get('key'): kwargs.get('value')}
-                return agent.delete_documents(metadata_filter)
+                if not metadata_filter or not kwargs.get('key'):
+                    raise VectorError("Metadata filter cannot be empty for safety")
+                database.delete_documents(metadata_filter)
+                filter_display = ", ".join([f"{k}={v}" for k, v in metadata_filter.items()])
+                return f"✅ Deleted documents matching filter: {filter_display}"
             else:
                 raise ValidationError(f"Unknown command: {command}")
                 
@@ -79,7 +111,6 @@ class VectorCLI:
     def _list_all_collections(self) -> str:
         """List all collections without initializing agent."""
         try:
-            from ..core.database import VectorDatabase
             temp_db = VectorDatabase("temp", self.config)
             return self.formatter.format_collections_list(temp_db.client)
         except Exception as e:

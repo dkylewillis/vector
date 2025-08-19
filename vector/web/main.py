@@ -86,14 +86,41 @@ def create_vector_app() -> gr.Blocks:
         def get_metadata_options(collection):
             """Get available metadata options for filters."""
             try:
-                # Get raw metadata directly from agent instead of formatted CLI output
-                agent = vector.get_agent(collection)
-                metadata_summary = agent.vector_db.get_metadata_summary()
+                # Get metadata summary from CLI command (which now uses agent properly)
+                metadata_result = vector.execute_command('metadata', collection_name=collection)
                 
-                # Extract the raw lists directly
-                filenames = metadata_summary.get('filenames', [])
-                sources = metadata_summary.get('sources', [])
-                headings = metadata_summary.get('headings', [])
+                # Parse the formatted output to extract lists
+                filenames = []
+                sources = []
+                headings = []
+                
+                lines = metadata_result.split('\n')
+                current_section = None
+                
+                for line in lines:
+                    line = line.strip()
+                    if '📁 Files:' in line:
+                        current_section = 'files'
+                        continue
+                    elif '📋 Sources:' in line:
+                        current_section = 'sources'
+                        continue
+                    elif '🏷️ Headings:' in line:
+                        current_section = 'headings'
+                        continue
+                    elif '📊 Total:' in line or not line:
+                        current_section = None
+                        continue
+                    
+                    # Parse items (remove bullet points and clean up)
+                    if current_section and line.startswith('•'):
+                        item = line[1:].strip()
+                        if current_section == 'files':
+                            filenames.append(item)
+                        elif current_section == 'sources':
+                            sources.append(item)
+                        elif current_section == 'headings':
+                            headings.append(item)
                 
                 return filenames, sources, headings
             except Exception as e:

@@ -62,3 +62,9 @@ data/
 notes.md
 
 reports/
+
+test/
+
+archive/
+
+.pytest_cache/

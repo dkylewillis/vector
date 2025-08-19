@@ -13,7 +13,8 @@ A powerful document processing and AI-powered analysis tool with both command-li
 - **Multiple Collections**: Organize documents into separate collections
 - **Configurable Response Lengths**: Short, medium, or long AI responses
 - **Cloud Storage**: Cloud-based vector database with local fallback support
-- **Professional Focus**: Specialized for civil engineering and regulatory documents
+- **Professional Focus**: Specialized for municipal documents, ordinances, and regulations
+- **Clean Architecture**: Separated concerns for search/AI, document processing, and database operations
 
 ## Quick Start
 
@@ -118,7 +119,7 @@ python -m vector models -p openai
 
 # Clear knowledge base
 python -m vector clear
-python -m regscout clear --collection temp  # Clear specific collection
+python -m vector clear --collection temp  # Clear specific collection
 ```
 
 **Note**: If you encounter permission errors when processing directories, process individual files instead or run as administrator.
@@ -144,24 +145,24 @@ python -m regscout clear --collection temp  # Clear specific collection
 
 ```cmd
 # Separate by jurisdiction (process individual files)
-python -m regscout process "coweta_docs\ordinance1.docx" -c coweta
-python -m regscout process "fulton_docs\zoning.pdf" -c fulton
+python -m vector process "coweta_docs\ordinance1.docx" -c coweta
+python -m vector process "fulton_docs\zoning.pdf" -c fulton
 
 # Separate by topic
-python -m regscout process "zoning_ordinances\*.docx" -c zoning
-python -m regscout process "drainage_manuals\manual.pdf" -c stormwater
+python -m vector process "zoning_ordinances\*.docx" -c zoning
+python -m vector process "drainage_manuals\manual.pdf" -c stormwater
 
 # Separate by project
-python -m regscout process "project_alpha_docs\spec.pdf" -c project_alpha
-python -m regscout process "project_beta_docs\*.docx" -c project_beta
+python -m vector process "project_alpha_docs\spec.pdf" -c project_alpha
+python -m vector process "project_beta_docs\*.docx" -c project_beta
 
 # Query specific collections
-python -m regscout search "setback requirements" -c zoning
-python -m regscout ask "What are easement requirements?" -c utilities
+python -m vector search "setback requirements" -c zoning
+python -m vector ask "What are easement requirements?" -c utilities
 
 # Remove outdated documents
-python -m regscout delete source "old_manual_v1" -c utilities
-python -m regscout delete filename "deprecated_spec.pdf" -c project_alpha
+python -m vector delete source "old_manual_v1" -c utilities
+python -m vector delete filename "deprecated_spec.pdf" -c project_alpha
 ```
 
 ## Configuration
@@ -182,11 +183,11 @@ Edit `config.yaml` to customize:
 ## Project Structure
 
 ```
-regscout/
-├── regscout_cli.py       # CLI entry point
-├── regscout_web.py       # Web interface entry point
+vector/
+├── vector_cli.py         # CLI entry point
+├── vector_web.py         # Web interface entry point
 ├── config.yaml           # Main configuration file
-├── regscout/             # Main package
+├── vector/               # Main package
 │   ├── __init__.py       # Package initialization
 │   ├── config.py         # Configuration management
 │   ├── exceptions.py     # Custom exceptions
@@ -195,19 +196,63 @@ regscout/
 │   │   ├── main.py       # CLI coordinator
 │   │   └── parser.py     # Argument parsing
 │   ├── web/              # Web interface
-│   │   └── main.py       # Gradio web app
+│   │   ├── main.py       # Gradio web app
+│   │   └── styles.css    # Web styling
 │   ├── core/             # Core functionality
-│   │   ├── agent.py      # Research agent
-│   │   ├── database.py   # Vector database
+│   │   ├── agent.py      # Research agent (search & AI)
+│   │   ├── document_service.py # Document processing service
+│   │   ├── database.py   # Vector database operations
 │   │   ├── embedder.py   # Text embeddings
-│   │   └── processor.py  # Document processing
+│   │   ├── processor.py  # Document processing engine
+│   │   └── models.py     # Data models
 │   ├── ai/               # AI model implementations
+│   │   ├── factory.py    # AI model factory
+│   │   ├── base.py       # Base AI model
 │   │   └── openai.py     # OpenAI integration
 │   └── utils/            # Utility functions
-│       └── formatting.py # Output formatting
+│       ├── formatting.py # Output formatting
+│       ├── files.py      # File utilities
+│       └── text.py       # Text processing
 ├── data/                 # Document storage
 └── qdrant_db/           # Local vector database (fallback)
 ```
+
+## Architecture
+
+Vector follows a clean architecture with separated concerns:
+
+### Core Components
+
+1. **ResearchAgent** (`core/agent.py`)
+   - Handles search and AI interactions only
+   - Semantic search with vector similarity
+   - AI-powered question answering with context
+   - No document processing logic
+
+2. **DocumentService** (`core/document_service.py`)
+   - Manages document processing and indexing
+   - Handles file processing pipelines
+   - Batch processing with progress tracking
+   - Uses DocumentProcessor for file conversion
+
+3. **VectorDatabase** (`core/database.py`)
+   - Direct database operations (CRUD)
+   - Collection management
+   - Metadata indexing and filtering
+   - No business logic
+
+4. **DocumentProcessor** (`core/processor.py`)
+   - Low-level document conversion
+   - Text chunking with Docling
+   - File format support (PDF, DOCX, etc.)
+
+### Interface Layer
+
+- **CLI** (`cli/main.py`) - Routes commands to appropriate services
+- **Web** (`web/main.py`) - Web interface using Gradio, routes through CLI
+- **AI Factory** (`ai/factory.py`) - Creates AI model instances
+
+This architecture ensures clean separation of concerns and makes the codebase more maintainable and testable.
 
 ## Key Features Explained
 
@@ -218,12 +263,13 @@ regscout/
 - Duplicate detection prevents reprocessing
 
 ### Smart Search & Q&A
-- Semantic search finds relevant content even with different wording
+- Semantic search finds relevant content even with different wording using sentence transformers
 - Context-aware AI responses with source citations using OpenAI GPT models
 - Configurable response lengths for different use cases (short/medium/long)
 - Advanced metadata filtering in web interface
-- Professional civil engineering focus
+- Professional municipal and regulatory document focus
 - Intelligent text chunking for optimal search results
+- Separated search/AI logic from document processing for better performance
 
 ### Web Interface Features
 - Modern, responsive web UI built with Gradio
@@ -238,5 +284,6 @@ regscout/
 - Local fallback support for offline usage
 - Environment-based configuration management
 - Modern Python packaging with proper imports
+- Clean architecture with separated document processing, search, and database layers
 
-The tool uses cloud vector database with local fallback and works with OpenAI for AI features.
+The tool uses cloud vector database with local fallback and works with OpenAI for AI features. The modular architecture ensures maintainability and allows for easy testing and extension.

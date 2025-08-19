@@ -8,7 +8,6 @@ from ..exceptions import VectorError, AIServiceError, DatabaseError
 from ..interfaces import SearchResult
 from .embedder import Embedder
 from .database import VectorDatabase
-from .processor import DocumentProcessor
 from ..ai.factory import AIModelFactory
 from ..utils.formatting import CLIFormatter
 
@@ -17,7 +16,8 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modul
 
 class ResearchAgent:
     """
-    Simplified research agent that handles search, AI interactions, and document processing.
+    Simplified research agent that handles search and AI interactions only.
+    Document processing is handled separately.
     """
 
     def __init__(self, config: Config, collection_name: str):
@@ -33,23 +33,12 @@ class ResearchAgent:
         # Initialize components
         self.embedder = Embedder(config)
         self.vector_db = VectorDatabase(collection_name, config)
-        self.processor = DocumentProcessor(config)
         
         # Initialize AI models using factory
         self.search_ai_model = AIModelFactory.create_model(config, 'search')
         self.answer_ai_model = AIModelFactory.create_model(config, 'answer')
         
         self.formatter = CLIFormatter()
-
-    def setup_collection(self) -> int:
-        """Setup the vector database collection with appropriate dimensions."""
-        vector_size = self.embedder.get_embedding_dimension()
-        self.vector_db.create_collection(vector_size=vector_size)
-        
-        # Ensure all metadata indexes exist
-        self.vector_db.ensure_indexes()
-        
-        return vector_size
 
     def search(self, query: str, top_k: int = 5, metadata_filter: Optional[Dict] = None) -> str:
         """Search for relevant documents.
@@ -137,105 +126,6 @@ class ResearchAgent:
             raise  # Re-raise AI service errors
         except Exception as e:
             raise VectorError(f"AI query failed: {e}")
-
-    def process_files(self, files: List[str], force: bool = False, 
-                     source: Optional[str] = None) -> str:
-        """Process and index documents.
-        
-        Args:
-            files: List of file or directory paths to process
-            force: Force reprocessing of existing documents
-            source: Source type for documents
-            
-        Returns:
-            Processing status message
-        """
-        try:
-            # Ensure collection exists
-            if not self.vector_db.collection_exists():
-                self.setup_collection()
-            
-            # Process each file or directory
-            total_processed = 0
-            processed_paths = 0
-            
-            for path in files:
-                try:
-                    chunks = self.processor.process_path(path, source, force, self.vector_db)
-                    if chunks:
-                        # Process in batches to avoid timeouts
-                        batch_size = 100  # Process 100 chunks at a time
-                        for i in range(0, len(chunks), batch_size):
-                            batch_chunks = chunks[i:i + batch_size]
-                            
-                            # Embed batch
-                            texts = [chunk['text'] for chunk in batch_chunks]
-                            vectors = self.embedder.embed_texts(texts)
-                            metadata = [chunk['metadata'] for chunk in batch_chunks]
-                            
-                            # Add to vector database
-                            self.vector_db.add_documents(texts, vectors, metadata)
-                            total_processed += len(batch_chunks)
-                            
-                            print(f"📦 Processed batch: {len(batch_chunks)} chunks (Total: {total_processed})")
-                        
-                        processed_paths += 1
-                except Exception as e:
-                    print(f"⚠️  Error processing {path}: {e}")
-                    continue
-            
-            return f"✅ Processed {total_processed} chunks from {processed_paths} path(s)"
-            
-        except Exception as e:
-            raise VectorError(f"File processing failed: {e}")
-
-    def get_info(self) -> str:
-        """Get collection information."""
-        try:
-            info = self.vector_db.get_collection_info()
-            return self.formatter.format_info(info)
-        except Exception as e:
-            raise VectorError(f"Failed to get collection info: {e}")
-
-    def get_metadata_summary(self) -> str:
-        """Get metadata summary."""
-        try:
-            summary = self.vector_db.get_metadata_summary()
-            return self.formatter.format_metadata_summary(summary)
-        except Exception as e:
-            raise VectorError(f"Failed to get metadata summary: {e}")
-
-    def delete_documents(self, metadata_filter: Dict[str, Any]) -> str:
-        """Delete documents from the collection based on metadata filter.
-        
-        Args:
-            metadata_filter: Metadata filter to identify documents to delete
-            
-        Returns:
-            Deletion status message
-        """
-        try:
-            if not metadata_filter:
-                raise VectorError("Metadata filter cannot be empty for safety")
-            
-            # Delete documents
-            result = self.vector_db.delete_documents(metadata_filter)
-            
-            # Format filter for display
-            filter_display = ", ".join([f"{k}={v}" for k, v in metadata_filter.items()])
-            
-            return f"✅ Deleted documents matching filter: {filter_display}"
-            
-        except Exception as e:
-            raise VectorError(f"Failed to delete documents: {e}")
-
-    def clear_collection(self) -> str:
-        """Clear the collection."""
-        try:
-            self.vector_db.clear_collection()
-            return f"✅ Collection '{self.collection_name}' cleared successfully"
-        except Exception as e:
-            raise VectorError(f"Failed to clear collection: {e}")
 
     def get_model_info(self) -> str:
         """Get information about configured models."""
