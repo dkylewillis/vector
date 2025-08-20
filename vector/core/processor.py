@@ -14,6 +14,7 @@ from ..config import Config
 from ..exceptions import ProcessingError, VectorError
 from .embedder import Embedder
 from .database import VectorDatabase
+from .collection_manager import CollectionManager
 from .models import Chunk, ChunkMetadata, DocumentResult
 
 class DocumentProcessor:
@@ -25,19 +26,21 @@ class DocumentProcessor:
     SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.doc']
     DEFAULT_SOURCE_CATEGORIES = ['ordinances', 'manuals', 'checklists']
 
-    def __init__(self, config: Config, collection_name: str):
+    def __init__(self, config: Config, collection_name: str, collection_manager: Optional[CollectionManager] = None):
         """Initialize the document processor.
 
         Args:
             config: Configuration object
-            collection_name: Name of the vector collection
+            collection_name: Name of the vector collection (can be display name if collection_manager provided)
+            collection_manager: Optional collection manager for name resolution
         """
         self.config = config
         self.collection_name = collection_name
+        self.collection_manager = collection_manager
         
         # Initialize embedding and database components
         self.embedder = Embedder(config)
-        self.vector_db = VectorDatabase(collection_name, config)
+        self.vector_db = VectorDatabase(collection_name, config, collection_manager)
         
         # Initialize tokenizer and chunker
         model_name = config.embedder_model

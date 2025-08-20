@@ -8,6 +8,7 @@ from ..exceptions import VectorError, AIServiceError, DatabaseError
 from ..interfaces import SearchResult
 from .embedder import Embedder
 from .database import VectorDatabase
+from .collection_manager import CollectionManager
 from ..ai.factory import AIModelFactory
 from ..utils.formatting import CLIFormatter
 
@@ -20,19 +21,21 @@ class ResearchAgent:
     Document processing is handled separately.
     """
 
-    def __init__(self, config: Config, collection_name: str):
+    def __init__(self, config: Config, collection_name: str, collection_manager: Optional[CollectionManager] = None):
         """Initialize the research agent.
 
         Args:
             config: Configuration object
-            collection_name: Name of the vector collection
+            collection_name: Name of the vector collection (can be display name if collection_manager provided)
+            collection_manager: Optional collection manager for name resolution
         """
         self.config = config
         self.collection_name = collection_name
+        self.collection_manager = collection_manager
         
         # Initialize components
         self.embedder = Embedder(config)
-        self.vector_db = VectorDatabase(collection_name, config)
+        self.vector_db = VectorDatabase(collection_name, config, collection_manager)
         
         # Initialize AI models using factory
         self.search_ai_model = AIModelFactory.create_model(config, 'search')

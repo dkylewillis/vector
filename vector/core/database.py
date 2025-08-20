@@ -34,7 +34,8 @@ class VectorDatabase:
             else:
                 raise ValueError(f"Collection with display name '{collection_name}' not found")
         
-        self.collection_name = collection_name.lower()
+        # Store the original resolved collection name (preserve case for Qdrant operations)
+        self.collection_name = collection_name
         self.config = config
         self.client = self._create_client()
 
@@ -272,13 +273,14 @@ class VectorDatabase:
         except Exception as e:
             raise DatabaseError(f"Failed to get metadata summary: {e}")
 
-    def clear_collection(self) -> None:
-        """Clear all documents from the collection."""
+    def delete_collection(self) -> None:
+        """Delete the entire collection and its metadata."""
         try:
             if self.collection_exists():
+                # Delete from Qdrant
                 self.client.delete_collection(self.collection_name)
                 
-                # If using collection manager, also remove metadata
+                # If using collection manager, find and remove metadata
                 if self.collection_manager:
                     # Find display name from collection name
                     for display_name, coll_name in self.collection_manager.metadata["display_name_to_id"].items():
@@ -286,27 +288,64 @@ class VectorDatabase:
                             self.collection_manager.delete_collection_metadata(display_name)
                             break
         except Exception as e:
+            raise DatabaseError(f"Failed to delete collection: {e}")
+
+    def clear_collection(self) -> None:
+        """Clear all documents from the collection (but keep the collection structure)."""
+        try:
+            if self.collection_exists():
+                # Delete all points by scrolling through and deleting them
+                # This is safer than trying to create a "match all" filter
+                scroll_result = self.client.scroll(
+                    collection_name=self.collection_name,
+                    limit=10000,  # Process in batches
+                    with_payload=False,
+                    with_vectors=False
+                )
+                
+                points, next_page_offset = scroll_result
+                all_point_ids = [point.id for point in points]
+                
+                # Continue scrolling if there are more points
+                while next_page_offset:
+                    scroll_result = self.client.scroll(
+                        collection_name=self.collection_name,
+                        limit=10000,
+                        offset=next_page_offset,
+                        with_payload=False,
+                        with_vectors=False
+                    )
+                    points, next_page_offset = scroll_result
+                    all_point_ids.extend([point.id for point in points])
+                
+                # Delete all points if any were found
+                if all_point_ids:
+                    self.client.delete(
+                        collection_name=self.collection_name,
+                        points_selector=all_point_ids
+                    )
+        except Exception as e:
             raise DatabaseError(f"Failed to clear collection: {e}")
 
     def _build_filter(self, metadata_filter: Dict) -> Filter:
-        """Build Qdrant filter from metadata filter dict."""
-        # Simple implementation - can be extended for more complex filters
-        must_conditions = []
-        
-        for key, value in metadata_filter.items():
-            if isinstance(value, list):
-                # Multiple values - use "should" (OR) condition
-                should_conditions = []
-                for v in value:
-                    should_conditions.append({"key": key, "match": {"value": v}})
-                must_conditions.append({"should": should_conditions})
-            else:
-                # Single value
-                must_conditions.append({"key": key, "match": {"value": value}})
-        
-        if must_conditions:
-            return Filter(must=must_conditions)
-        return None
+            """Build Qdrant filter from metadata filter dict."""
+            # Simple implementation - can be extended for more complex filters
+            must_conditions = []
+            
+            for key, value in metadata_filter.items():
+                if isinstance(value, list):
+                    # Multiple values - use "should" (OR) condition
+                    should_conditions = []
+                    for v in value:
+                        should_conditions.append({"key": key, "match": {"value": v}})
+                    must_conditions.append({"should": should_conditions})
+                else:
+                    # Single value
+                    must_conditions.append({"key": key, "match": {"value": value}})
+            
+            if must_conditions:
+                return Filter(must=must_conditions)
+            return None
 
     def close(self):
         """Close the database connection."""

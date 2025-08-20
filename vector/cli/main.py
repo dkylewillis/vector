@@ -30,14 +30,14 @@ class VectorCLI:
     def get_agent(self, collection_name: str) -> ResearchAgent:
         """Get or create research agent for collection."""
         if self._agent is None or self._current_collection != collection_name:
-            self._agent = ResearchAgent(self.config, collection_name)
+            self._agent = ResearchAgent(self.config, collection_name, self.collection_manager)
             self._current_collection = collection_name
         return self._agent
     
     def get_document_processor(self, collection_name: str) -> DocumentProcessor:
         """Get or create document processor for collection."""
         if self._document_processor is None or self._current_collection != collection_name:
-            self._document_processor = DocumentProcessor(self.config, collection_name)
+            self._document_processor = DocumentProcessor(self.config, collection_name, self.collection_manager)
             self._current_collection = collection_name
         return self._document_processor
     
@@ -95,16 +95,7 @@ class VectorCLI:
             elif command == 'clear':
                 database = self.get_database(collection_name)
                 database.clear_collection()
-                
-                # Also clean up metadata if using collection manager
-                if self.collection_manager:
-                    # Find display name from collection name
-                    for display_name, coll_name in self.collection_manager.metadata["display_name_to_id"].items():
-                        if coll_name == collection_name:
-                            self.collection_manager.delete_collection_metadata(display_name)
-                            break
-                            
-                return f"✅ Collection '{collection_name}' cleared successfully"
+                return f"✅ Collection '{collection_name}' cleared successfully (metadata preserved)"
             elif command == 'delete':
                 database = self.get_database(collection_name)
                 metadata_filter = {kwargs.get('key'): kwargs.get('value')}
@@ -197,13 +188,26 @@ class VectorCLI:
             if not display_name or not modality:
                 return "❌ Both display_name and modality are required"
             
+            # Create collection metadata
             collection_name = self.collection_manager.create_collection_name(
                 display_name=display_name,
                 modality=modality,
                 description=description
             )
             
-            return f"✅ Created collection '{display_name}' with ID: {collection_name}"
+            # Also create the actual vector database collection
+            try:
+                # Use a default vector size - this will be updated when documents are first added
+                vector_size = 1536  # OpenAI embedding size
+                database = VectorDatabase(collection_name, self.config, self.collection_manager)
+                database.create_collection(vector_size)
+                
+                return f"✅ Created collection '{display_name}' with ID: {collection_name}\n✅ Vector database collection created successfully"
+            except Exception as e:
+                # If database creation fails, clean up metadata
+                self.collection_manager.delete_collection_metadata(display_name)
+                return f"❌ Failed to create vector database collection: {e}"
+            
         except ValueError as e:
             return f"❌ {e}"
         except Exception as e:
@@ -247,19 +251,20 @@ class VectorCLI:
                 return (f"⚠️  This will permanently delete collection '{display_name}' ({collection_name}) "
                        "and all its data. Use --force to confirm.")
             
-            # Delete from vector database
+            # Delete from vector database using the proper delete_collection method
+            # This will handle both vector data and metadata deletion through collection_manager
             try:
-                database = VectorDatabase(collection_name, self.config)
-                database.clear_collection()
+                database = VectorDatabase(collection_name, self.config, self.collection_manager)
+                database.delete_collection()
+                return f"✅ Deleted collection '{display_name}' and all its data"
             except Exception as e:
+                # If database deletion fails, try to clean up metadata manually
                 print(f"⚠️  Warning: Could not delete vector data: {e}")
-            
-            # Delete metadata
-            success = self.collection_manager.delete_collection_metadata(display_name)
-            if success:
-                return f"✅ Deleted collection '{display_name}'"
-            else:
-                return f"❌ Error deleting collection metadata"
+                success = self.collection_manager.delete_collection_metadata(display_name)
+                if success:
+                    return f"⚠️  Deleted collection metadata for '{display_name}', but vector data deletion failed: {e}"
+                else:
+                    return f"❌ Error deleting collection: {e}"
         except Exception as e:
             return f"❌ Error deleting collection: {e}"
     
