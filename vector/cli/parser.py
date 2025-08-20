@@ -17,8 +17,12 @@ Examples:
   vector process documents/*.pdf --source manuals
   vector delete filename "old_document.pdf" --collection documents
   vector delete source "outdated_manuals" --collection documents
-  vector info --collection all
+  vector info --collection documents
   vector models --provider openai
+  vector collections
+  vector create-collection "Legal Docs Q1" chunks --description "Q1 legal documents"
+  vector rename-collection "Legal Docs Q1" "Legal Documents Q1 2024"
+  vector delete-collection "Old Collection" --force
         """
     )
     
@@ -127,7 +131,7 @@ Examples:
     )
     info_parser.add_argument(
         '--collection', '-c',
-        help='Collection name or "all" to list all collections',
+        help='Collection name (default: from config)',
         default=None
     )
     info_parser.add_argument(
@@ -209,6 +213,81 @@ Examples:
         help='AI provider to list models for (default: openai)'
     )
     models_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
+    # Collections command
+    collections_parser = subparsers.add_parser(
+        'collections',
+        help='List all collections'
+    )
+    collections_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
+    # Create collection command
+    create_collection_parser = subparsers.add_parser(
+        'create-collection',
+        help='Create a new collection with display name'
+    )
+    create_collection_parser.add_argument(
+        'display_name',
+        help='Human-readable name for the collection'
+    )
+    create_collection_parser.add_argument(
+        'modality',
+        choices=['chunks', 'artifacts'],
+        help='Type of data to store (chunks or artifacts)'
+    )
+    create_collection_parser.add_argument(
+        '--description', '-d',
+        help='Optional description for the collection',
+        default=''
+    )
+    create_collection_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
+    # Rename collection command
+    rename_collection_parser = subparsers.add_parser(
+        'rename-collection',
+        help='Rename a collection\'s display name'
+    )
+    rename_collection_parser.add_argument(
+        'old_name',
+        help='Current display name of the collection'
+    )
+    rename_collection_parser.add_argument(
+        'new_name',
+        help='New display name for the collection'
+    )
+    rename_collection_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
+    # Delete collection command
+    delete_collection_parser = subparsers.add_parser(
+        'delete-collection',
+        help='Delete a collection and all its data'
+    )
+    delete_collection_parser.add_argument(
+        'display_name',
+        help='Display name of the collection to delete'
+    )
+    delete_collection_parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Skip confirmation prompt'
+    )
+    delete_collection_parser.add_argument(
         '--verbose', '-v',
         action='store_true',
         help='Enable verbose output'

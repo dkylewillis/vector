@@ -10,18 +10,30 @@ import uuid
 from ..config import Config
 from ..interfaces import SearchResult
 from ..exceptions import DatabaseError
+from .collection_manager import CollectionManager
 
 
 class VectorDatabase:
     """Simplified vector database using Qdrant."""
 
-    def __init__(self, collection_name: str, config: Config):
+    def __init__(self, collection_name: str, config: Config, collection_manager: Optional[CollectionManager] = None):
         """Initialize the vector database.
 
         Args:
-            collection_name: Name of the collection
+            collection_name: Name of the collection (can be display name if using collection_manager)
             config: Configuration object
+            collection_manager: Optional collection manager for name resolution
         """
+        self.collection_manager = collection_manager
+        
+        # Resolve collection name if using collection manager
+        if collection_manager and not collection_name.startswith('c_'):
+            resolved_name = collection_manager.get_collection_by_display_name(collection_name)
+            if resolved_name:
+                collection_name = resolved_name
+            else:
+                raise ValueError(f"Collection with display name '{collection_name}' not found")
+        
         self.collection_name = collection_name.lower()
         self.config = config
         self.client = self._create_client()
@@ -265,6 +277,14 @@ class VectorDatabase:
         try:
             if self.collection_exists():
                 self.client.delete_collection(self.collection_name)
+                
+                # If using collection manager, also remove metadata
+                if self.collection_manager:
+                    # Find display name from collection name
+                    for display_name, coll_name in self.collection_manager.metadata["display_name_to_id"].items():
+                        if coll_name == self.collection_name:
+                            self.collection_manager.delete_collection_metadata(display_name)
+                            break
         except Exception as e:
             raise DatabaseError(f"Failed to clear collection: {e}")
 

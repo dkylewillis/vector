@@ -48,22 +48,20 @@ def create_vector_app() -> gr.Blocks:
         
         # Collection selector
         def get_collections():
-            """Get all available collections."""
+            """Get all available collections with display names."""
             try:
-                collections_result = vector.execute_command('info', collection_name='all')
+                collections_result = vector.execute_command('collections')
                 collections = []
-                if "Available Collections:" in collections_result:
+                if "Collections:" in collections_result:
                     lines = collections_result.split('\n')
                     for line in lines:
                         if line.strip().startswith('•'):
-                            full_line = line.strip()[2:].strip()
-                            if '(' in full_line:
-                                collection_name = full_line.split('(')[0].strip()
-                            else:
-                                collection_name = full_line
-                            collections.append(collection_name)
+                            # Extract display name from the line
+                            display_name = line.strip()[2:].strip()
+                            collections.append(display_name)
                 return collections if collections else [config.default_collection]
-            except Exception:
+            except Exception as e:
+                print(f"Error getting collections: {e}")
                 return [config.default_collection]
         
         with gr.Column(elem_id="dropdown_column"):
@@ -290,7 +288,111 @@ def create_vector_app() -> gr.Blocks:
                     interactive=False
                 )
             
-            # Tab 4: Delete Documents
+            # Tab 4: Collection Management
+            with gr.TabItem("📚 Collection Management"):
+                
+                with gr.Tabs():
+                    
+                    # Sub-tab: List Collections
+                    with gr.TabItem("📋 List Collections"):
+                        with gr.Row():
+                            list_collections_btn = gr.Button("📋 List All Collections", variant="primary")
+                        
+                        collections_list = gr.Textbox(
+                            label="Collections",
+                            lines=12,
+                            interactive=False,
+                            placeholder="Click 'List All Collections' to see available collections..."
+                        )
+                    
+                    # Sub-tab: Create Collection
+                    with gr.TabItem("➕ Create Collection"):
+                        gr.Markdown("### Create New Collection")
+                        
+                        with gr.Row():
+                            create_display_name = gr.Textbox(
+                                label="Display Name",
+                                placeholder="Enter a friendly name for the collection...",
+                                scale=2
+                            )
+                            create_modality = gr.Dropdown(
+                                choices=["chunks", "artifacts"],
+                                value="chunks",
+                                label="Modality",
+                                info="Type of data to store",
+                                scale=1
+                            )
+                        
+                        create_description = gr.Textbox(
+                            label="Description (Optional)",
+                            placeholder="Enter a description for the collection...",
+                            lines=2
+                        )
+                        
+                        with gr.Row():
+                            create_collection_btn = gr.Button("➕ Create Collection", variant="primary")
+                        
+                        create_output = gr.Textbox(
+                            label="Creation Result",
+                            lines=4,
+                            interactive=False,
+                            placeholder="Collection creation results will appear here..."
+                        )
+                    
+                    # Sub-tab: Rename Collection
+                    with gr.TabItem("✏️ Rename Collection"):
+                        gr.Markdown("### Rename Collection Display Name")
+                        
+                        with gr.Row():
+                            rename_old_name = gr.Textbox(
+                                label="Current Display Name",
+                                placeholder="Enter current display name...",
+                                scale=1
+                            )
+                            rename_new_name = gr.Textbox(
+                                label="New Display Name",
+                                placeholder="Enter new display name...",
+                                scale=1
+                            )
+                        
+                        with gr.Row():
+                            rename_collection_btn = gr.Button("✏️ Rename Collection", variant="primary")
+                        
+                        rename_output = gr.Textbox(
+                            label="Rename Result",
+                            lines=4,
+                            interactive=False,
+                            placeholder="Collection rename results will appear here..."
+                        )
+                    
+                    # Sub-tab: Delete Collection
+                    with gr.TabItem("🗑️ Delete Collection"):
+                        gr.Markdown("### ⚠️ Delete Collection")
+                        gr.Markdown("**Warning:** This will permanently delete the collection and all its data!")
+                        
+                        delete_collection_name = gr.Textbox(
+                            label="Collection Display Name",
+                            placeholder="Enter display name of collection to delete...",
+                            info="Type the exact display name of the collection you want to delete"
+                        )
+                        
+                        delete_force_checkbox = gr.Checkbox(
+                            label="I understand this action cannot be undone",
+                            value=False,
+                            info="Check this box to confirm deletion"
+                        )
+                        
+                        with gr.Row():
+                            delete_collection_btn = gr.Button("🗑️ Delete Collection", variant="stop")
+                        
+                        delete_collection_output = gr.Textbox(
+                            label="Deletion Result",
+                            lines=4,
+                            interactive=False,
+                            placeholder="Collection deletion results will appear here..."
+                        )
+            
+            # Tab 5: Delete Documents
             with gr.TabItem("🗑️ Delete Documents"):
                 
                 gr.Markdown("### ⚠️ Delete Documents")
@@ -400,10 +502,27 @@ def create_vector_app() -> gr.Blocks:
             if collection_mode == "new":
                 if not new_collection or not new_collection.strip():
                     return "❌ Please enter a name for the new collection."
-                collection_name = new_collection.strip().lower()
-                # Validate collection name (basic validation)
-                if not collection_name.replace('_', '').replace('-', '').isalnum():
-                    return "❌ Collection name can only contain letters, numbers, hyphens, and underscores."
+                
+                collection_name = new_collection.strip()
+                
+                # Try to create the collection first
+                try:
+                    create_result = vector.execute_command(
+                        'create-collection',
+                        display_name=collection_name,
+                        modality="chunks",  # Default to chunks for document processing
+                        description=f"Auto-created collection for uploaded documents"
+                    )
+                    
+                    if "❌" in create_result:
+                        # Collection creation failed, might already exist
+                        if "already exists" not in create_result:
+                            return f"❌ Failed to create collection: {create_result}"
+                        # If it already exists, continue with processing
+                    
+                except Exception as e:
+                    return f"❌ Error creating collection: {e}"
+                    
             else:
                 collection_name = current_collection
             
@@ -417,7 +536,7 @@ def create_vector_app() -> gr.Blocks:
                 try:
                     # If creating a new collection, show a message
                     if collection_mode == "new":
-                        print(f"🆕 Creating new collection: {collection_name}")
+                        print(f"🆕 Using collection: {collection_name}")
                     
                     for file in files:
                         file_path = file.name
@@ -434,7 +553,7 @@ def create_vector_app() -> gr.Blocks:
                     
                     # Add success message with collection info
                     if collection_mode == "new":
-                        success_msg = f"✅ Documents processed successfully in new collection '{collection_name}'!"
+                        success_msg = f"✅ Documents processed successfully in collection '{collection_name}'!"
                     else:
                         success_msg = f"✅ Documents processed successfully in collection '{collection_name}'!"
                     
@@ -513,6 +632,68 @@ def create_vector_app() -> gr.Blocks:
             """Refresh the collections dropdown."""
             return gr.Dropdown(choices=get_collections())
         
+        def list_all_collections():
+            """List all collections with their metadata."""
+            try:
+                return vector.execute_command('collections')
+            except Exception as e:
+                return f"❌ Error listing collections: {e}"
+        
+        def create_new_collection(display_name, modality, description):
+            """Create a new collection."""
+            try:
+                if not display_name or not display_name.strip():
+                    return "❌ Display name is required"
+                
+                if not modality:
+                    return "❌ Modality is required"
+                
+                result = vector.execute_command(
+                    'create-collection',
+                    display_name=display_name.strip(),
+                    modality=modality,
+                    description=description.strip() if description else ""
+                )
+                return result
+            except Exception as e:
+                return f"❌ Error creating collection: {e}"
+        
+        def rename_collection(old_name, new_name):
+            """Rename a collection's display name."""
+            try:
+                if not old_name or not old_name.strip():
+                    return "❌ Current display name is required"
+                
+                if not new_name or not new_name.strip():
+                    return "❌ New display name is required"
+                
+                result = vector.execute_command(
+                    'rename-collection',
+                    old_name=old_name.strip(),
+                    new_name=new_name.strip()
+                )
+                return result
+            except Exception as e:
+                return f"❌ Error renaming collection: {e}"
+        
+        def delete_collection(collection_name, force_confirmed):
+            """Delete a collection."""
+            try:
+                if not collection_name or not collection_name.strip():
+                    return "❌ Collection display name is required"
+                
+                if not force_confirmed:
+                    return "❌ Please confirm deletion by checking the checkbox"
+                
+                result = vector.execute_command(
+                    'delete-collection',
+                    display_name=collection_name.strip(),
+                    force=True
+                )
+                return result
+            except Exception as e:
+                return f"❌ Error deleting collection: {e}"
+        
         # Connect events
         refresh_btn.click(
             fn=refresh_collections,
@@ -580,6 +761,30 @@ def create_vector_app() -> gr.Blocks:
             fn=refresh_delete_files,
             inputs=[collection_dropdown],
             outputs=delete_filename_dropdown
+        )
+        
+        # Collection management handlers
+        list_collections_btn.click(
+            fn=list_all_collections,
+            outputs=collections_list
+        )
+        
+        create_collection_btn.click(
+            fn=create_new_collection,
+            inputs=[create_display_name, create_modality, create_description],
+            outputs=create_output
+        )
+        
+        rename_collection_btn.click(
+            fn=rename_collection,
+            inputs=[rename_old_name, rename_new_name],
+            outputs=rename_output
+        )
+        
+        delete_collection_btn.click(
+            fn=delete_collection,
+            inputs=[delete_collection_name, delete_force_checkbox],
+            outputs=delete_collection_output
         )
     
     return app

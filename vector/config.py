@@ -158,6 +158,11 @@ class Config:
         return self.get('vector_database.collection_name', 'regscout_documents')
     
     @property
+    def collections_metadata_file(self) -> str:
+        """Get collection metadata file path."""
+        return self.get('vector_database.collections_metadata_file', './collections_metadata.json')
+    
+    @property
     def response_lengths(self) -> Dict[str, int]:
         """Get response length presets."""
         return self.get('response_lengths', {

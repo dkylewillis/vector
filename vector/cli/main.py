@@ -10,6 +10,7 @@ from .parser import create_parser
 from ..core.agent import ResearchAgent
 from ..core.processor import DocumentProcessor
 from ..core.database import VectorDatabase
+from ..core.collection_manager import CollectionManager
 from ..utils.formatting import CLIFormatter
 
 
@@ -20,6 +21,7 @@ class VectorCLI:
         """Initialize CLI with configuration."""
         self.config = config or Config()
         self.formatter = CLIFormatter()
+        self.collection_manager = CollectionManager(self.config)
         self._agent = None
         self._document_processor = None
         self._database = None
@@ -42,7 +44,7 @@ class VectorCLI:
     def get_database(self, collection_name: str) -> VectorDatabase:
         """Get or create database for collection."""
         if self._database is None or self._current_collection != collection_name:
-            self._database = VectorDatabase(collection_name, self.config)
+            self._database = VectorDatabase(collection_name, self.config, self.collection_manager)
             self._current_collection = collection_name
         return self._database
     
@@ -52,10 +54,16 @@ class VectorCLI:
             collection_name = collection_name or self.config.default_collection
             
             # Handle special cases that don't need agent initialization
-            if command == 'info' and collection_name == 'all':
-                return self._list_all_collections()
-            elif command == 'models':
+            if command == 'models':
                 return self._list_available_models(kwargs.get('provider', 'openai'))
+            elif command == 'collections':
+                return self._handle_collections_command(kwargs)
+            elif command == 'create-collection':
+                return self._create_collection(kwargs)
+            elif command == 'rename-collection':
+                return self._rename_collection(kwargs)
+            elif command == 'delete-collection':
+                return self._delete_collection(kwargs)
             
             # Get agent for collection
             agent = self.get_agent(collection_name)
@@ -87,6 +95,15 @@ class VectorCLI:
             elif command == 'clear':
                 database = self.get_database(collection_name)
                 database.clear_collection()
+                
+                # Also clean up metadata if using collection manager
+                if self.collection_manager:
+                    # Find display name from collection name
+                    for display_name, coll_name in self.collection_manager.metadata["display_name_to_id"].items():
+                        if coll_name == collection_name:
+                            self.collection_manager.delete_collection_metadata(display_name)
+                            break
+                            
                 return f"✅ Collection '{collection_name}' cleared successfully"
             elif command == 'delete':
                 database = self.get_database(collection_name)
@@ -107,14 +124,6 @@ class VectorCLI:
             return f"❌ {e}"
         except Exception as e:
             return f"❌ Unexpected error: {e}"
-    
-    def _list_all_collections(self) -> str:
-        """List all collections without initializing agent."""
-        try:
-            temp_db = VectorDatabase("temp", self.config)
-            return self.formatter.format_collections_list(temp_db.client)
-        except Exception as e:
-            return f"❌ Error listing collections: {e}"
     
     def _list_available_models(self, provider: str) -> str:
         """List available models for the specified provider."""
@@ -157,6 +166,102 @@ class VectorCLI:
             "   3. Add api_key to config.yaml under ai_model section\n"
             "   Get your API key from: https://platform.openai.com/api-keys"
         )
+    
+    def _handle_collections_command(self, kwargs) -> str:
+        """Handle the collections list command."""
+        try:
+            collections = self.collection_manager.list_collections()
+            if not collections:
+                return "📝 No collections found"
+            
+            result = "📚 Collections:\n"
+            for collection in collections:
+                result += f"   • {collection['display_name']}\n"
+                result += f"     ID: {collection['collection_name']}\n"
+                result += f"     Type: {collection['modality']}\n"
+                if collection.get('description'):
+                    result += f"     Description: {collection['description']}\n"
+                result += f"     Created: {collection['created_at'][:10]}\n\n"
+            
+            return result.rstrip()
+        except Exception as e:
+            return f"❌ Error listing collections: {e}"
+    
+    def _create_collection(self, kwargs) -> str:
+        """Create a new collection."""
+        try:
+            display_name = kwargs.get('display_name')
+            modality = kwargs.get('modality')
+            description = kwargs.get('description', '')
+            
+            if not display_name or not modality:
+                return "❌ Both display_name and modality are required"
+            
+            collection_name = self.collection_manager.create_collection_name(
+                display_name=display_name,
+                modality=modality,
+                description=description
+            )
+            
+            return f"✅ Created collection '{display_name}' with ID: {collection_name}"
+        except ValueError as e:
+            return f"❌ {e}"
+        except Exception as e:
+            return f"❌ Error creating collection: {e}"
+    
+    def _rename_collection(self, kwargs) -> str:
+        """Rename a collection's display name."""
+        try:
+            old_name = kwargs.get('old_name')
+            new_name = kwargs.get('new_name')
+            
+            if not old_name or not new_name:
+                return "❌ Both old_name and new_name are required"
+            
+            success = self.collection_manager.rename_collection(old_name, new_name)
+            if success:
+                return f"✅ Renamed collection from '{old_name}' to '{new_name}'"
+            else:
+                return f"❌ Collection '{old_name}' not found"
+        except ValueError as e:
+            return f"❌ {e}"
+        except Exception as e:
+            return f"❌ Error renaming collection: {e}"
+    
+    def _delete_collection(self, kwargs) -> str:
+        """Delete a collection and its metadata."""
+        try:
+            display_name = kwargs.get('display_name')
+            force = kwargs.get('force', False)
+            
+            if not display_name:
+                return "❌ display_name is required"
+            
+            # Get collection name first
+            collection_name = self.collection_manager.get_collection_by_display_name(display_name)
+            if not collection_name:
+                return f"❌ Collection '{display_name}' not found"
+            
+            # Confirm deletion unless forced
+            if not force:
+                return (f"⚠️  This will permanently delete collection '{display_name}' ({collection_name}) "
+                       "and all its data. Use --force to confirm.")
+            
+            # Delete from vector database
+            try:
+                database = VectorDatabase(collection_name, self.config)
+                database.clear_collection()
+            except Exception as e:
+                print(f"⚠️  Warning: Could not delete vector data: {e}")
+            
+            # Delete metadata
+            success = self.collection_manager.delete_collection_metadata(display_name)
+            if success:
+                return f"✅ Deleted collection '{display_name}'"
+            else:
+                return f"❌ Error deleting collection metadata"
+        except Exception as e:
+            return f"❌ Error deleting collection: {e}"
     
 
 

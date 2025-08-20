@@ -10,7 +10,8 @@ A powerful document processing and AI-powered analysis tool with both command-li
 - **AI-Powered Q&A**: Get intelligent answers with document context using OpenAI GPT models
 - **Web Interface**: Modern web UI with Gradio and comprehensive metadata filtering
 - **Advanced Filtering**: Filter searches by filename, source, and document headings
-- **Multiple Collections**: Organize documents into separate collections
+- **Multiple Collections**: Organize documents into separate collections with ULID-based naming
+- **Collection Management**: Create, rename, and manage collections with friendly display names
 - **Configurable Response Lengths**: Short, medium, or long AI responses
 - **Cloud Storage**: Cloud-based vector database with local fallback support
 - **Professional Focus**: Specialized for municipal documents, ordinances, and regulations
@@ -66,7 +67,8 @@ The web interface provides an intuitive way to interact with Vector:
 - **Search Documents**: Perform semantic search with result ranking
 - **Advanced Filters**: Filter by filename, source, and document headings
 - **Upload Documents**: Process new documents directly through the web UI
-- **Collection Management**: Switch between different document collections
+- **Collection Management**: Create, rename, and delete collections with display names
+- **Collection Switching**: Switch between different document collections seamlessly
 - **Real-time Processing**: Upload and process documents with progress tracking
 
 Launch with: `python vector_web.py` and navigate to http://127.0.0.1:7860
@@ -76,9 +78,22 @@ Launch with: `python vector_web.py` and navigate to http://127.0.0.1:7860
 **Main CLI:** Use `python -m vector`
 
 **Collection Management:**
-All commands support the `--collection` or `-c` flag to specify which collection to use.
+All commands support the `--collection` or `-c` flag to specify which collection to use. Collections use ULID-based naming internally but can be referenced by friendly display names.
 
 ```cmd
+# Create new collections with display names
+python -m vector create-collection "Legal Documents Q1 2024" chunks --description "Q1 legal documents"
+python -m vector create-collection "Legal Docs Q1 Artifacts" artifacts --description "Tables and figures"
+
+# List all collections
+python -m vector collections
+
+# Rename a collection's display name
+python -m vector rename-collection "Legal Docs Q1" "Legal Documents Q1 2024"
+
+# Delete a collection (requires --force for safety)
+python -m vector delete-collection "Old Collection" --force
+
 # Process individual documents (supports PDF, DOCX, TXT, MD)
 python -m vector process "data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
 
@@ -126,6 +141,16 @@ python -m vector clear --collection temp  # Clear specific collection
 
 ## Commands
 
+### Collection Management Commands
+- **`collections`** - List all collections with metadata and display names
+- **`create-collection <display_name> <modality>`** - Create new collection with friendly name
+  - `<modality>` - Type of data: `chunks` (text) or `artifacts` (tables/figures)
+  - `--description` - Optional description
+- **`rename-collection <old_name> <new_name>`** - Change collection display name
+- **`delete-collection <display_name>`** - Delete collection and all data
+  - `--force` - Required flag to confirm deletion
+
+### Document Processing & Search Commands
 - **`--collection <name>`** - Global flag to specify collection (works with all commands)
 - **`process <files/dirs>`** - Add documents to knowledge base (supports directories)
 - **`search <query>`** - Search for relevant content using semantic similarity
@@ -144,25 +169,33 @@ python -m vector clear --collection temp  # Clear specific collection
 ## Collection Examples by Use Case
 
 ```cmd
-# Separate by jurisdiction (process individual files)
-python -m vector process "coweta_docs\ordinance1.docx" -c coweta
-python -m vector process "fulton_docs\zoning.pdf" -c fulton
+# Create collections for different purposes
+python -m vector create-collection "Coweta Legal Documents" chunks -d "Coweta ordinances and regulations"
+python -m vector create-collection "Fulton Zoning" chunks -d "Fulton County zoning documents"
+python -m vector create-collection "Drainage Artifacts" artifacts -d "Tables and figures from drainage manuals"
 
-# Separate by topic
-python -m vector process "zoning_ordinances\*.docx" -c zoning
-python -m vector process "drainage_manuals\manual.pdf" -c stormwater
+# Process documents to specific collections (use display names)
+python -m vector process "coweta_docs\ordinance1.docx" -c "Coweta Legal Documents"
+python -m vector process "fulton_docs\zoning.pdf" -c "Fulton Zoning"
 
-# Separate by project
-python -m vector process "project_alpha_docs\spec.pdf" -c project_alpha
-python -m vector process "project_beta_docs\*.docx" -c project_beta
+# Organize by topic
+python -m vector create-collection "Zoning Ordinances" chunks
+python -m vector create-collection "Stormwater Management" chunks
+python -m vector process "zoning_ordinances\*.docx" -c "Zoning Ordinances"
+python -m vector process "drainage_manuals\manual.pdf" -c "Stormwater Management"
 
-# Query specific collections
-python -m vector search "setback requirements" -c zoning
-python -m vector ask "What are easement requirements?" -c utilities
+# Query specific collections using display names
+python -m vector search "setback requirements" -c "Zoning Ordinances"
+python -m vector ask "What are easement requirements?" -c "Stormwater Management"
+
+# Manage collections
+python -m vector collections  # List all collections
+python -m vector rename-collection "Legal Docs" "Legal Documents 2024"
+python -m vector delete-collection "Temporary Collection" --force
 
 # Remove outdated documents
-python -m vector delete source "old_manual_v1" -c utilities
-python -m vector delete filename "deprecated_spec.pdf" -c project_alpha
+python -m vector delete source "old_manual_v1" -c "Stormwater Management"
+python -m vector delete filename "deprecated_spec.pdf" -c "Zoning Ordinances"
 ```
 
 ## Configuration
@@ -200,6 +233,7 @@ vector/
 │   │   └── styles.css    # Web styling
 │   ├── core/             # Core functionality
 │   │   ├── agent.py      # Research agent (search & AI)
+│   │   ├── collection_manager.py # Collection naming & metadata management
 │   │   ├── document_service.py # Document processing service
 │   │   ├── database.py   # Vector database operations
 │   │   ├── embedder.py   # Text embeddings
@@ -237,11 +271,18 @@ Vector follows a clean architecture with separated concerns:
 
 3. **VectorDatabase** (`core/database.py`)
    - Direct database operations (CRUD)
-   - Collection management
+   - Collection management with CollectionManager integration
    - Metadata indexing and filtering
+   - ULID-based collection naming with display name resolution
    - No business logic
 
-4. **DocumentProcessor** (`core/processor.py`)
+4. **CollectionManager** (`core/collection_manager.py`)
+   - ULID-based collection naming convention
+   - Display name to collection ID mapping
+   - Metadata storage and management
+   - Unique display name enforcement
+
+5. **DocumentProcessor** (`core/processor.py`)
    - Low-level document conversion
    - Text chunking with Docling
    - File format support (PDF, DOCX, etc.)
@@ -271,13 +312,24 @@ This architecture ensures clean separation of concerns and makes the codebase mo
 - Intelligent text chunking for optimal search results
 - Separated search/AI logic from document processing for better performance
 
+### Collection Management
+- ULID-based collection naming for guaranteed uniqueness and sortability
+- Friendly display names for easy human interaction
+- Automatic metadata tracking (creation date, description, modality)
+- Support for both `chunks` (text) and `artifacts` (tables/figures) modalities
+- JSON-based metadata storage with collection lifecycle management
+- CLI commands for creating, listing, renaming, and deleting collections
+
 ### Web Interface Features
 - Modern, responsive web UI built with Gradio
 - Real-time document upload and processing
 - Interactive filtering with multiple selection support
-- Collection management with visual feedback
+- Collection management with visual feedback and full CRUD operations
+- Collection creation, renaming, and deletion through intuitive interface
+- Display name management for user-friendly collection identification
 - Scrollable filter lists for large document sets
 - Professional styling with Inter font
+- Safety mechanisms for destructive operations (deletion confirmations)
 
 ### Cloud Infrastructure
 - Cloud Qdrant vector database for scalable storage
