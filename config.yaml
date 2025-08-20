@@ -34,7 +34,7 @@ vector_database:
   collection_name: "default"  # Default collection name
   
   # Collection metadata storage
-  collections_metadata_file: "data/collections_metadata.json"  # Path to collection metadata storage
+  collections_metadata_file: "./collections_metadata.json"  # Path to collection metadata storage
   
   # Legacy local storage (deprecated)
   local_path: "./qdrant_db"         # Path for local file storage

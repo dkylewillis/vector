@@ -1,0 +1,80 @@
+{
+  "collections": {
+    "c_01K32QV4PMB9ZE7KW133SG62Q5__chunks": {
+      "display_name": "gsmm",
+      "ulid": "01K32QV4PMB9ZE7KW133SG62Q5",
+      "modality": "chunks",
+      "description": "Migrated from gsmm",
+      "created_at": "2025-08-19T23:20:13.060091",
+      "status": "active"
+    },
+    "c_01K32QVKNKB7GKRQ0SKR9TPRNY__chunks": {
+      "display_name": "fayette",
+      "ulid": "01K32QVKNKB7GKRQ0SKR9TPRNY",
+      "modality": "chunks",
+      "description": "Migrated from fayette",
+      "created_at": "2025-08-19T23:20:27.690773",
+      "status": "active"
+    },
+    "c_01K32QW1YAFNFBZARN4673FHDQ__chunks": {
+      "display_name": "ada",
+      "ulid": "01K32QW1YAFNFBZARN4673FHDQ",
+      "modality": "chunks",
+      "description": "Migrated from ada",
+      "created_at": "2025-08-19T23:20:31.076741",
+      "status": "active"
+    },
+    "c_01K32QW5818FF3DVWBMH4YVPP9__chunks": {
+      "display_name": "peachtree_city",
+      "ulid": "01K32QW5818FF3DVWBMH4YVPP9",
+      "modality": "chunks",
+      "description": "Migrated from peachtree_city",
+      "created_at": "2025-08-19T23:20:38.603425",
+      "status": "active"
+    },
+    "c_01K32QWCK9GXAGGX8AHD03D5N4__chunks": {
+      "display_name": "clayton_county",
+      "ulid": "01K32QWCK9GXAGGX8AHD03D5N4",
+      "modality": "chunks",
+      "description": "Migrated from clayton_county",
+      "created_at": "2025-08-19T23:20:51.507952",
+      "status": "active"
+    },
+    "c_01K32QWS7SRHCEW0BMBSV6XFQC__chunks": {
+      "display_name": "default",
+      "ulid": "01K32QWS7SRHCEW0BMBSV6XFQC",
+      "modality": "chunks",
+      "description": "Migrated from default",
+      "created_at": "2025-08-19T23:20:52.021445",
+      "status": "active"
+    },
+    "c_01K32QWSPDND32KK5J021QMP83__chunks": {
+      "display_name": "coweta",
+      "ulid": "01K32QWSPDND32KK5J021QMP83",
+      "modality": "chunks",
+      "description": "Migrated from coweta",
+      "created_at": "2025-08-19T23:21:00.452575",
+      "status": "active"
+    },
+    "c_01K32QX1XY0GWGMBPQ0Q2R3REK__chunks": {
+      "display_name": "test",
+      "ulid": "01K32QX1XY0GWGMBPQ0Q2R3REK",
+      "modality": "chunks",
+      "description": "Migrated from test",
+      "created_at": "2025-08-19T23:21:01.541778",
+      "status": "active"
+    }
+  },
+  "display_name_to_id": {
+    "gsmm": "c_01K32QV4PMB9ZE7KW133SG62Q5__chunks",
+    "fayette": "c_01K32QVKNKB7GKRQ0SKR9TPRNY__chunks",
+    "ada": "c_01K32QW1YAFNFBZARN4673FHDQ__chunks",
+    "peachtree_city": "c_01K32QW5818FF3DVWBMH4YVPP9__chunks",
+    "clayton_county": "c_01K32QWCK9GXAGGX8AHD03D5N4__chunks",
+    "default": "c_01K32QWS7SRHCEW0BMBSV6XFQC__chunks",
+    "coweta": "c_01K32QWSPDND32KK5J021QMP83__chunks",
+    "test": "c_01K32QX1XY0GWGMBPQ0Q2R3REK__chunks"
+  },
+  "created_at": "2025-08-19T23:19:53.632065",
+  "updated_at": "2025-08-19T23:21:01.541787"
+}

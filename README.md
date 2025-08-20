@@ -234,7 +234,6 @@ vector/
 │   ├── core/             # Core functionality
 │   │   ├── agent.py      # Research agent (search & AI)
 │   │   ├── collection_manager.py # Collection naming & metadata management
-│   │   ├── document_service.py # Document processing service
 │   │   ├── database.py   # Vector database operations
 │   │   ├── embedder.py   # Text embeddings
 │   │   ├── processor.py  # Document processing engine
