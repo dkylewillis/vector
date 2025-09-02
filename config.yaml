@@ -38,3 +38,13 @@ vector_database:
   
   # Legacy local storage (deprecated)
   local_path: "./qdrant_db"         # Path for local file storage
+
+ # Directory to store generated artifacts
+
+# Storage Configuration
+storage:
+  backend: "filesystem"               # Options: 'filesystem', 'postgresql' (future)
+  artifacts_dir: "./data"             # Base directory for processed data storage
+  
+  # PostgreSQL configuration (when using postgresql backend - future)
+  # postgres_connection_string: "postgresql://user:password@localhost/vectordb"

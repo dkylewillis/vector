@@ -21,6 +21,7 @@ python-dotenv
 
 # AI services
 openai
+runpod
 
 # Additional web dependencies
 gradio>=4.0.0

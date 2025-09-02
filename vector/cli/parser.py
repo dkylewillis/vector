@@ -15,6 +15,8 @@ Examples:
   vector search "zoning requirements" --collection documents
   vector ask "What are the fire safety requirements?" --length long
   vector process documents/*.pdf --source manuals
+  vector process documents/*.pdf --source manuals --no-artifacts
+  vector process documents/*.pdf --source manuals --use-pdf-pipeline
   vector delete filename "old_document.pdf" --collection documents
   vector delete source "outdated_manuals" --collection documents
   vector info --collection documents
@@ -117,6 +119,16 @@ Examples:
         '--force', '-f',
         action='store_true',
         help='Force reprocessing of existing documents'
+    )
+    process_parser.add_argument(
+        '--no-artifacts',
+        action='store_true',
+        help='Skip indexing of images and tables (faster processing)'
+    )
+    process_parser.add_argument(
+        '--use-pdf-pipeline',
+        action='store_true',
+        help='Use PDF Pipeline instead of VLM Pipeline (faster but less accurate)'
     )
     process_parser.add_argument(
         '--verbose', '-v',

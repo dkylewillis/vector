@@ -3,18 +3,15 @@
 import os
 import hashlib
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-
-from docling.document_converter import DocumentConverter
-from docling.chunking import HybridChunker
-from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-from transformers import AutoTokenizer
-
+from typing import List, Optional
 from ..config import Config
 from ..exceptions import ProcessingError, VectorError
 from .embedder import Embedder
 from .database import VectorDatabase
 from .collection_manager import CollectionManager
+from .chunking import DocumentChunker
+from .artifacts import ArtifactProcessor
+from .converter import DocumentConverter
 from .models import Chunk, ChunkMetadata, DocumentResult
 
 class DocumentProcessor:
@@ -38,33 +35,40 @@ class DocumentProcessor:
         self.collection_name = collection_name
         self.collection_manager = collection_manager
         
-        # Initialize embedding and database components
+        # Initialize core components
         self.embedder = Embedder(config)
         self.vector_db = VectorDatabase(collection_name, config, collection_manager)
+        self.chunker = DocumentChunker(config.embedder_model)
+        self.artifact_processor = ArtifactProcessor(self.embedder, self.vector_db)
         
-        # Initialize tokenizer and chunker
-        model_name = config.embedder_model
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
-        self.tokenizer = HuggingFaceTokenizer(
-            tokenizer=tokenizer,
-            max_tokens=tokenizer.model_max_length,
-        )
-        
-        self.chunker = HybridChunker(tokenizer=self.tokenizer)
-        self.converter = DocumentConverter()
+        # Note: converter will be created per operation based on artifact needs
         
         # Track processed files by file hash
         self.processed_files = set()
 
+    def _get_converter(self, generate_artifacts: bool, use_vlm_pipeline: bool = True) -> DocumentConverter:
+        """Get a converter instance configured for artifact generation needs.
+        
+        Args:
+            generate_artifacts: Whether artifacts should be generated
+            use_vlm_pipeline: Whether to use VLM Pipeline (True) or PDF Pipeline (False)
+            
+        Returns:
+            Configured DocumentConverter instance
+        """
+        return DocumentConverter(generate_artifacts=generate_artifacts, use_vlm_pipeline=use_vlm_pipeline)
+
     def process_and_index_files(self, files: List[str], force: bool = False, 
-                               source: Optional[str] = None) -> str:
+                               source: Optional[str] = None, index_artifacts: bool = True, 
+                               use_vlm_pipeline: bool = True) -> str:
         """Process and index documents in one step.
         
         Args:
             files: List of file or directory paths to process
             force: Force reprocessing of existing documents
             source: Source type for documents
+            index_artifacts: Whether to index artifacts (images, tables)
+            use_vlm_pipeline: Whether to use VLM Pipeline (True) or PDF Pipeline (False)
             
         Returns:
             Processing status message
@@ -82,7 +86,7 @@ class DocumentProcessor:
             
             for path in files:
                 try:
-                    chunks = self.process_path(path, source, force)
+                    chunks = self.process_path(path, source, force, index_artifacts=index_artifacts, use_vlm_pipeline=use_vlm_pipeline)
                     if chunks:
                         # Process in batches to avoid timeouts
                         batch_size = self.BATCH_SIZE  # Process 100 chunks at a time
@@ -110,74 +114,45 @@ class DocumentProcessor:
         except Exception as e:
             raise VectorError(f"File processing failed: {e}")
 
-    def process_document(self, file_path: Path, source: Optional[str] = None) -> DocumentResult:
+    def process_document(self, file_path: Path, source: Optional[str] = None, index_artifacts: bool = True, use_vlm_pipeline: bool = True) -> DocumentResult:
         """Convert file to DocumentResult - reusable document conversion.
         
         Args:
             file_path: Path to the file to convert
             source: Source category (ordinances, manuals, etc.)
+            index_artifacts: Whether to index artifacts
+            use_vlm_pipeline: Whether to use VLM Pipeline (True) or PDF Pipeline (False)
             
         Returns:
             DocumentResult object with converted document and metadata
         """
         print(f"Converting: {file_path}")
         
-        # Convert document using Docling
-        doc = self.converter.convert(str(file_path)).document
-        if not doc:
-            raise ProcessingError(f"Failed to convert {file_path}")
+        # Get converter configured for artifact needs
+        converter = self._get_converter(generate_artifacts=index_artifacts, use_vlm_pipeline=use_vlm_pipeline)
         
+        # Convert document using Docling
+        doc = converter.convert_document(file_path)
+
         # Calculate metadata
         file_hash = self._calculate_file_hash(file_path)
         source_category = self._determine_source(file_path, source)
         
-        return DocumentResult(
+        doc_result = DocumentResult(
             document=doc,
             file_path=file_path,
             source_category=source_category,
             file_hash=file_hash
         )
 
-    def chunk_document(self, doc_result: DocumentResult) -> List[Chunk]:
-        """Convert DocumentResult to chunks - separated chunking logic.
-        
-        Args:
-            doc_result: DocumentResult from process_document()
-            
-        Returns:
-            List of Chunk objects with text and metadata
-        """
-        # Chunk the document
-        chunks = self.chunker.chunk(doc_result.document)
-        if not chunks:
-            print(f"No chunks created for {doc_result.file_path.name}")
-            return []
+        # Index artifacts if requested
+        if index_artifacts:
+            self.artifact_processor.index_artifacts(doc_result)
 
-        # Process chunks and add metadata
-        processed_chunks = []
-        for chunk in chunks:
-            contextualized_text = self.chunker.contextualize(chunk=chunk)
-            metadata = chunk.meta.export_json_dict()
-
-            chunk_metadata = ChunkMetadata(
-                filename=doc_result.file_path.name,
-                headings=metadata.get('headings', []),
-                source=doc_result.source_category,
-                file_path=str(doc_result.file_path),
-                file_hash=doc_result.file_hash
-            )
-            
-            chunk_obj = Chunk(
-                text=contextualized_text,
-                metadata=chunk_metadata
-            )
-            processed_chunks.append(chunk_obj)
-
-        print(f"✅ Created {len(processed_chunks)} chunks from {doc_result.file_path.name}")
-        return processed_chunks
+        return doc_result
 
     def process_path(self, path: str, source: Optional[str] = None, 
-                    force: bool = False, recursive: bool = True) -> List[Chunk]:
+                    force: bool = False, recursive: bool = True, index_artifacts: bool = True, use_vlm_pipeline: bool = True) -> List[Chunk]:
         """Process a file or directory path and return chunks.
 
         Args:
@@ -185,6 +160,8 @@ class DocumentProcessor:
             source: Source category (ordinances, manuals, etc.)
             force: Force reprocessing if already processed
             recursive: Whether to process subdirectories (ignored for files)
+            index_artifacts: Whether to index artifacts
+            use_vlm_pipeline: Whether to use VLM Pipeline (True) or PDF Pipeline (False)
 
         Returns:
             List of Chunk objects from processed file(s)
@@ -201,7 +178,7 @@ class DocumentProcessor:
         if path_obj.is_file():
             # Single file processing
             if self.is_supported_file(str(path_obj)):
-                chunks = self._process_single_file(path_obj, source, force)
+                chunks = self._process_single_file(path_obj, source, force, index_artifacts, use_vlm_pipeline)
                 if chunks:
                     all_chunks.extend(chunks)
                     processed_files += 1
@@ -218,7 +195,7 @@ class DocumentProcessor:
             for file_path in path_obj.glob(pattern):
                 if file_path.is_file() and self.is_supported_file(str(file_path)):
                     try:
-                        chunks = self._process_single_file(file_path, source, force)
+                        chunks = self._process_single_file(file_path, source, force, index_artifacts, use_vlm_pipeline)
                         if chunks:
                             all_chunks.extend(chunks)
                             processed_files += 1
@@ -341,13 +318,15 @@ class DocumentProcessor:
             print(f"⚠️  Warning: Could not remove existing documents for {file_path.name}: {e}")
 
     def _process_single_file(self, file_path: Path, source: Optional[str] = None, 
-                            force: bool = False) -> List[Chunk]:
+                            force: bool = False, index_artifacts: bool = True, use_vlm_pipeline: bool = True) -> List[Chunk]:
         """Process a single file and return chunks (internal method).
 
         Args:
             file_path: Path object for the file to process
             source: Source category (ordinances, manuals, etc.)
             force: Force reprocessing if already processed
+            index_artifacts: Whether to index artifacts
+            use_vlm_pipeline: Whether to use VLM Pipeline (True) or PDF Pipeline (False)
 
         Returns:
             List of Chunk objects with text and metadata
@@ -363,10 +342,10 @@ class DocumentProcessor:
                 self._remove_existing_file_documents(file_path)
 
             # Convert to DocumentResult first
-            doc_result = self.process_document(file_path, source)
+            doc_result = self.process_document(file_path, source, index_artifacts, use_vlm_pipeline)
             
             # Then chunk it
-            chunks = self.chunk_document(doc_result)
+            chunks = self.chunker.chunk_document(doc_result)
             
             # Mark file as processed
             self.processed_files.add(doc_result.file_hash)

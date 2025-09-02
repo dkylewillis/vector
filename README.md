@@ -5,6 +5,8 @@ A powerful document processing and AI-powered analysis tool with both command-li
 ## Features
 
 - **Document Processing**: Supports PDF, DOCX, TXT, and Markdown files with Docling converter
+- **Pipeline Options**: Choose between VLM Pipeline (better quality) or PDF Pipeline (faster processing)
+- **Artifact Processing**: Optional indexing of images and tables with `--no-artifacts` for faster processing
 - **Directory Processing**: Process entire directories recursively with duplicate detection
 - **Vector Search**: Fast semantic search using cloud Qdrant vector database
 - **AI-Powered Q&A**: Get intelligent answers with document context using OpenAI GPT models
@@ -97,6 +99,15 @@ python -m vector delete-collection "Old Collection" --force
 # Process individual documents (supports PDF, DOCX, TXT, MD)
 python -m vector process "data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
 
+# Process documents without indexing artifacts (faster processing)
+python -m vector process "data\large_documents\*.pdf" --no-artifacts
+
+# Use PDF Pipeline for faster processing (less accurate than VLM)
+python -m vector process "data\technical_manuals\*.pdf" --use-pdf-pipeline
+
+# Combine flags for fastest processing
+python -m vector process "data\large_batch\*.pdf" --no-artifacts --use-pdf-pipeline
+
 # Process to specific collections
 python -m vector process "data\zoning\zoning_ordinance.docx" --collection zoning
 python -m vector process "data\utilities\utility_standards.pdf" -c utilities
@@ -153,6 +164,10 @@ python -m vector clear --collection temp  # Clear specific collection
 ### Document Processing & Search Commands
 - **`--collection <name>`** - Global flag to specify collection (works with all commands)
 - **`process <files/dirs>`** - Add documents to knowledge base (supports directories)
+  - `--no-artifacts` - Skip indexing of images and tables for faster processing
+  - `--use-pdf-pipeline` - Use PDF Pipeline instead of VLM Pipeline (faster but less accurate)
+  - `--force` - Force reprocessing of existing documents
+  - `--source <type>` - Specify document source type (ordinances, manuals, checklists, other)
 - **`search <query>`** - Search for relevant content using semantic similarity
 - **`ask <question>`** - Get AI-powered answers with document context
   - `--length short|medium|long` - Response length (150/500/1500 tokens)
@@ -177,6 +192,12 @@ python -m vector create-collection "Drainage Artifacts" artifacts -d "Tables and
 # Process documents to specific collections (use display names)
 python -m vector process "coweta_docs\ordinance1.docx" -c "Coweta Legal Documents"
 python -m vector process "fulton_docs\zoning.pdf" -c "Fulton Zoning"
+
+# Process large documents without artifacts for faster processing
+python -m vector process "large_manuals\*.pdf" -c "Technical Manuals" --no-artifacts
+
+# Use PDF Pipeline for batch processing (fastest option)
+python -m vector process "batch_docs\*.pdf" -c "Batch Collection" --use-pdf-pipeline --no-artifacts
 
 # Organize by topic
 python -m vector create-collection "Zoning Ordinances" chunks
@@ -294,13 +315,58 @@ Vector follows a clean architecture with separated concerns:
 
 This architecture ensures clean separation of concerns and makes the codebase more maintainable and testable.
 
+## Processing Pipeline Options
+
+Vector offers two document processing pipelines to balance quality and speed:
+
+### VLM Pipeline (Default - Recommended)
+- **Best Quality**: Uses Vision Language Models for superior document understanding
+- **Better Artifact Detection**: More accurate extraction of images, tables, and complex layouts
+- **Slower Processing**: Takes more time due to advanced AI processing
+- **Use Cases**: High-quality document analysis, complex layouts, important documents
+
+### PDF Pipeline (Fast Alternative)
+- **Faster Processing**: Traditional PDF processing for speed
+- **Good Quality**: Reliable text extraction with basic layout understanding
+- **Less Accurate Artifacts**: May miss some complex visual elements
+- **Use Cases**: Batch processing, simple documents, quick indexing
+
+### Performance Comparison
+
+| Configuration | Pipeline | Artifacts | Speed | Quality | Best For |
+|--------------|----------|-----------|-------|---------|----------|
+| *(default)* | VLM | Yes | Slowest | Excellent | Important documents |
+| `--no-artifacts` | VLM | No | Medium | Very Good | Text-focused analysis |
+| `--use-pdf-pipeline` | PDF | Yes | Medium | Good | Balanced processing |
+| `--no-artifacts --use-pdf-pipeline` | PDF | No | Fastest | Basic | Batch processing |
+
+### Usage Examples
+
+```cmd
+# High quality processing (default)
+python -m vector process important_docs/*.pdf -c "Legal Documents"
+
+# Fast batch processing
+python -m vector process large_batch/*.pdf -c "Archive" --use-pdf-pipeline --no-artifacts
+
+# Text-only processing with VLM quality
+python -m vector process reports/*.pdf -c "Reports" --no-artifacts
+
+# Balanced speed/quality
+python -m vector process manuals/*.pdf -c "Manuals" --use-pdf-pipeline
+```
+
 ## Key Features Explained
 
 ### Document Processing
 - Processes PDF, DOCX, TXT, and Markdown files using Docling converter
+- **VLM Pipeline**: Uses Vision Language Models for superior document understanding (default)
+- **PDF Pipeline**: Traditional processing for faster speed with `--use-pdf-pipeline` flag
 - Automatic hybrid chunking for better search results
 - Preserves document structure and headings
 - Duplicate detection prevents reprocessing
+- Optional artifact indexing (images/tables) with `--no-artifacts` flag for faster processing
+- Configurable document conversion based on processing needs
 
 ### Smart Search & Q&A
 - Semantic search finds relevant content even with different wording using sentence transformers

@@ -81,9 +81,15 @@ class VectorCLI:
                                kwargs.get('metadata_filter'))
             elif command == 'process':
                 doc_processor = self.get_document_processor(collection_name)
+                # Convert --no-artifacts flag to index_artifacts boolean
+                index_artifacts = not kwargs.get('no_artifacts', False)
+                # Convert --use-pdf-pipeline flag to use_vlm_pipeline boolean (inverted)
+                use_vlm_pipeline = not kwargs.get('use_pdf_pipeline', False)
                 return doc_processor.process_and_index_files(kwargs.get('files', []),
                                          kwargs.get('force', False),
-                                         kwargs.get('source'))
+                                         kwargs.get('source'),
+                                         index_artifacts,
+                                         use_vlm_pipeline)
             elif command == 'info':
                 database = self.get_database(collection_name)
                 info = database.get_collection_info()
@@ -198,7 +204,7 @@ class VectorCLI:
             # Also create the actual vector database collection
             try:
                 # Use a default vector size - this will be updated when documents are first added
-                vector_size = 1536  # OpenAI embedding size
+                vector_size = 384  
                 database = VectorDatabase(collection_name, self.config, self.collection_manager)
                 database.create_collection(vector_size)
                 

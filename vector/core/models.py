@@ -8,11 +8,16 @@ from docling_core.types import DoclingDocument
 
 class ChunkMetadata(BaseModel):
     """Metadata for a document chunk."""
+    chunk_ref: Optional[str] = None  # Docling ref_item if available
     filename: str
     headings: List[str] = Field(default_factory=list)
     source: str
     file_path: str
     file_hash: str
+    # Artifact references using Docling ref_item IDs
+    referenced_artifacts: List[str] = Field(default_factory=list)  # ref_item IDs
+    nearby_artifacts: List[str] = Field(default_factory=list)     # ref_item IDs in same section
+
 
 
 class Chunk(BaseModel):
@@ -23,7 +28,8 @@ class Chunk(BaseModel):
 
 class ArtifactMetadata(BaseModel):
     """Metadata for figures and tables."""
-    type: str  # "figure" | "table"
+    ref_item: str  # Docling's ref_item ID - required for artifacts
+    type: str  # "image" | "table" 
     title: str
     label: str
     caption: str
@@ -32,12 +38,9 @@ class ArtifactMetadata(BaseModel):
     source: str
     heading_path: List[str] = Field(default_factory=list)
     nearby_text: str
-    image_path: Optional[str] = None
-    thumb_path: Optional[str] = None
-    table_html: Optional[str] = None
-    ocr_text: Optional[str] = None
-    width_px: Optional[int] = None
-    height_px: Optional[int] = None
+    # References back to chunks using ref_item IDs
+    related_chunks: List[str] = Field(default_factory=list)
+    # ...existing optional fields...
 
 
 class Artifact(BaseModel):

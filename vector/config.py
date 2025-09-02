@@ -170,6 +170,31 @@ class Config:
             'medium': 8000, 
             'long': 15000
         })
+
+    @property
+    def artifacts_dir(self) -> str:
+        """Get artifacts directory path."""
+        # First try new storage config, then fall back to legacy
+        storage_dir = self.get('storage.artifacts_dir')
+        if storage_dir:
+            return storage_dir
+        return self.get('vector_database.artifacts_dir', './scratch')
+    
+    @property
+    def storage_backend(self) -> str:
+        """Get storage backend type."""
+        return self.get('storage.backend', 'filesystem')
+    
+    @property
+    def postgres_connection_string(self) -> Optional[str]:
+        """Get PostgreSQL connection string."""
+        # First try environment variable
+        conn_str = os.getenv('POSTGRES_CONNECTION_STRING')
+        if conn_str:
+            return conn_str
+        
+        # Then try config file
+        return self.get('storage.postgres_connection_string')
     
     def __getitem__(self, key: str) -> Any:
         """Support dict-like access for backward compatibility."""
