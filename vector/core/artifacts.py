@@ -8,14 +8,14 @@ from typing import List, Optional, Dict, Tuple
 from pathlib import Path
 from datetime import datetime
 
-from docling_core.types.doc.document import RefItem, TableItem, PictureItem, DoclingDocument, SectionHeaderItem
+from docling_core.types.doc.document import RefItem, TextItem, TableItem, PictureItem, DoclingDocument, SectionHeaderItem
 
 from .models import DocumentResult
 from .embedder import Embedder
 from .database import VectorDatabase
 from ..config import Config
 from .utils import extract_ref_id, image_to_hexhash
-from .storage import StorageBackend, StorageFactory
+from .filesystem import FileSystemStorage
 
 import hashlib
 
@@ -28,7 +28,7 @@ class ArtifactProcessor:
     def __init__(self, embedder: Optional[Embedder] = None, vector_db: Optional[VectorDatabase] = None, 
                  debug: bool = False, save_metadata: bool = False, 
                  generate_thumbnails: bool = True, thumbnail_size: Tuple[int, int] = (150, 150),
-                 config: Optional[Config] = None, storage_backend: Optional[StorageBackend] = None):
+                 config: Optional[Config] = None, storage: Optional[FileSystemStorage] = None):
         """Initialize artifact processor.
         
         Args:
@@ -39,7 +39,7 @@ class ArtifactProcessor:
             generate_thumbnails: Whether to generate thumbnails for artifacts
             thumbnail_size: Max dimensions for thumbnails (width, height)
             config: Configuration instance
-            storage_backend: Storage backend for documents and artifacts
+            storage: Filesystem storage instance
         """
         self.embedder = embedder
         self.vector_db = vector_db
@@ -49,78 +49,144 @@ class ArtifactProcessor:
         self.thumbnail_size = thumbnail_size
         self.config = config or Config()
         
-        # Initialize storage backend
-        self.storage_backend = storage_backend
-        self._storage_initialized = False
+        # Initialize storage
+        self.storage = storage or FileSystemStorage(self.config)
         
-    async def _ensure_storage_initialized(self) -> None:
-        """Ensure storage backend is initialized."""
-        if not self._storage_initialized and self.storage_backend:
-            await self.storage_backend.initialize()
-            self._storage_initialized = True
-    
-    async def process_document(self, doc_result: DocumentResult) -> None:
-        """Process document with storage.
-        
-        Args:
-            doc_result: Document result to process
-        """
-        await self._ensure_storage_initialized()
-        
-        # Save document if storage backend is available
-        if self.storage_backend:
-            doc_id = await self.storage_backend.get_document_storage().save_document(doc_result)
-            print(f"📄 Saved document: {doc_id}")
-        
-        # Process artifacts
-        await self.index_artifacts(doc_result)
-    
     async def index_artifacts(self, doc_result: DocumentResult) -> None:
-        """Index artifacts (images, tables) from a document.
-        
-        Args:
-            doc_result: Document result with metadata
-        """
+        """Index artifacts (images, tables) from a document."""
         artifacts_processed = 0
         artifacts_stored = 0
-        heading_stack = []  # Stack to track current heading hierarchy
+        heading_stack = []
         doc = doc_result.document
         
-        for item, level in doc.iterate_items():
+        # Convert to list for bidirectional access
+        items = list(doc.iterate_items())
+        
+        for idx, (item, level) in enumerate(items):
             
             if isinstance(item, SectionHeaderItem):
-                # Update heading stack based on current level
                 heading_stack = self._update_heading_stack(heading_stack, item, level)
-                
+                    
             elif isinstance(item, PictureItem):
-                # Step 1: Create metadata (always succeeds)
-                metadata = await self._get_picture_metadata(item, doc_result, level, heading_stack.copy())
-                artifacts_processed += 1
+                # Get before_text (200 chars before current item)
+                before_text = self._get_context_text(items, idx, direction="before", max_chars=200)
                 
-                # Step 2: Embed and store (can fail independently)
+                # Get after_text (200 chars after current item)  
+                after_text = self._get_context_text(items, idx, direction="after", max_chars=200)
+                
+                # Pass context to metadata creation
+                metadata = await self._get_picture_metadata(item, doc_result, level, heading_stack.copy(), 
+                                                          before_text=before_text, after_text=after_text)
+                
+                # Generate thumbnail separately if enabled
+                if self.generate_thumbnails:
+                    thumbnail_info = await self._generate_thumbnail(item, doc_result, "image", extra_metadata=metadata)
+                    metadata.update(thumbnail_info)
+                    artifacts_processed += 1
+                
                 if self._should_embed_and_store():
                     success = self._embed_and_store_picture(metadata['caption'], metadata)
                     if success:
                         artifacts_stored += 1
-                
+                    
             elif isinstance(item, TableItem):
-                # Step 1: Create metadata (always succeeds)
-                metadata = await self._get_table_metadata(item, doc_result, level, heading_stack.copy())
+                # Same logic for tables
+                before_text = self._get_context_text(items, idx, direction="before", max_chars=200)
+                after_text = self._get_context_text(items, idx, direction="after", max_chars=200)
+                
+                # Pass context to metadata creation
+                metadata = await self._get_table_metadata(item, doc_result, level, heading_stack.copy(),
+                                                        before_text=before_text, after_text=after_text)
+                
+                # Generate thumbnail separately if enabled
+                if self.generate_thumbnails:
+                    thumbnail_info = await self._generate_thumbnail(item, doc_result, "table", extra_metadata=metadata)
+                    metadata.update(thumbnail_info)
+
                 artifacts_processed += 1
                 
-                # Step 2: Embed and store (can fail independently)
                 if self._should_embed_and_store():
                     table_text = self._extract_table_text(doc, item)
                     success = self._embed_and_store_table(table_text, metadata)
                     if success:
                         artifacts_stored += 1
-        
+
         # Summary reporting
         if artifacts_processed > 0:
             print(f"📊 Indexed {artifacts_processed} artifacts from {doc_result.file_path.name}")
             if self._should_embed_and_store():
                 print(f"💾 Stored {artifacts_stored}/{artifacts_processed} artifacts in vector database")
 
+    def _get_context_text(self, items: List[Tuple], current_idx: int, direction: str, max_chars: int = 200) -> Optional[str]:
+        """Extract context text before or after the current item.
+        
+        Args:
+            items: List of (item, level) tuples
+            current_idx: Index of current item
+            direction: "before" or "after"
+            max_chars: Maximum characters to collect
+            
+        Returns:
+            Context text or None if not enough content
+        """
+        text_buffer = ""
+        
+        if direction == "before":
+            # Collect text from items before current index (backwards)
+            for i in range(current_idx - 1, -1, -1):
+                item, level = items[i]
+                item_text = self._extract_item_text(item)
+                if item_text:
+                    # Add to beginning since we're going backwards
+                    text_buffer = item_text + " " + text_buffer
+                    if len(text_buffer) >= max_chars:
+                        break
+                        
+        elif direction == "after":
+            # Collect text from items after current index (forwards)
+            for i in range(current_idx + 1, len(items)):
+                item, level = items[i]
+                item_text = self._extract_item_text(item)
+                if item_text:
+                    text_buffer += item_text + " "
+                    if len(text_buffer) >= max_chars:
+                        break
+        
+        # Trim to max_chars and clean up
+        if text_buffer:
+            text_buffer = text_buffer.strip()
+            if len(text_buffer) > max_chars:
+                if direction == "before":
+                    text_buffer = text_buffer[-max_chars:]  # Keep end
+                else:
+                    text_buffer = text_buffer[:max_chars]   # Keep beginning
+            return text_buffer
+        
+        return None
+
+    def _extract_item_text(self, item) -> Optional[str]:
+        """Extract text from any document item type."""
+        # ✅ Check if item is TextItem
+        if isinstance(item, TextItem) and item.text:
+            return item.text
+        
+        # ✅ Check if item is SectionHeaderItem  
+        elif isinstance(item, SectionHeaderItem) and item.text:
+            return item.text
+        
+        # Check for other text-containing items
+        elif hasattr(item, 'text') and item.text:
+            return item.text
+        
+        # Try caption text for picture/table items
+        elif hasattr(item, 'caption_text') and callable(item.caption_text):
+            try:
+                return item.caption_text()
+            except:
+                return None
+                
+        return None
+    
     def _update_heading_stack(self, heading_stack: List[Dict], header_item: SectionHeaderItem, level: int) -> List[Dict]:
         """Update the heading stack based on the current header level.
         
@@ -179,14 +245,14 @@ class ArtifactProcessor:
             f.write("-" * 80 + "\n")
 
     async def _get_picture_metadata(self, item: PictureItem, doc_result: DocumentResult, 
-                                         level: int, heading_stack: List[Dict]) -> Dict:
-        """Get metadata for a picture artifact with storage backend."""
+                                        level: int, heading_stack: List[Dict], before_text: str = None, after_text: str = None) -> Dict:
+        """Get metadata for a picture artifact."""
         doc = doc_result.document
         caption = item.caption_text(doc=doc) or "Image without description"
         headings = self._get_heading_context(heading_stack)
         
         metadata = {
-            'ref_item': item.self_ref,  # Use Docling's ref_item ID
+            'ref_item': item.self_ref,
             'type': 'image',
             'caption': caption,
             'filename': doc_result.file_path.name,
@@ -195,13 +261,10 @@ class ArtifactProcessor:
             'file_hash': doc_result.file_hash,
             'level': level,
             'headings': headings,
-            'has_thumbnail': False  # Default value
+            'has_thumbnail': False,  # Default value
+            'before_text': before_text,
+            'after_text': after_text
         }
-
-        # Generate thumbnail and save artifact if enabled
-        if self.generate_thumbnails:
-            thumbnail_info = await self._generate_thumbnail(item, doc_result, "image")
-            metadata.update(thumbnail_info)
 
         self._debug_print(f"Created image metadata with ref_item: {item.self_ref}")
         self._debug_save_metadata(metadata)
@@ -209,30 +272,28 @@ class ArtifactProcessor:
         return metadata
 
     async def _get_table_metadata(self, item: TableItem, doc_result: DocumentResult, 
-                                       level: int, heading_stack: List[Dict]) -> Dict:
-        """Get metadata for a table artifact with storage backend."""
+                                    level: int, heading_stack: List[Dict], before_text: str = None, after_text: str = None) -> Dict:
+        """Get metadata for a table artifact."""
         doc = doc_result.document
         table_text = self._extract_table_text(doc, item)
         caption = item.caption_text(doc=doc) or f"Table with {len(table_text)} content"
         headings = self._get_heading_context(heading_stack)
 
         metadata = {
-            'ref_item': item.self_ref,  # Use Docling's ref_item ID
+            'ref_item': item.self_ref,
             'type': 'table',
             'caption': caption,
+            'table_text': table_text,  # Include table text in metadata
             'filename': doc_result.file_path.name,
             'source': doc_result.source_category,
             'file_path': str(doc_result.file_path),
             'file_hash': doc_result.file_hash,
             'level': level,
             'headings': headings,
-            'has_thumbnail': False  # Default value
+            'has_thumbnail': False,  # Default value
+            'before_text': before_text,
+            'after_text': after_text
         }
-
-        # Generate thumbnail and save artifact if enabled
-        if self.generate_thumbnails:
-            thumbnail_info = await self._generate_thumbnail(item, doc_result, "table")
-            metadata.update(thumbnail_info)
 
         self._debug_print(f"Created table metadata with ref_item: {item.self_ref}")
         self._debug_save_metadata(metadata)
@@ -306,13 +367,14 @@ class ArtifactProcessor:
         # based on the table structure in DoclingDocument
         return f"Table content: {table_item.export_to_markdown(doc=doc) or 'No description'}"
 
-    async def _generate_thumbnail(self, item, doc_result: DocumentResult, item_type: str) -> Dict:
+    async def _generate_thumbnail(self, item, doc_result: DocumentResult, item_type: str, extra_metadata: Dict = None) -> Dict:
         """Generate thumbnail for any artifact type.
         
         Args:
             item: Artifact item (PictureItem or TableItem)
             doc_result: Document result with metadata
             item_type: Type of item ("image" or "table")
+            extra_metadata: Additional metadata to include (like before_text/after_text)
             
         Returns:
             Dict with thumbnail information
@@ -328,48 +390,29 @@ class ArtifactProcessor:
             thumbnail = image.copy()
             thumbnail.thumbnail(self.thumbnail_size, PILImage.Resampling.LANCZOS)
 
-            if self.storage_backend:
-                # Save original artifact using storage backend
-                artifact_id = await self.storage_backend.get_artifact_storage().save_artifact(
-                    image_data, doc_result.file_hash, item.self_ref, item_type
-                )
+            # Save original artifact using storage
+            artifact_id = await self.storage.save_artifact(
+                image_data, doc_result.file_hash, item.self_ref, item_type, metadata=extra_metadata
+            )
 
-                # Save thumbnail as separate artifact
-                thumbnail_buffer = io.BytesIO()
-                thumbnail.save(thumbnail_buffer, format='PNG')
-                thumbnail_data = thumbnail_buffer.getvalue()
+            # Save thumbnail as separate artifact
+            thumbnail_buffer = io.BytesIO()
+            thumbnail.save(thumbnail_buffer, format='PNG')
+            thumbnail_data = thumbnail_buffer.getvalue()
 
-                thumbnail_id = await self.storage_backend.get_artifact_storage().save_artifact(
-                    thumbnail_data, doc_result.file_hash, item.self_ref, f"{item_type}_thumbnail",
-                    metadata={'original_artifact_id': artifact_id}
-                )
+            thumbnail_id = await self.storage.save_artifact(
+                thumbnail_data, doc_result.file_hash, item.self_ref, f"{item_type}_thumbnail",
+                metadata={'original_artifact_id': artifact_id}
+            )
 
-                self._debug_print(f"Generated {item_type} thumbnail and saved to storage: {thumbnail_id}")
+            self._debug_print(f"Generated {item_type} thumbnail and saved to storage: {thumbnail_id}")
 
-                return {
-                    'artifact_id': artifact_id,
-                    'thumbnail_id': thumbnail_id,
-                    'thumbnail_size': {"width": thumbnail.width, "height": thumbnail.height},
-                    'has_thumbnail': True
-                }
-            else:
-                # Fallback to file system when no storage backend
-                artifacts_dir = Path(self.config.artifacts_dir)
-                thumbnails_dir = artifacts_dir / "thumbnails"
-                thumbnails_dir.mkdir(parents=True, exist_ok=True)
-
-                hexhash = image_to_hexhash(image)
-                image_ref_id = extract_ref_id(item.self_ref)
-                thumbnail_path = thumbnails_dir / f"{item_type}_{image_ref_id:06}_{hexhash}.png"
-                thumbnail.save(thumbnail_path, "PNG")
-
-                self._debug_print(f"Generated {item_type} thumbnail: {thumbnail_path}")
-
-                return {
-                    'thumbnail_path': str(thumbnail_path),
-                    'thumbnail_size': {"width": thumbnail.width, "height": thumbnail.height},
-                    'has_thumbnail': True
-                }
+            return {
+                'artifact_id': artifact_id,
+                'thumbnail_id': thumbnail_id,
+                'thumbnail_size': {"width": thumbnail.width, "height": thumbnail.height},
+                'has_thumbnail': True
+            }
 
         except Exception as e:
             self._debug_print(f"Failed to generate {item_type} thumbnail: {e}")

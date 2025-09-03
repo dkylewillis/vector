@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from vector.core.storage import StorageFactory
+from vector.core.filesystem import FileSystemStorage
 from vector.config import Config
 
 
@@ -14,17 +14,17 @@ async def test_load_from_storage():
     
     # Initialize configuration and storage
     config = Config()
-    print(f"🔧 Using storage backend: {config.storage_backend}")
+    print(f"🔧 Using filesystem storage")
     
-    # Create storage backend
-    storage_backend = await StorageFactory.create_backend(config)
-    print(f"✅ Storage backend initialized: {type(storage_backend).__name__}")
+    # Create storage
+    storage = FileSystemStorage(config)
+    print(f"✅ Storage initialized: {type(storage).__name__}")
     
     # Document ID to load (from test 1)
     doc_id = "gsmm_75_85_test"
     
     print(f"\n📥 Loading document: {doc_id}")
-    loaded_doc_data = await storage_backend.get_document_storage().load_document(doc_id)
+    loaded_doc_data = await storage.load_document(doc_id)
     
     if loaded_doc_data:
         loaded_doc, loaded_metadata = loaded_doc_data
@@ -54,7 +54,7 @@ async def test_load_from_storage():
     
     # Load some artifacts
     print(f"\n🖼️ Loading artifacts for document...")
-    artifacts = await storage_backend.get_artifact_storage().list_artifacts()
+    artifacts = await storage.list_artifacts()
     doc_artifacts = [a for a in artifacts if a.get('doc_hash') == doc_id or a.get('doc_id') == doc_id]
     
     print(f"📊 Found {len(doc_artifacts)} artifacts for this document")
@@ -67,7 +67,7 @@ async def test_load_from_storage():
             artifact_type = artifact_info.get('artifact_type', 'unknown')
             
             try:
-                artifact_data = await storage_backend.get_artifact_storage().load_artifact(artifact_id)
+                artifact_data = await storage.load_artifact(artifact_id)
                 if artifact_data:
                     data, metadata = artifact_data
                     print(f"   ✅ Loaded {artifact_type} artifact: {len(data)} bytes")
@@ -79,7 +79,7 @@ async def test_load_from_storage():
                 traceback.print_exc()
     
     # Get current storage statistics
-    stats = await storage_backend.get_stats()
+    stats = await storage.get_stats()
     print(f"\n📊 Current Storage Statistics:")
     print(f"  Backend Type: {stats['backend_type']}")
     print(f"  Documents: {stats['total_documents']}")

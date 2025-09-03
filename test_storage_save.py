@@ -5,7 +5,7 @@ from pathlib import Path
 from vector.core.converter import DocumentConverter
 from vector.core.artifacts import ArtifactProcessor
 from vector.core.models import DocumentResult
-from vector.core.storage import StorageFactory
+from vector.core.filesystem import FileSystemStorage
 from vector.config import Config
 
 
@@ -17,12 +17,12 @@ async def test_save_to_storage():
     
     # Initialize configuration and storage
     config = Config()
-    print(f"🔧 Using storage backend: {config.storage_backend}")
+    print(f"🔧 Using filesystem storage")
     print(f"📁 Artifacts directory: {config.artifacts_dir}")
     
-    # Create storage backend
-    storage_backend = await StorageFactory.create_backend(config)
-    print(f"✅ Storage backend initialized: {type(storage_backend).__name__}")
+    # Create storage
+    storage = FileSystemStorage(config)
+    print(f"✅ Storage initialized: {type(storage).__name__}")
     
     # Convert PDF document
     file_path = Path("data/source_documents/gsmm/gsmm_75_85.pdf")
@@ -31,11 +31,11 @@ async def test_save_to_storage():
     print(f"\n🔄 Converting PDF document: {file_path}")
     doc = converter.convert_document(file_path)
     print(f"✅ Document converted successfully")
-    
-    # Create artifact processor with storage backend
+
+    # Create artifact processor with storage
     artifact_processor = ArtifactProcessor(
         config=config,
-        storage_backend=storage_backend,
+        storage=storage,
         debug=True,
         generate_thumbnails=True
     )
@@ -47,12 +47,14 @@ async def test_save_to_storage():
         source_category="gsmm",
         file_hash="gsmm_75_85_test"
     )
+
+    await storage.save_document(doc_result)
     
-    print(f"\n🔄 Processing and saving document with storage backend...")
-    await artifact_processor.process_document(doc_result)
+    print(f"\n🔄 Processing and saving document with storage...")
+    await artifact_processor.index_artifacts(doc_result)
     
     # Get storage statistics
-    stats = await storage_backend.get_stats()
+    stats = await storage.get_stats()
     print(f"\n📊 Storage Statistics After Save:")
     print(f"  Backend Type: {stats['backend_type']}")
     print(f"  Documents: {stats['total_documents']}")
@@ -60,7 +62,7 @@ async def test_save_to_storage():
     print(f"  Storage Size: {stats['storage_size_mb']} MB")
     
     # List what we saved
-    documents = await storage_backend.get_document_storage().list_documents()
+    documents = await storage.list_documents()
     print(f"\n📄 Saved Documents: {len(documents)}")
     for doc_info in documents:
         # Handle different possible metadata structures
@@ -68,7 +70,7 @@ async def test_save_to_storage():
         source = doc_info.get('source') or doc_info.get('source_category', 'Unknown')
         print(f"  - {doc_info['doc_id']}: {filename} ({source})")
     
-    artifacts = await storage_backend.get_artifact_storage().list_artifacts()
+    artifacts = await storage.list_artifacts()
     print(f"\n🖼️ Saved Artifacts: {len(artifacts)}")
     artifact_types = {}
     for artifact in artifacts:
