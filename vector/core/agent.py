@@ -26,7 +26,7 @@ class ResearchAgent:
 
         Args:
             config: Configuration object
-            collection_name: Name of the vector collection (can be display name if collection_manager provided)
+            collection_name: Name of the collection (display name or actual chunks collection name)
             collection_manager: Optional collection manager for name resolution
         """
         self.config = config
@@ -35,6 +35,7 @@ class ResearchAgent:
         
         # Initialize components
         self.embedder = Embedder(config)
+        # Agent works with the chunks collection (database handles the resolution)
         self.vector_db = VectorDatabase(collection_name, config, collection_manager)
         
         # Initialize AI models using factory

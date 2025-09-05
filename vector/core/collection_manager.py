@@ -2,8 +2,8 @@
 
 import json
 import os
-from typing import Dict, List, Optional
-from ulid import ULID
+from typing import Dict, List, Optional, Tuple
+from ulid import new as new_ulid
 from datetime import datetime
 
 from ..config import Config
@@ -13,12 +13,7 @@ class CollectionManager:
     """Manages collection naming conventions and metadata for vector databases."""
     
     def __init__(self, config: Optional[Config] = None, metadata_file: Optional[str] = None):
-        """Initialize collection manager.
-        
-        Args:
-            config: Configuration object
-            metadata_file: Override metadata file path (defaults to config)
-        """
+        """Initialize collection manager."""
         self.config = config or Config()
         self.metadata_file = metadata_file or self.config.collections_metadata_file
         self.metadata = self._load_metadata()
@@ -29,8 +24,9 @@ class CollectionManager:
             with open(self.metadata_file, 'r') as f:
                 return json.load(f)
         return {
-            "collections": {},
-            "display_name_to_id": {},
+            "collection_pairs": {},  # pair_id -> {chunks_collection, artifacts_collection, metadata}
+            "display_name_to_pair": {},  # display_name -> pair_id
+            "documents": {},  # document_id -> {in_collections, metadata}
             "created_at": datetime.now().isoformat()
         }
     
@@ -40,114 +36,207 @@ class CollectionManager:
         with open(self.metadata_file, 'w') as f:
             json.dump(self.metadata, f, indent=2)
     
-    def _generate_collection_name(self, modality: str) -> tuple[str, str]:
-        """Generate a collection name following the c_<ulid>__<modality> pattern."""
-        ulid_str = str(ULID())
-        collection_name = f"c_{ulid_str}__{modality}"
-        return collection_name, ulid_str
+    def _generate_collection_pair(self, base_name: str) -> Tuple[str, str, str]:
+        """Generate a paired collection (chunks + artifacts) with shared ULID."""
+        ulid_str = str(new_ulid())
+        pair_id = f"cp_{ulid_str}"
+        chunks_collection = f"c_{ulid_str}__chunks"
+        artifacts_collection = f"c_{ulid_str}__artifacts"
+        return chunks_collection, artifacts_collection, pair_id
     
-    def create_collection_name(self, display_name: str, modality: str, description: str = "") -> str:
+    def create_collection_pair(self, display_name: str, description: str = "") -> Dict[str, str]:
         """
-        Create a new collection name with metadata tracking.
+        Create a new paired collection (chunks + artifacts).
         
         Args:
-            display_name: Human-readable name for the collection
-            modality: Data type ('chunks' or 'artifacts')
+            display_name: Human-readable name for the collection pair
             description: Optional description
             
         Returns:
-            The generated collection name
+            Dict with 'chunks_collection' and 'artifacts_collection' names
             
         Raises:
-            ValueError: If display_name already exists or modality is invalid
+            ValueError: If display_name already exists
         """
-        # Validate modality
-        valid_modalities = {"chunks", "artifacts"}
-        if modality not in valid_modalities:
-            raise ValueError(f"Invalid modality '{modality}'. Must be one of: {valid_modalities}")
-        
         # Check for duplicate display name
-        if display_name in self.metadata["display_name_to_id"]:
+        if display_name in self.metadata["display_name_to_pair"]:
             raise ValueError(f"Display name '{display_name}' already exists")
         
-        # Generate collection name
-        collection_name, ulid_str = self._generate_collection_name(modality)
+        # Generate collection pair
+        chunks_collection, artifacts_collection, pair_id = self._generate_collection_pair(display_name)
+        
+        # Extract ULID from pair_id (remove cp_ prefix)
+        ulid_str = pair_id[3:]  # Remove "cp_" prefix
         
         # Store metadata
-        self.metadata["collections"][collection_name] = {
+        self.metadata["collection_pairs"][pair_id] = {
             "display_name": display_name,
             "ulid": ulid_str,
-            "modality": modality,
+            "chunks_collection": chunks_collection,
+            "artifacts_collection": artifacts_collection,
             "description": description,
             "created_at": datetime.now().isoformat(),
-            "status": "active"
+            "status": "active",
+            "document_count": 0
         }
         
         # Create reverse mapping
-        self.metadata["display_name_to_id"][display_name] = collection_name
+        self.metadata["display_name_to_pair"][display_name] = pair_id
         
         # Save to file
         self._save_metadata()
         
-        return collection_name
+        return {
+            "chunks_collection": chunks_collection,
+            "artifacts_collection": artifacts_collection,
+            "pair_id": pair_id
+        }
     
-    def get_collection_by_display_name(self, display_name: str) -> Optional[str]:
-        """Get collection name by display name."""
-        return self.metadata["display_name_to_id"].get(display_name)
-    
-    def get_collection_metadata(self, collection_name: str) -> Optional[Dict]:
-        """Get metadata for a specific collection."""
-        return self.metadata["collections"].get(collection_name)
-    
-    def list_collections(self) -> List[Dict]:
-        """List all collections with their metadata."""
-        collections = []
-        for name, metadata in self.metadata["collections"].items():
-            collections.append({
-                "collection_name": name,
-                **metadata
-            })
-        return collections
-    
-    def rename_collection(self, old_display_name: str, new_display_name: str) -> bool:
+    def add_document_to_pair(self, pair_id: str, document_id: str, document_metadata: Dict = None) -> bool:
         """
-        Change a collection's display name.
+        Add a document to a collection pair.
         
         Args:
-            old_display_name: Current display name
-            new_display_name: New display name
+            pair_id: Collection pair ID
+            document_id: Unique document identifier (file hash)
+            document_metadata: Optional document metadata
             
         Returns:
-            True if renamed, False if old name not found
-            
-        Raises:
-            ValueError: If new display name already exists
+            True if added, False if pair doesn't exist
         """
-        # Check if new name already exists
-        if new_display_name in self.metadata["display_name_to_id"]:
-            raise ValueError(f"Display name '{new_display_name}' already exists")
-        
-        # Get collection name
-        collection_name = self.get_collection_by_display_name(old_display_name)
-        if not collection_name:
+        if pair_id not in self.metadata["collection_pairs"]:
             return False
         
-        # Update mappings
-        self.metadata["collections"][collection_name]["display_name"] = new_display_name
-        self.metadata["display_name_to_id"][new_display_name] = collection_name
-        del self.metadata["display_name_to_id"][old_display_name]
+        # Find existing document by file hash or create new one
+        doc_ulid_key = None
+        for key, doc_info in self.metadata["documents"].items():
+            if doc_info.get("file_hash") == document_id:
+                doc_ulid_key = key
+                break
+                
+        # If document doesn't exist, create new one
+        if doc_ulid_key is None:
+            doc_ulid = f"doc_{str(new_ulid())}"
+            doc_ulid_key = doc_ulid
+            self.metadata["documents"][doc_ulid_key] = {
+                "ulid": doc_ulid[4:],  # Store just the ULID part without doc_ prefix
+                "file_hash": document_id,  # Store the original file hash for reference
+                "in_collections": {},
+                "metadata": document_metadata or {}
+            }
         
-        # Save changes
+        # Check if document is already in this specific pair
+        if pair_id in self.metadata["documents"][doc_ulid_key]["in_collections"]:
+            # Document already exists in this pair, no need to add again
+            return True
+            
+        # Add document to this pair
+        self.metadata["documents"][doc_ulid_key]["in_collections"][pair_id] = {
+            "added_at": datetime.now().isoformat()
+        }
+        
+        # Update document count for this pair
+        self.metadata["collection_pairs"][pair_id]["document_count"] += 1
+        
         self._save_metadata()
         return True
-
-    def delete_collection_metadata(self, display_name: str) -> bool:
-        """Remove collection metadata (call this after deleting from vector DB)."""
-        collection_name = self.get_collection_by_display_name(display_name)
-        if not collection_name:
+    
+    def get_collections_for_document(self, document_id: str) -> Optional[List[Dict[str, str]]]:
+        """Get collection names for a document (may be in multiple pairs)."""
+        # Find document by file hash
+        document_info = None
+        for doc_key, doc_data in self.metadata["documents"].items():
+            if doc_data.get("file_hash") == document_id:
+                document_info = doc_data
+                break
+                
+        if document_info is None:
+            return None
+            
+        collections = []
+        
+        for pair_id in document_info.get("in_collections", {}):
+            if pair_id in self.metadata["collection_pairs"]:
+                pair_info = self.metadata["collection_pairs"][pair_id]
+                collections.append({
+                    "chunks_collection": pair_info["chunks_collection"],
+                    "artifacts_collection": pair_info["artifacts_collection"],
+                    "pair_id": pair_id,
+                    "display_name": pair_info["display_name"]
+                })
+        
+        return collections if collections else None
+    
+    def get_pair_by_display_name(self, display_name: str) -> Optional[Dict]:
+        """Get collection pair by display name."""
+        pair_id = self.metadata["display_name_to_pair"].get(display_name)
+        if not pair_id:
+            return None
+            
+        pair_info = self.metadata["collection_pairs"][pair_id].copy()
+        pair_info["pair_id"] = pair_id
+        return pair_info
+    
+    def list_collection_pairs(self) -> List[Dict]:
+        """List all collection pairs."""
+        pairs = []
+        for pair_id, pair_info in self.metadata["collection_pairs"].items():
+            pair_data = pair_info.copy()
+            pair_data["pair_id"] = pair_id
+            pairs.append(pair_data)
+        return pairs
+    
+    def rename_collection_pair(self, old_name: str, new_name: str) -> bool:
+        """Rename a collection pair."""
+        if new_name in self.metadata["display_name_to_pair"]:
+            raise ValueError(f"Display name '{new_name}' already exists")
+            
+        pair_id = self.metadata["display_name_to_pair"].get(old_name)
+        if not pair_id:
             return False
+            
+        # Update display name in pair info
+        self.metadata["collection_pairs"][pair_id]["display_name"] = new_name
         
-        del self.metadata["collections"][collection_name]
-        del self.metadata["display_name_to_id"][display_name]
+        # Update mapping
+        del self.metadata["display_name_to_pair"][old_name]
+        self.metadata["display_name_to_pair"][new_name] = pair_id
+        
         self._save_metadata()
         return True
+    
+    def delete_collection_pair(self, display_name: str) -> bool:
+        """Delete a collection pair and all its documents."""
+        pair_id = self.metadata["display_name_to_pair"].get(display_name)
+        if not pair_id:
+            return False
+            
+        # Remove from collection_pairs
+        del self.metadata["collection_pairs"][pair_id]
+        
+        # Remove from display_name_to_pair
+        del self.metadata["display_name_to_pair"][display_name]
+        
+        # Remove this pair from all documents
+        for document_id in list(self.metadata["documents"].keys()):
+            doc_info = self.metadata["documents"][document_id]
+            if pair_id in doc_info.get("in_collections", {}):
+                del doc_info["in_collections"][pair_id]
+                # If document has no more collection pairs, remove it entirely
+                if not doc_info.get("in_collections"):
+                    del self.metadata["documents"][document_id]
+        
+        self._save_metadata()
+        return True
+    
+    def get_total_documents(self) -> int:
+        """Get total number of unique documents across all pairs."""
+        return len(self.metadata["documents"])
+    
+    def get_document_pairs(self, document_id: str) -> Optional[List[str]]:
+        """Get list of pair IDs that contain a specific document."""
+        # Find document by file hash
+        for doc_key, doc_data in self.metadata["documents"].items():
+            if doc_data.get("file_hash") == document_id:
+                return list(doc_data.get("in_collections", {}).keys())
+        return None

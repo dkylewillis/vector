@@ -13,6 +13,8 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   vector search "zoning requirements" --collection documents
+  vector search "flow chart" --type artifacts --collection documents  
+  vector search "nomograph diagram" --type both --collection documents
   vector ask "What are the fire safety requirements?" --length long
   vector process documents/*.pdf --source manuals
   vector process documents/*.pdf --source manuals --no-artifacts
@@ -22,7 +24,7 @@ Examples:
   vector info --collection documents
   vector models --provider openai
   vector collections
-  vector create-collection "Legal Docs Q1" chunks --description "Q1 legal documents"
+  vector create-collection "Legal Documents Q1 2024" --description "Q1 legal documents"
   vector rename-collection "Legal Docs Q1" "Legal Documents Q1 2024"
   vector delete-collection "Old Collection" --force
         """
@@ -48,6 +50,12 @@ Examples:
         '--collection', '-c',
         help='Collection name (default: from config)',
         default=None
+    )
+    search_parser.add_argument(
+        '--type', '-t',
+        choices=['chunks', 'artifacts', 'both'],
+        default='chunks',
+        help='Type of content to search: chunks (text), artifacts (images/tables), or both (default: chunks)'
     )
     search_parser.add_argument(
         '--top-k', '-k',
@@ -244,20 +252,15 @@ Examples:
     # Create collection command
     create_collection_parser = subparsers.add_parser(
         'create-collection',
-        help='Create a new collection with display name'
+        help='Create a new collection pair with display name'
     )
     create_collection_parser.add_argument(
         'display_name',
-        help='Human-readable name for the collection'
-    )
-    create_collection_parser.add_argument(
-        'modality',
-        choices=['chunks', 'artifacts'],
-        help='Type of data to store (chunks or artifacts)'
+        help='Human-readable name for the collection pair'
     )
     create_collection_parser.add_argument(
         '--description', '-d',
-        help='Optional description for the collection',
+        help='Optional description for the collection pair',
         default=''
     )
     create_collection_parser.add_argument(

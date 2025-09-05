@@ -30,13 +30,16 @@ class VectorCLI:
     def get_agent(self, collection_name: str) -> ResearchAgent:
         """Get or create research agent for collection."""
         if self._agent is None or self._current_collection != collection_name:
-            self._agent = ResearchAgent(self.config, collection_name, self.collection_manager)
+            # For agents, we need the chunks collection from the pair
+            resolved_collection = self._resolve_collection_name(collection_name, 'chunks')
+            self._agent = ResearchAgent(self.config, resolved_collection, self.collection_manager)
             self._current_collection = collection_name
         return self._agent
     
     def get_document_processor(self, collection_name: str) -> DocumentProcessor:
         """Get or create document processor for collection."""
         if self._document_processor is None or self._current_collection != collection_name:
+            # Document processor handles both collections internally
             self._document_processor = DocumentProcessor(self.config, collection_name, self.collection_manager)
             self._current_collection = collection_name
         return self._document_processor
@@ -44,9 +47,35 @@ class VectorCLI:
     def get_database(self, collection_name: str) -> VectorDatabase:
         """Get or create database for collection."""
         if self._database is None or self._current_collection != collection_name:
-            self._database = VectorDatabase(collection_name, self.config, self.collection_manager)
+            # For database operations, we typically work with chunks collection
+            resolved_collection = self._resolve_collection_name(collection_name, 'chunks')
+            self._database = VectorDatabase(resolved_collection, self.config, self.collection_manager)
             self._current_collection = collection_name
         return self._database
+    
+    def _resolve_collection_name(self, collection_name: str, collection_type: str = 'chunks') -> str:
+        """Resolve display name to actual collection name for specified type.
+        
+        Args:
+            collection_name: Display name or actual collection name
+            collection_type: 'chunks' or 'artifacts'
+            
+        Returns:
+            Actual collection name
+        """
+        if not self.collection_manager:
+            return collection_name
+            
+        # If it's already a collection pair name, return as-is
+        if collection_name.startswith('c_') and ('__chunks' in collection_name or '__artifacts' in collection_name):
+            return collection_name
+            
+        # Try to get pair by display name
+        pair_info = self.collection_manager.get_pair_by_display_name(collection_name)
+        if pair_info:
+            return pair_info[f'{collection_type}_collection']
+            
+        return collection_name
     
     def execute_command(self, command: str, collection_name: str = None, **kwargs) -> str:
         """Execute a command with automatic initialization."""
@@ -70,10 +99,10 @@ class VectorCLI:
             
             # Execute command through appropriate service
             if command == 'search':
-                agent = self.get_agent(collection_name)
-                return agent.search(kwargs.get('question', ''), 
-                                  kwargs.get('top_k', 5),
-                                  kwargs.get('metadata_filter'))
+                search_type = kwargs.get('type', 'chunks')
+                return self._handle_search(collection_name, kwargs.get('question', ''), 
+                                         search_type, kwargs.get('top_k', 5), 
+                                         kwargs.get('metadata_filter'))
             elif command == 'ask':
                 agent = self.get_agent(collection_name)
                 return agent.ask(kwargs.get('question', ''),
@@ -167,60 +196,67 @@ class VectorCLI:
     def _handle_collections_command(self, kwargs) -> str:
         """Handle the collections list command."""
         try:
-            collections = self.collection_manager.list_collections()
-            if not collections:
-                return "📝 No collections found"
+            pairs = self.collection_manager.list_collection_pairs()
+            if not pairs:
+                return "📝 No collection pairs found"
             
-            result = "📚 Collections:\n"
-            for collection in collections:
-                result += f"   • {collection['display_name']}\n"
-                result += f"     ID: {collection['collection_name']}\n"
-                result += f"     Type: {collection['modality']}\n"
-                if collection.get('description'):
-                    result += f"     Description: {collection['description']}\n"
-                result += f"     Created: {collection['created_at'][:10]}\n\n"
+            result = "📚 Collection Pairs:\n"
+            for pair in pairs:
+                result += f"   • {pair['display_name']}\n"
+                result += f"     Chunks: {pair['chunks_collection']}\n"
+                result += f"     Artifacts: {pair['artifacts_collection']}\n"
+                if pair.get('description'):
+                    result += f"     Description: {pair['description']}\n"
+                result += f"     Documents: {pair['document_count']}\n"
+                result += f"     Created: {pair['created_at'][:10]}\n\n"
             
             return result.rstrip()
         except Exception as e:
-            return f"❌ Error listing collections: {e}"
+            return f"❌ Error listing collection pairs: {e}"
     
     def _create_collection(self, kwargs) -> str:
-        """Create a new collection."""
+        """Create a new collection pair."""
         try:
             display_name = kwargs.get('display_name')
-            modality = kwargs.get('modality')
             description = kwargs.get('description', '')
             
-            if not display_name or not modality:
-                return "❌ Both display_name and modality are required"
+            if not display_name:
+                return "❌ Display name is required"
             
-            # Create collection metadata
-            collection_name = self.collection_manager.create_collection_name(
+            # Create collection pair
+            pair_info = self.collection_manager.create_collection_pair(
                 display_name=display_name,
-                modality=modality,
                 description=description
             )
             
-            # Also create the actual vector database collection
+            # Create the actual vector database collections
             try:
                 # Use a default vector size - this will be updated when documents are first added
-                vector_size = 384  
-                database = VectorDatabase(collection_name, self.config, self.collection_manager)
-                database.create_collection(vector_size)
+                vector_size = 384
                 
-                return f"✅ Created collection '{display_name}' with ID: {collection_name}\n✅ Vector database collection created successfully"
+                # Create chunks collection
+                chunks_db = VectorDatabase(pair_info['chunks_collection'], self.config, self.collection_manager)
+                chunks_db.create_collection(vector_size)
+                
+                # Create artifacts collection  
+                artifacts_db = VectorDatabase(pair_info['artifacts_collection'], self.config, self.collection_manager)
+                artifacts_db.create_collection(vector_size)
+                
+                return (f"✅ Created collection pair '{display_name}'\n"
+                       f"   Chunks: {pair_info['chunks_collection']}\n"
+                       f"   Artifacts: {pair_info['artifacts_collection']}")
             except Exception as e:
                 # If database creation fails, clean up metadata
-                self.collection_manager.delete_collection_metadata(display_name)
-                return f"❌ Failed to create vector database collection: {e}"
+                self.collection_manager.delete_collection_pair(display_name)
+                return f"❌ Failed to create vector database collections: {e}"
             
         except ValueError as e:
             return f"❌ {e}"
         except Exception as e:
-            return f"❌ Error creating collection: {e}"
+            return f"❌ Error creating collection pair: {e}"
     
     def _rename_collection(self, kwargs) -> str:
-        """Rename a collection's display name."""
+        """Rename a collection pair's display name."""
         try:
             old_name = kwargs.get('old_name')
             new_name = kwargs.get('new_name')
@@ -228,18 +264,18 @@ class VectorCLI:
             if not old_name or not new_name:
                 return "❌ Both old_name and new_name are required"
             
-            success = self.collection_manager.rename_collection(old_name, new_name)
+            success = self.collection_manager.rename_collection_pair(old_name, new_name)
             if success:
-                return f"✅ Renamed collection from '{old_name}' to '{new_name}'"
+                return f"✅ Renamed collection pair from '{old_name}' to '{new_name}'"
             else:
-                return f"❌ Collection '{old_name}' not found"
+                return f"❌ Collection pair '{old_name}' not found"
         except ValueError as e:
             return f"❌ {e}"
         except Exception as e:
-            return f"❌ Error renaming collection: {e}"
+            return f"❌ Error renaming collection pair: {e}"
     
     def _delete_collection(self, kwargs) -> str:
-        """Delete a collection and its metadata."""
+        """Delete a collection pair and its metadata."""
         try:
             display_name = kwargs.get('display_name')
             force = kwargs.get('force', False)
@@ -247,33 +283,151 @@ class VectorCLI:
             if not display_name:
                 return "❌ display_name is required"
             
-            # Get collection name first
-            collection_name = self.collection_manager.get_collection_by_display_name(display_name)
-            if not collection_name:
-                return f"❌ Collection '{display_name}' not found"
+            # Get collection pair info first
+            pair_info = self.collection_manager.get_pair_by_display_name(display_name)
+            if not pair_info:
+                return f"❌ Collection pair '{display_name}' not found"
             
             # Confirm deletion unless forced
             if not force:
-                return (f"⚠️  This will permanently delete collection '{display_name}' ({collection_name}) "
+                return (f"⚠️  This will permanently delete collection pair '{display_name}' "
+                       f"({pair_info['chunks_collection']} & {pair_info['artifacts_collection']}) "
                        "and all its data. Use --force to confirm.")
             
-            # Delete from vector database using the proper delete_collection method
-            # This will handle both vector data and metadata deletion through collection_manager
+            # Delete both collections from vector database
             try:
-                database = VectorDatabase(collection_name, self.config, self.collection_manager)
-                database.delete_collection()
-                return f"✅ Deleted collection '{display_name}' and all its data"
+                # Delete chunks collection
+                chunks_db = VectorDatabase(pair_info['chunks_collection'], self.config, self.collection_manager)
+                if chunks_db.collection_exists():
+                    chunks_db.delete_collection()
+                
+                # Delete artifacts collection
+                artifacts_db = VectorDatabase(pair_info['artifacts_collection'], self.config, self.collection_manager)
+                if artifacts_db.collection_exists():
+                    artifacts_db.delete_collection()
+                
+                # Delete metadata
+                self.collection_manager.delete_collection_pair(display_name)
+                
+                return f"✅ Deleted collection pair '{display_name}' and all its data"
             except Exception as e:
                 # If database deletion fails, try to clean up metadata manually
                 print(f"⚠️  Warning: Could not delete vector data: {e}")
-                success = self.collection_manager.delete_collection_metadata(display_name)
+                success = self.collection_manager.delete_collection_pair(display_name)
                 if success:
-                    return f"⚠️  Deleted collection metadata for '{display_name}', but vector data deletion failed: {e}"
+                    return f"⚠️  Deleted collection pair metadata for '{display_name}', but vector data deletion failed: {e}"
                 else:
-                    return f"❌ Error deleting collection: {e}"
+                    return f"❌ Error deleting collection pair: {e}"
         except Exception as e:
-            return f"❌ Error deleting collection: {e}"
+            return f"❌ Error deleting collection pair: {e}"
     
+    def _handle_search(self, collection_name: str, query: str, search_type: str, top_k: int, metadata_filter: str) -> str:
+        """Handle search command with support for chunks, artifacts, or both.
+        
+        Args:
+            collection_name: Name of the collection pair
+            query: Search query
+            search_type: 'chunks', 'artifacts', or 'both'
+            top_k: Number of results to return
+            metadata_filter: Optional metadata filter
+            
+        Returns:
+            Formatted search results
+        """
+        try:
+            if not query.strip():
+                return "❌ Search query cannot be empty"
+                
+            from ..core.embedder import Embedder
+            from ..core.database import VectorDatabase
+            
+            embedder = Embedder(self.config)
+            query_vector = embedder.embed_text(query)
+            
+            # Get collection pair info
+            pair_info = self.collection_manager.get_pair_by_display_name(collection_name)
+            if not pair_info:
+                return f"❌ Collection pair '{collection_name}' not found"
+            
+            results = []
+            
+            # Search chunks if requested
+            if search_type in ['chunks', 'both']:
+                try:
+                    chunks_db = VectorDatabase(pair_info['chunks_collection'], self.config, self.collection_manager)
+                    chunk_results = chunks_db.search(query_vector, top_k, metadata_filter)
+                    for result in chunk_results:
+                        results.append({
+                            'type': 'chunk',
+                            'score': result.score,
+                            'text': result.text,
+                            'metadata': result.metadata
+                        })
+                except Exception as e:
+                    if search_type == 'chunks':
+                        return f"❌ Error searching chunks: {e}"
+                    else:
+                        print(f"⚠️  Warning: Could not search chunks: {e}")
+            
+            # Search artifacts if requested
+            if search_type in ['artifacts', 'both']:
+                try:
+                    artifacts_db = VectorDatabase(pair_info['artifacts_collection'], self.config, self.collection_manager)
+                    artifact_results = artifacts_db.search(query_vector, top_k, metadata_filter)
+                    for result in artifact_results:
+                        results.append({
+                            'type': 'artifact',
+                            'score': result.score,
+                            'text': result.text,
+                            'metadata': result.metadata
+                        })
+                except Exception as e:
+                    if search_type == 'artifacts':
+                        return f"❌ Error searching artifacts: {e}"
+                    else:
+                        print(f"⚠️  Warning: Could not search artifacts: {e}")
+            
+            if not results:
+                return f"🔍 No results found for '{query}'"
+            
+            # Sort results by score (descending) and limit to top_k
+            results.sort(key=lambda x: x['score'], reverse=True)
+            results = results[:top_k]
+            
+            # Format output
+            output = []
+            if search_type == 'both':
+                output.append(f"🔍 Search Results ({search_type}):")
+            else:
+                output.append(f"🔍 Search Results:")
+            output.append("")
+            
+            for i, result in enumerate(results, 1):
+                result_type = result['type']
+                score = result['score']
+                metadata = result['metadata']
+                text = result['text']
+                
+                if result_type == 'chunk':
+                    output.append(f"Result {i} (Score: {score:.3f}) [CHUNK]")
+                    output.append(f"📄 {metadata.get('filename', 'Unknown')}")
+                    output.append(f"📂 Source: {metadata.get('source', 'Unknown')}")
+                    output.append(f"📝 Content: {text[:200]}...")
+                else:  # artifact
+                    output.append(f"Result {i} (Score: {score:.3f}) [ARTIFACT]")
+                    output.append(f"🖼️ Type: {metadata.get('type', 'unknown').title()}")
+                    output.append(f"📄 {metadata.get('filename', 'Unknown')}")
+                    output.append(f"📝 Caption: {metadata.get('caption', 'No caption')}")
+                    headings = metadata.get('headings', [])
+                    if headings:
+                        output.append(f"📋 Context: {' > '.join(headings)}")
+                
+                output.append("-" * 50)
+            
+            return "\n".join(output)
+            
+        except Exception as e:
+            return f"❌ Search error: {e}"
 
 
 def main() -> int:

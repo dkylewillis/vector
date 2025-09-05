@@ -12,6 +12,70 @@ from ..interfaces import SearchResult
 from ..exceptions import DatabaseError
 from .collection_manager import CollectionManager
 
+# Module-level shared client instance
+_shared_client = None
+_shared_config_hash = None
+
+
+def _get_shared_client(config: Config) -> QdrantClient:
+    """Get or create shared Qdrant client instance."""
+    global _shared_client, _shared_config_hash
+    
+    # Create a hash of the config to detect if it changed
+    config_hash = hash((
+        config.use_cloud_qdrant,
+        config.vector_db_url,
+        config.vector_db_api_key,
+        config.vector_db_path
+    ))
+    
+    # Create new client if none exists or config changed
+    if _shared_client is None or _shared_config_hash != config_hash:
+        
+        if _shared_client is not None:
+            # Close the old client if it exists
+            try:
+                _shared_client.close()
+            except:
+                pass
+        
+        _shared_client = _create_client(config)
+        _shared_config_hash = config_hash
+    
+    return _shared_client
+
+
+def _create_client(config: Config) -> QdrantClient:
+    """Create Qdrant client based on configuration."""
+    # Use cloud Qdrant if URL is configured
+    if config.use_cloud_qdrant:
+        url = config.vector_db_url
+        api_key = config.vector_db_api_key
+        
+        if api_key:
+            return QdrantClient(url=url, api_key=api_key)
+        else:
+            # For public instances or if API key not needed
+            return QdrantClient(url=url)
+    else:
+        # Fall back to local storage
+        db_path = config.vector_db_path
+        path = Path(db_path)
+        path.mkdir(parents=True, exist_ok=True)
+        return QdrantClient(path=str(path))
+
+
+def close_shared_client():
+    """Close the shared client instance."""
+    global _shared_client, _shared_config_hash
+    if _shared_client is not None:
+        try:
+            _shared_client.close()
+        except Exception:
+            pass
+        _shared_client = None
+        _shared_config_hash = None
+
 
 class VectorDatabase:
     """Simplified vector database using Qdrant."""
@@ -20,43 +84,28 @@ class VectorDatabase:
         """Initialize the vector database.
 
         Args:
-            collection_name: Name of the collection (can be display name if using collection_manager)
+            collection_name: Name of the collection (can be display name or actual collection name)
             config: Configuration object
             collection_manager: Optional collection manager for name resolution
         """
         self.collection_manager = collection_manager
         
-        # Resolve collection name if using collection manager
-        if collection_manager and not collection_name.startswith('c_'):
-            resolved_name = collection_manager.get_collection_by_display_name(collection_name)
-            if resolved_name:
-                collection_name = resolved_name
-            else:
-                raise ValueError(f"Collection with display name '{collection_name}' not found")
+        # Store the original collection name (could be display name or actual name)
+        self.original_collection_name = collection_name
         
-        # Store the original resolved collection name (preserve case for Qdrant operations)
+        # Resolve collection name if using collection manager and it looks like a display name
+        if collection_manager and not collection_name.startswith('c_'):
+            # Try to get pair info by display name
+            pair_info = collection_manager.get_pair_by_display_name(collection_name)
+            if pair_info:
+                # Default to chunks collection if no specific type specified
+                collection_name = pair_info['chunks_collection']
+            # If not found as display name, assume it's an actual collection name
+        
+        # Store the resolved collection name (preserve case for Qdrant operations)
         self.collection_name = collection_name
         self.config = config
-        self.client = self._create_client()
-
-    def _create_client(self) -> QdrantClient:
-        """Create Qdrant client based on configuration."""
-        # Use cloud Qdrant if URL is configured
-        if self.config.use_cloud_qdrant:
-            url = self.config.vector_db_url
-            api_key = self.config.vector_db_api_key
-            
-            if api_key:
-                return QdrantClient(url=url, api_key=api_key)
-            else:
-                # For public instances or if API key not needed
-                return QdrantClient(url=url)
-        else:
-            # Fall back to local storage
-            db_path = self.config.vector_db_path
-            path = Path(db_path)
-            path.mkdir(parents=True, exist_ok=True)
-            return QdrantClient(path=str(path))
+        self.client = _get_shared_client(config)
 
     def collection_exists(self) -> bool:
         """Check if the collection exists."""
@@ -279,14 +328,6 @@ class VectorDatabase:
             if self.collection_exists():
                 # Delete from Qdrant
                 self.client.delete_collection(self.collection_name)
-                
-                # If using collection manager, find and remove metadata
-                if self.collection_manager:
-                    # Find display name from collection name
-                    for display_name, coll_name in self.collection_manager.metadata["display_name_to_id"].items():
-                        if coll_name == self.collection_name:
-                            self.collection_manager.delete_collection_metadata(display_name)
-                            break
         except Exception as e:
             raise DatabaseError(f"Failed to delete collection: {e}")
 
@@ -349,9 +390,7 @@ class VectorDatabase:
 
     def close(self):
         """Close the database connection."""
-        try:
-            self.client.close()
-        except Exception:
-            pass
+        # Don't close the shared client from individual instances
+        pass
 
 

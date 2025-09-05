@@ -28,18 +28,34 @@ class DocumentProcessor:
 
         Args:
             config: Configuration object
-            collection_name: Name of the vector collection (can be display name if collection_manager provided)
+            collection_name: Name of the collection pair (display name) 
             collection_manager: Optional collection manager for name resolution
         """
         self.config = config
         self.collection_name = collection_name
         self.collection_manager = collection_manager
         
+        # Resolve collection pair if collection manager is provided
+        self.pair_info = None
+        if collection_manager:
+            self.pair_info = collection_manager.get_pair_by_display_name(collection_name)
+            if not self.pair_info:
+                raise ValueError(f"Collection pair with display name '{collection_name}' not found")
+        
         # Initialize core components
         self.embedder = Embedder(config)
-        self.vector_db = VectorDatabase(collection_name, config, collection_manager)
+        
+        # Create vector databases for both chunks and artifacts collections
+        if self.pair_info:
+            self.chunks_vector_db = VectorDatabase(self.pair_info['chunks_collection'], config, collection_manager)
+            self.artifacts_vector_db = VectorDatabase(self.pair_info['artifacts_collection'], config, collection_manager)
+        else:
+            # Fallback for when not using collection manager
+            self.chunks_vector_db = VectorDatabase(collection_name, config, collection_manager)
+            self.artifacts_vector_db = self.chunks_vector_db  # Use same collection as fallback
+        
         self.chunker = DocumentChunker(config.embedder_model)
-        self.artifact_processor = ArtifactProcessor(self.embedder, self.vector_db)
+        self.artifact_processor = ArtifactProcessor(self.embedder, self.artifacts_vector_db)
         
         # Note: converter will be created per operation based on artifact needs
         
@@ -74,11 +90,16 @@ class DocumentProcessor:
             Processing status message
         """
         try:
-            # Ensure collection exists
-            if not self.vector_db.collection_exists():
+            # Ensure collections exist
+            if not self.chunks_vector_db.collection_exists():
                 vector_size = self.embedder.get_embedding_dimension()
-                self.vector_db.create_collection(vector_size=vector_size)
-                self.vector_db.ensure_indexes()
+                self.chunks_vector_db.create_collection(vector_size=vector_size)
+                self.chunks_vector_db.ensure_indexes()
+            
+            if index_artifacts and not self.artifacts_vector_db.collection_exists():
+                vector_size = self.embedder.get_embedding_dimension()
+                self.artifacts_vector_db.create_collection(vector_size=vector_size)
+                self.artifacts_vector_db.ensure_indexes()
             
             # Process each file or directory
             total_processed = 0
@@ -88,6 +109,21 @@ class DocumentProcessor:
                 try:
                     chunks = self.process_path(path, source, force, index_artifacts=index_artifacts, use_vlm_pipeline=use_vlm_pipeline)
                     if chunks:
+                        # Add document to collection pair metadata if we have pair info
+                        if self.pair_info and self.collection_manager:
+                            # Use first chunk's metadata to get document info
+                            doc_metadata = chunks[0].metadata.model_dump()
+                            document_id = doc_metadata.get('file_hash', doc_metadata.get('filename', path))
+                            self.collection_manager.add_document_to_pair(
+                                self.pair_info['pair_id'], 
+                                document_id, 
+                                {
+                                    'filename': doc_metadata.get('filename'),
+                                    'source': doc_metadata.get('source'),
+                                    'file_path': doc_metadata.get('file_path')
+                                }
+                            )
+                        
                         # Process in batches to avoid timeouts
                         batch_size = self.BATCH_SIZE  # Process 100 chunks at a time
                         for i in range(0, len(chunks), batch_size):
@@ -98,8 +134,8 @@ class DocumentProcessor:
                             vectors = self.embedder.embed_texts(texts)
                             metadata = [chunk.metadata.model_dump() for chunk in batch_chunks]
                             
-                            # Add to vector database
-                            self.vector_db.add_documents(texts, vectors, metadata)
+                            # Add to chunks vector database
+                            self.chunks_vector_db.add_documents(texts, vectors, metadata)
                             total_processed += len(batch_chunks)
                             
                             print(f"📦 Processed batch: {len(batch_chunks)} chunks (Total: {total_processed})")
@@ -147,7 +183,8 @@ class DocumentProcessor:
 
         # Index artifacts if requested
         if index_artifacts:
-            self.artifact_processor.index_artifacts(doc_result)
+            import asyncio
+            asyncio.run(self.artifact_processor.index_artifacts(doc_result))
 
         return doc_result
 
@@ -249,14 +286,14 @@ class DocumentProcessor:
         if file_hash in self.processed_files:
             return True
         
-        # Check for existing documents by file_hash in database
+        # Check for existing documents by file_hash in chunks database
         try:
             # Ensure indexes exist before filtering
-            self.vector_db.ensure_indexes()
+            self.chunks_vector_db.ensure_indexes()
             
             # Search for documents with this file hash
-            scroll_result = self.vector_db.client.scroll(
-                collection_name=self.vector_db.collection_name,
+            scroll_result = self.chunks_vector_db.client.scroll(
+                collection_name=self.chunks_vector_db.collection_name,
                 scroll_filter={
                     "must": [
                         {"key": "file_hash", "match": {"value": file_hash}}
@@ -285,32 +322,39 @@ class DocumentProcessor:
         try:
             file_hash = self._calculate_file_hash(file_path)
             
-            # Ensure indexes exist before filtering
-            self.vector_db.ensure_indexes()
-            
-            # Find all points with this file hash
-            scroll_result = self.vector_db.client.scroll(
-                collection_name=self.vector_db.collection_name,
-                scroll_filter={
-                    "must": [
-                        {"key": "file_hash", "match": {"value": file_hash}}
-                    ]
-                },
-                limit=self.MAX_CHUNKS_PER_FILE,  # Assume no more than 10k chunks per file
-                with_payload=False,
-                with_vectors=False
-            )
-            
-            points_to_delete = [point.id for point in scroll_result[0]]
-            
-            if points_to_delete:
-                from qdrant_client.models import PointIdsList
-                self.vector_db.client.delete(
-                    collection_name=self.vector_db.collection_name,
-                    points_selector=PointIdsList(points=points_to_delete)
-                )
-                print(f"🗑️  Removed {len(points_to_delete)} existing chunks for {file_path.name}")
-                
+            # Remove from both chunks and artifacts collections
+            for db_name, vector_db in [("chunks", self.chunks_vector_db), ("artifacts", self.artifacts_vector_db)]:
+                try:
+                    # Ensure indexes exist before filtering
+                    vector_db.ensure_indexes()
+                    
+                    # Find all points with this file hash
+                    scroll_result = vector_db.client.scroll(
+                        collection_name=vector_db.collection_name,
+                        scroll_filter={
+                            "must": [
+                                {"key": "file_hash", "match": {"value": file_hash}}
+                            ]
+                        },
+                        limit=self.MAX_CHUNKS_PER_FILE,  # Assume no more than 10k chunks per file
+                        with_payload=False,
+                        with_vectors=False
+                    )
+                    
+                    points_to_delete = [point.id for point in scroll_result[0]]
+                    
+                    if points_to_delete:
+                        from qdrant_client.models import PointIdsList
+                        vector_db.client.delete(
+                            collection_name=vector_db.collection_name,
+                            points_selector=PointIdsList(points=points_to_delete)
+                        )
+                        if points_to_delete:  # Only log if we actually deleted something
+                            print(f"🗑️  Removed {len(points_to_delete)} existing {db_name} for {file_path.name}")
+                            
+                except Exception as e:
+                    print(f"⚠️  Warning: Could not remove existing {db_name} for {file_path.name}: {e}")
+                    
             # Remove from processed files cache
             self.processed_files.discard(file_hash)
             
