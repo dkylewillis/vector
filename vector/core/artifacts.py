@@ -23,12 +23,31 @@ from PIL import Image as PILImage
 
 
 class ArtifactProcessor:
-    """Handles document artifact (images, tables) processing and indexing."""
+    """Handles document artifact (images, tables) processing and indexing.
+    
+    Supports three modes of operation:
+    1. Full mode: Embed and store artifacts in vector database (default when embedder and vector_db provided)
+    2. Save-only mode: Save artifacts to filesystem storage without embedding (save_only=True)
+    3. Storage-only mode: Save artifacts to storage but skip vector database (when embedder/vector_db not provided)
+    
+    Examples:
+        # Full processing with embedding and storage
+        processor = ArtifactProcessor(embedder=embedder, vector_db=db)
+        await processor.index_artifacts(doc_result)
+        
+        # Save-only mode (storage only, no embedding)
+        processor = ArtifactProcessor(storage=storage, save_only=True)
+        await processor.index_artifacts(doc_result)
+        
+        # Or use the convenience method
+        await processor.save_artifacts_only(doc_result)
+    """
     
     def __init__(self, embedder: Optional[Embedder] = None, vector_db: Optional[VectorDatabase] = None, 
                  debug: bool = False, save_metadata: bool = False, 
                  generate_thumbnails: bool = True, thumbnail_size: Tuple[int, int] = (150, 150),
-                 config: Optional[Config] = None, storage: Optional[FileSystemStorage] = None):
+                 config: Optional[Config] = None, storage: Optional[FileSystemStorage] = None,
+                 save_only: bool = False):
         """Initialize artifact processor.
         
         Args:
@@ -40,6 +59,7 @@ class ArtifactProcessor:
             thumbnail_size: Max dimensions for thumbnails (width, height)
             config: Configuration instance
             storage: Filesystem storage instance
+            save_only: If True, only save artifacts to storage without embedding/storing in vector DB
         """
         self.embedder = embedder
         self.vector_db = vector_db
@@ -48,12 +68,20 @@ class ArtifactProcessor:
         self.generate_thumbnails = generate_thumbnails
         self.thumbnail_size = thumbnail_size
         self.config = config or Config()
+        self.save_only = save_only
         
         # Initialize storage
         self.storage = storage or FileSystemStorage(self.config)
         
     async def index_artifacts(self, doc_result: DocumentResult) -> None:
         """Index artifacts (images, tables) from a document."""
+        if self.save_only:
+            self._debug_print("Running in save-only mode - artifacts will be saved to storage without embedding")
+        elif self._should_embed_and_store():
+            self._debug_print("Running in full mode - artifacts will be embedded and stored in vector database")
+        else:
+            self._debug_print("Running in storage-only mode - artifacts will be saved to storage")
+            
         artifacts_processed = 0
         artifacts_stored = 0
         heading_stack = []
@@ -114,8 +142,24 @@ class ArtifactProcessor:
         # Summary reporting
         if artifacts_processed > 0:
             print(f"📊 Indexed {artifacts_processed} artifacts from {doc_result.file_path.name}")
-            if self._should_embed_and_store():
+            if self.save_only:
+                print(f"💾 Saved {artifacts_processed} artifacts to storage (save-only mode)")
+            elif self._should_embed_and_store():
                 print(f"💾 Stored {artifacts_stored}/{artifacts_processed} artifacts in vector database")
+
+    async def save_artifacts_only(self, doc_result: DocumentResult) -> None:
+        """Save artifacts to storage without embedding or vector storage.
+        
+        Args:
+            doc_result: Document result containing artifacts to save
+        """
+        # Temporarily set save_only mode
+        original_save_only = self.save_only
+        self.save_only = True
+        try:
+            await self.index_artifacts(doc_result)
+        finally:
+            self.save_only = original_save_only
 
     def _get_context_text(self, items: List[Tuple], current_idx: int, direction: str, max_chars: int = 200) -> Optional[str]:
         """Extract context text before or after the current item.
@@ -215,7 +259,7 @@ class ArtifactProcessor:
 
     def _should_embed_and_store(self) -> bool:
         """Check if embedding and storage should be performed."""
-        return self.embedder is not None and self.vector_db is not None
+        return not self.save_only and self.embedder is not None and self.vector_db is not None
 
     def _debug_print(self, message: str) -> None:
         """Print debug message if debug mode is enabled."""

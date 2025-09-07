@@ -3,15 +3,21 @@
 import argparse
 import sys
 from typing import Optional
+from pathlib import Path
 
 from ..config import Config
 from ..exceptions import VectorError, ValidationError, AIServiceError
 from .parser import create_parser
 from ..core.agent import ResearchAgent
-from ..core.processor import DocumentProcessor
+from ..core.processor import DocumentProcessor, PipelineType
 from ..core.database import VectorDatabase
 from ..core.collection_manager import CollectionManager
 from ..utils.formatting import CLIFormatter
+from ..core.models import DocumentResult
+from ..core.converter import DocumentConverter
+from docling_core.types.doc import ImageRefMode
+from ..core.filesystem import FileSystemStorage
+from ..core.artifacts import ArtifactProcessor
 
 
 class VectorCLI:
@@ -112,13 +118,17 @@ class VectorCLI:
                 doc_processor = self.get_document_processor(collection_name)
                 # Convert --no-artifacts flag to index_artifacts boolean
                 index_artifacts = not kwargs.get('no_artifacts', False)
-                # Convert --use-pdf-pipeline flag to use_vlm_pipeline boolean (inverted)
-                use_vlm_pipeline = not kwargs.get('use_pdf_pipeline', False)
-                return doc_processor.process_and_index_files(kwargs.get('files', []),
-                                         kwargs.get('force', False),
-                                         kwargs.get('source'),
-                                         index_artifacts,
-                                         use_vlm_pipeline)
+                # Convert --use-pdf-pipeline flag to PipelineType
+                pipeline_type = PipelineType.PDF if kwargs.get('use_pdf_pipeline', False) else PipelineType.VLM
+                return doc_processor.execute_processing_pipeline(
+                    kwargs.get('files', []),
+                    pipeline_type,
+                    index_artifacts,
+                    kwargs.get('force', False),
+                    kwargs.get('source')
+                )
+            elif command == 'convert':
+                return self._handle_convert_command(kwargs)
             elif command == 'info':
                 database = self.get_database(collection_name)
                 info = database.get_collection_info()
@@ -428,6 +438,60 @@ class VectorCLI:
             
         except Exception as e:
             return f"❌ Search error: {e}"
+    
+    def _handle_convert_command(self, kwargs) -> str:
+        """Handle the convert command for document conversion only.
+        
+        Args:
+            kwargs: Command arguments from parser
+            
+        Returns:
+            Formatted result string
+        """
+        try:
+            files = kwargs.get('files', [])
+            output_dir = kwargs.get('output', './converted')
+            source = kwargs.get('source')
+            no_artifacts = kwargs.get('no_artifacts', False)
+            use_pdf_pipeline = kwargs.get('use_pdf_pipeline', False)
+            output_format = kwargs.get('format', 'markdown')
+            verbose = kwargs.get('verbose', False)
+            save_to_storage = kwargs.get('save_to_storage', False)
+            
+            if not files:
+                return "❌ No files specified for conversion"
+            
+            # Create output directory if it doesn't exist
+            output_path = Path(output_dir)
+            output_path.mkdir(parents=True, exist_ok=True)
+            
+            # Get document processor (we don't need collection for file conversion)
+            # Use a processor instance without collection for file conversion only
+            temp_processor = DocumentProcessor(self.config, None, None)
+            
+            # Determine pipeline type
+            pipeline_type = PipelineType.PDF if use_pdf_pipeline else PipelineType.VLM
+            
+            # Use the new convert_documents_to_files method
+            results = temp_processor.convert_documents_to_files(
+                files=files,
+                pipeline_type=pipeline_type,
+                include_artifacts=not no_artifacts,
+                output_dir=output_path,
+                output_format=output_format,
+                save_to_storage=save_to_storage,
+                source=source,
+                verbose=verbose
+            )
+            
+            # Format final output
+            if results:
+                return f"📄 Document Conversion Results ({len(results)} files):\n" + "\n".join(results)
+            else:
+                return "📄 No files were processed"
+                
+        except Exception as e:
+            return f"❌ Convert command error: {e}"
 
 
 def main() -> int:

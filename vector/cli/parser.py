@@ -144,6 +144,53 @@ Examples:
         help='Enable verbose output'
     )
     
+    # Convert command
+    convert_parser = subparsers.add_parser(
+        'convert',
+        help='Convert documents to text (without indexing)'
+    )
+    convert_parser.add_argument(
+        'files',
+        nargs='+',
+        help='Files or directories to convert'
+    )
+    convert_parser.add_argument(
+        '--output', '-o',
+        help='Output directory for converted files (default: current directory)',
+        default='.'
+    )
+    convert_parser.add_argument(
+        '--source', '-s',
+        choices=['ordinances', 'manuals', 'checklists', 'other'],
+        help='Source type for documents'
+    )
+    convert_parser.add_argument(
+        '--no-artifacts',
+        action='store_true',
+        help='Skip artifact extraction (faster processing)'
+    )
+    convert_parser.add_argument(
+        '--use-pdf-pipeline',
+        action='store_true',
+        help='Use PDF Pipeline instead of VLM Pipeline (faster but less accurate)'
+    )
+    convert_parser.add_argument(
+        '--format', '-f',
+        choices=['markdown', 'json'],
+        default='markdown',
+        help='Output format: markdown or json (default: markdown)'
+    )
+    convert_parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    convert_parser.add_argument(
+        '--save-to-storage',
+        action='store_true',
+        help='Save documents to filesystem storage in addition to output files'
+    )
+    
     # Info command
     info_parser = subparsers.add_parser(
         'info',

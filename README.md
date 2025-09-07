@@ -18,6 +18,8 @@ A powerful document processing and AI-powered analysis tool with both command-li
 - **Cloud Storage**: Cloud-based vector database with local fallback support
 - **Professional Focus**: Specialized for municipal documents, ordinances, and regulations
 - **Clean Architecture**: Separated concerns for search/AI, document processing, and database operations
+- **Modular Pipeline**: Refactored processing pipeline for better maintainability and testing
+- **Type-Safe Configuration**: PipelineType enum for consistent pipeline selection
 
 ## Quick Start
 
@@ -296,12 +298,14 @@ Vector follows a clean architecture with separated concerns:
    - No document processing logic
 
 2. **DocumentProcessor** (`core/processor.py`)
-   - Manages document processing and indexing
-   - Handles file processing pipelines with both VLM and PDF pipelines
-   - Batch processing with progress tracking
-   - Document conversion using Docling
-   - Text chunking and artifact processing
-   - File format support (PDF, DOCX, TXT, MD)
+   - Manages document processing and indexing with modular pipeline architecture
+   - **execute_processing_pipeline()**: Main orchestration method for the 3-step process
+   - **convert_documents()**: Handles Docling conversion with VLM/PDF pipeline options
+   - **chunk_and_embed()**: Text chunking and vector embedding generation
+   - **store_chunks()**: Batch storage in vector database with metadata
+   - Batch processing with progress tracking and error handling
+   - File format support (PDF, DOCX, TXT, MD) with duplicate detection
+   - Integrated artifact processing for comprehensive document analysis
 
 3. **VectorDatabase** (`core/database.py`)
    - Direct database operations (CRUD)
@@ -346,6 +350,20 @@ Vector offers two document processing pipelines to balance quality and speed:
 - **Less Accurate Artifacts**: May miss some complex visual elements
 - **Use Cases**: Batch processing, simple documents, quick indexing
 
+### Modular Processing Pipeline
+
+Vector's document processing follows a clean, modular 3-step pipeline:
+
+1. **Convert**: Document conversion using Docling with configurable pipelines (VLM/PDF)
+2. **Chunk & Embed**: Text chunking with hybrid chunking and vector embeddings
+3. **Store**: Batch storage in vector database with metadata indexing
+
+This modular approach ensures:
+- **Easy Testing**: Each step can be tested independently
+- **Better Error Handling**: Clear separation of concerns for debugging
+- **Flexible Configuration**: Pipeline options can be mixed and matched
+- **Maintainable Code**: Changes to one step don't affect others
+
 ### Performance Comparison
 
 | Configuration | Pipeline | Artifacts | Speed | Quality | Best For |
@@ -377,12 +395,14 @@ python -m vector process manuals/*.pdf -c "Manuals" --use-pdf-pipeline
 - Processes PDF, DOCX, TXT, and Markdown files using Docling converter
 - **VLM Pipeline**: Uses Vision Language Models for superior document understanding (default)
 - **PDF Pipeline**: Traditional processing for faster speed with `--use-pdf-pipeline` flag
+- **Modular Pipeline Architecture**: Clean 3-step process (Convert → Chunk → Embed → Store)
 - Automatic hybrid chunking for better search results
 - Preserves document structure and headings
 - Duplicate detection prevents reprocessing
 - Optional artifact indexing (images/tables) with `--no-artifacts` flag for faster processing
 - Configurable document conversion based on processing needs
 - Integrated artifact processing for comprehensive document analysis
+- Improved error handling and progress tracking
 
 ### Smart Search & Q&A
 - Semantic search finds relevant content even with different wording using sentence transformers
@@ -421,3 +441,21 @@ python -m vector process manuals/*.pdf -c "Manuals" --use-pdf-pipeline
 - Clean architecture with separated document processing, search, and database layers
 
 The tool uses cloud vector database with local fallback and works with OpenAI for AI features. The modular architecture ensures maintainability and allows for easy testing and extension.
+
+## Recent Improvements
+
+### Refactored Processing Pipeline
+- **Modular Design**: Clean separation of Convert → Chunk → Embed → Store steps
+- **Better Testability**: Each pipeline step can be tested independently
+- **Improved Error Handling**: Clear error boundaries between processing stages
+- **Enhanced Maintainability**: Changes to one step don't affect others
+- **Type Safety**: PipelineType enum for consistent configuration
+- **Backward Compatibility**: All existing functionality preserved
+
+### CLI Integration
+- Updated to use new pipeline methods directly
+- Better argument mapping with PipelineType enum
+- Maintained all existing command-line functionality
+- Improved consistency between CLI and processor APIs
+
+This refactoring makes the codebase more robust, easier to understand, and better aligned with the core purpose of document conversion, embedding, and vector storage.

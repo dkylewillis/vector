@@ -2,9 +2,15 @@
 
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from ..config import Config
+
+
+# Forward declaration for type hints
+class Chunk:
+    """Forward declaration for Chunk class."""
+    pass
 
 
 class Embedder:
@@ -75,3 +81,52 @@ class Embedder:
             all_embeddings.extend([embedding.tolist() for embedding in batch_embeddings])
 
         return all_embeddings
+
+    def embed_chunks(self, chunks: List['Chunk']) -> List[tuple]:
+        """Generate embeddings for chunks and return with chunk objects.
+        
+        Args:
+            chunks: List of Chunk objects to embed
+            
+        Returns:
+            List of tuples (chunk, embedding_vector)
+        """
+        if not chunks:
+            return []
+        
+        # Extract texts from chunks
+        texts = [chunk.text for chunk in chunks]
+        
+        # Generate embeddings in batch
+        embeddings = self.embed_texts(texts)
+        
+        # Return tuples of (chunk, embedding)
+        return list(zip(chunks, embeddings))
+
+    def embed_chunks_batch(self, chunks: List['Chunk'], batch_size: int = 32) -> List[tuple]:
+        """Generate embeddings for chunks in batches and return with chunk objects.
+        
+        Args:
+            chunks: List of Chunk objects to embed
+            batch_size: Number of chunks to process in each batch
+            
+        Returns:
+            List of tuples (chunk, embedding_vector)
+        """
+        if not chunks:
+            return []
+        
+        chunks_with_embeddings = []
+        
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i:i + batch_size]
+            batch_texts = [chunk.text for chunk in batch_chunks]
+            
+            # Generate embeddings for this batch
+            batch_embeddings = self.embed_texts(batch_texts)
+            
+            # Combine chunks with their embeddings
+            for chunk, embedding in zip(batch_chunks, batch_embeddings):
+                chunks_with_embeddings.append((chunk, embedding))
+        
+        return chunks_with_embeddings

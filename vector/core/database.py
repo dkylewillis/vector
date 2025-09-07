@@ -4,13 +4,19 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import (Distance, VectorParams, PointStruct, Filter, 
                                   PayloadSchemaType, CreateFieldIndex)
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import uuid
 
 from ..config import Config
 from ..interfaces import SearchResult
 from ..exceptions import DatabaseError
 from .collection_manager import CollectionManager
+
+
+# Forward declaration for type hints
+class Chunk:
+    """Forward declaration for Chunk class."""
+    pass
 
 # Module-level shared client instance
 _shared_client = None
@@ -259,6 +265,28 @@ class VectorDatabase:
             return results
         except Exception as e:
             raise DatabaseError(f"Search failed: {e}")
+
+    def store_chunks_batch(self, chunks_with_embeddings: List[Tuple['Chunk', List[float]]], 
+                          batch_size: int = 100) -> None:
+        """Store chunks and embeddings in batches.
+        
+        Args:
+            chunks_with_embeddings: List of tuples (chunk, embedding_vector)
+            batch_size: Number of chunks to process in each batch
+        """
+        if not chunks_with_embeddings:
+            return
+        
+        # Process in batches
+        for i in range(0, len(chunks_with_embeddings), batch_size):
+            batch = chunks_with_embeddings[i:i + batch_size]
+            texts = [chunk.text for chunk, _ in batch]
+            vectors = [embedding for _, embedding in batch]
+            metadata = [chunk.metadata.model_dump() for chunk, _ in batch]
+            
+            # Add to vector database
+            self.add_documents(texts, vectors, metadata)
+            print(f"📦 Stored batch: {len(batch)} chunks")
 
     def get_collection_info(self) -> Dict[str, Any]:
         """Get collection information."""

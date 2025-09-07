@@ -98,3 +98,20 @@ class DocumentChunker:
 
         print(f"✅ Created {len(processed_chunks)} chunks from {doc_result.file_path.name}")
         return processed_chunks
+
+    def chunk_documents_batch(self, doc_results: List['DocumentResult']) -> List['Chunk']:
+        """Convert multiple DocumentResults to chunks in batch.
+        
+        Args:
+            doc_results: List of DocumentResult objects from document conversion
+            
+        Returns:
+            List of Chunk objects with text and metadata
+        """
+        all_chunks = []
+        for doc_result in doc_results:
+            chunks = self.chunk_document(doc_result)
+            all_chunks.extend(chunks)
+        
+        print(f"✅ Created {len(all_chunks)} total chunks from {len(doc_results)} documents")
+        return all_chunks
