@@ -14,6 +14,7 @@ from .database import VectorDatabase
 from .collection_manager import CollectionManager
 from .artifacts import ArtifactProcessor
 from .models import Chunk, ChunkMetadata, DocumentResult
+from .filesystem import FileSystemStorage as FS
 
 
 class PipelineType(Enum):
@@ -97,33 +98,90 @@ class DocumentProcessor:
         return chunks_with_embeddings
 
     def execute_processing_pipeline(self, files: List[str], pipeline_type: PipelineType, 
-                                   include_artifacts: bool = True, force: bool = False, 
-                                   source: Optional[str] = None) -> str:
+                                include_artifacts: bool = True, force: bool = False, 
+                                source: Optional[str] = None, from_storage: bool = False) -> str:
         """Main pipeline: Convert → Chunk → Embed → Store.
         
         Args:
-            files: List of file or directory paths to process
-            pipeline_type: VLM or PDF pipeline
+            files: List of file or directory paths to process OR filenames if from_storage=True
+            pipeline_type: VLM or PDF pipeline (ignored if from_storage=True)
             include_artifacts: Whether to process artifacts (images, tables)
             force: Force reprocessing of existing documents
             source: Source type for documents
+            from_storage: If True, load documents from storage by filename instead of converting
             
         Returns:
             Processing status message
         """
         try:
-            # Step 1: Convert documents
-            doc_results = self.convert_documents(files, pipeline_type, include_artifacts, force, source)
+            if from_storage:
+                # Step 1: Load documents from storage instead of converting
+                doc_results = self.load_documents_from_storage(files)
+            else:
+                # Step 1: Convert documents
+                doc_results = self.convert_documents(files, pipeline_type, include_artifacts, force, source)
             
             # Step 2: Chunk and embed
             chunks_with_embeddings = self.process_documents_to_chunks(doc_results)
             
             # Step 3: Store in vector database
             self.store_chunks(chunks_with_embeddings)
-            
+
+            # Step 4: Save Document Results (skip if from_storage since already saved)
+            if not from_storage:
+                self.save_document_results(doc_results)
+
             return f"✅ Pipeline completed for {len(doc_results)} documents"
         except Exception as e:
             raise ProcessingError(f"Pipeline failed: {e}")
+
+    def load_documents_from_storage(self, filenames: List[str]) -> List[DocumentResult]:
+        """Load already-converted documents from filesystem storage.
+        
+        Args:
+            filenames: List of original filenames to load
+            
+        Returns:
+            List of DocumentResult objects reconstructed from storage
+        """
+        storage = FS(self.config)
+        doc_results = []
+        
+        for filename in filenames:
+            try:
+                loaded_doc_and_metadata = storage.load_document_by_filename(filename)
+                if loaded_doc_and_metadata:
+                    loaded_doc, metadata = loaded_doc_and_metadata
+                    # Reconstruct DocumentResult from stored data
+                    doc_result = DocumentResult(
+                        document=loaded_doc,
+                        file_path=Path(metadata['file_path']),
+                        source_category=metadata['source_category'],
+                        file_hash=metadata['file_hash']
+                    )
+                    doc_results.append(doc_result)
+                    print(f"📂 Loaded from storage: {filename}")
+                else:
+                    print(f"⚠️  Document not found in storage: {filename}")
+            except Exception as e:
+                print(f"❌ Error loading {filename} from storage: {e}")
+        
+        return doc_results
+        
+    def save_document_results(self, doc_results: List[DocumentResult]) -> None:
+        for doc_result in doc_results:
+            try:
+                # Save to filesystem storage
+                storage = FS(self.config)
+                doc_id = storage.save_document(doc_result)
+                print(f"   💾 Saved document with ID: {doc_id}")
+                
+                # Also save markdown to storage directory
+                markdown_content = doc_result.document.export_to_markdown()
+                storage.save_markdown(doc_result, markdown_content)
+                print(f"   💾 Saved markdown to storage: {doc_result.file_path.stem}.md")
+            except Exception as e:
+                print(f"❌ Failed to save {doc_result.file_path.name} to storage: {e}")
 
     def convert_documents(self, files: List[str], pipeline_type: PipelineType, 
                          include_artifacts: bool, force: bool, source: Optional[str]) -> List[DocumentResult]:
@@ -161,56 +219,6 @@ class DocumentProcessor:
                     results.append(doc_result)
             else:
                 print(f"⚠️  Skipping {file_path}: Unsupported file type")
-                
-        return results
-
-    def convert_documents_to_files(self, files: List[str], pipeline_type: PipelineType, 
-                                   include_artifacts: bool, output_dir: Path, 
-                                   output_format: str, save_to_storage: bool = False, 
-                                   source: Optional[str] = None, verbose: bool = False) -> List[str]:
-        """Convert documents and save to files (without indexing).
-        
-        Args:
-            files: List of file paths
-            pipeline_type: VLM or PDF pipeline
-            include_artifacts: Whether to process artifacts
-            output_dir: Directory to save outputs
-            output_format: 'markdown' or 'json'
-            save_to_storage: Whether to save to filesystem storage
-            source: Source type
-            verbose: Enable verbose output
-            
-        Returns:
-            List of result messages
-        """
-        results = []
-        use_vlm = (pipeline_type == PipelineType.VLM)
-        
-        for file_path in files:
-            path_obj = Path(file_path)
-            if not path_obj.exists():
-                results.append(f"❌ File not found: {file_path}")
-                continue
-                
-            if path_obj.is_dir():
-                # Handle directories recursively
-                for file_in_dir in path_obj.rglob("*"):
-                    if file_in_dir.is_file() and self.is_supported_file(str(file_in_dir)):
-                        result = self._convert_single_document_to_file(
-                            file_in_dir, source, include_artifacts, use_vlm, 
-                            output_dir, output_format, save_to_storage, verbose
-                        )
-                        if result:
-                            results.append(result)
-            elif path_obj.is_file() and self.is_supported_file(str(path_obj)):
-                result = self._convert_single_document_to_file(
-                    path_obj, source, include_artifacts, use_vlm,
-                    output_dir, output_format, save_to_storage, verbose
-                )
-                if result:
-                    results.append(result)
-            else:
-                results.append(f"❌ Unsupported file type: {file_path}")
                 
         return results
 

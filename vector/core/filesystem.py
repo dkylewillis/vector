@@ -20,15 +20,18 @@ Example usage with FileSystemStorage directly:
     )
     
     # Save to filesystem storage
-    doc_id = await storage.save_document(doc_result)
+    doc_id = storage.save_document(doc_result)
     print(f"Document saved with ID: {doc_id}")
     
     # Load document back
-    loaded_doc, metadata = await storage.load_document(doc_id)
+    loaded_doc, metadata = storage.load_document_by_id(doc_id)
     print(f"Loaded document: {metadata['original_filename']}")
+    
+    # Load document by filename
+    loaded_doc, metadata = storage.load_document_by_filename("document.pdf")
+    print(f"Loaded document by filename: {metadata['original_filename']}")
 """
 
-import asyncio
 import json
 import hashlib
 import shutil
@@ -65,7 +68,7 @@ class FileSystemStorage:
             dir_path.mkdir(parents=True, exist_ok=True)
     
     # Document operations
-    async def save_document(self, doc_result: DocumentResult) -> str:
+    def save_document(self, doc_result: DocumentResult) -> str:
         """Save document to filesystem."""
         doc_id = doc_result.file_hash
         doc_dir = self.converted_docs_path / doc_id
@@ -74,10 +77,7 @@ class FileSystemStorage:
         # Save document JSON
         doc_path = doc_dir / "docling_document.json"
         doc_dict = doc_result.document.export_to_dict()
-        
-        await asyncio.get_event_loop().run_in_executor(
-            None, self._write_json, doc_path, doc_dict
-        )
+        self._write_json(doc_path, doc_dict)
         
         # Save metadata
         metadata_path = doc_dir / "metadata.json"
@@ -89,14 +89,11 @@ class FileSystemStorage:
             'processed_at': datetime.now().isoformat(),
             'original_filename': doc_result.file_path.name
         }
-        
-        await asyncio.get_event_loop().run_in_executor(
-            None, self._write_json, metadata_path, metadata
-        )
+        self._write_json(metadata_path, metadata)
         
         return doc_id
     
-    async def save_markdown(self, doc_result: DocumentResult, markdown_content: str) -> str:
+    def save_markdown(self, doc_result: DocumentResult, markdown_content: str) -> str:
         """Save markdown content to the document directory."""
         doc_id = doc_result.file_hash
         doc_dir = self.converted_docs_path / doc_id
@@ -105,15 +102,12 @@ class FileSystemStorage:
         # Save as original filename with .md extension
         base_name = doc_result.file_path.stem
         markdown_path = doc_dir / f"{base_name}.md"
-        
-        await asyncio.get_event_loop().run_in_executor(
-            None, self._write_text, markdown_path, markdown_content
-        )
+        self._write_text(markdown_path, markdown_content)
         
         return str(markdown_path)
     
-    async def load_document(self, doc_id: str) -> Optional[Tuple[DoclingDocument, Dict]]:
-        """Load document from filesystem."""
+    def load_document_by_id(self, doc_id: str) -> Optional[Tuple[DoclingDocument, Dict]]:
+        """Load document from filesystem by ID."""
         doc_dir = self.converted_docs_path / doc_id
         doc_path = doc_dir / "docling_document.json"
         metadata_path = doc_dir / "metadata.json"
@@ -122,10 +116,8 @@ class FileSystemStorage:
             return None
         
         try:
-            doc_dict, metadata = await asyncio.gather(
-                asyncio.get_event_loop().run_in_executor(None, self._read_json, doc_path),
-                asyncio.get_event_loop().run_in_executor(None, self._read_json, metadata_path)
-            )
+            doc_dict = self._read_json(doc_path)
+            metadata = self._read_json(metadata_path)
             
             document = DoclingDocument.model_validate(doc_dict)
             return document, metadata
@@ -134,7 +126,31 @@ class FileSystemStorage:
             print(f"Error loading document {doc_id}: {e}")
             return None
     
-    async def list_documents(self, filters: Optional[Dict] = None) -> List[Dict]:
+    def load_document_by_filename(self, original_filename: str) -> Optional[Tuple[DoclingDocument, Dict]]:
+        """Load document from filesystem by original filename."""
+        # Search through all documents to find matching filename
+        if not self.converted_docs_path.exists():
+            return None
+        
+        for doc_dir in self.converted_docs_path.iterdir():
+            if doc_dir.is_dir():
+                metadata_path = doc_dir / "metadata.json"
+                if metadata_path.exists():
+                    try:
+                        metadata = self._read_json(metadata_path)
+                        
+                        if metadata.get('original_filename') == original_filename:
+                            # Found matching filename, load the document
+                            doc_id = metadata['doc_id']
+                            return self.load_document_by_id(doc_id)
+                            
+                    except Exception as e:
+                        print(f"Error reading metadata {metadata_path}: {e}")
+                        continue
+        
+        return None
+    
+    def list_documents(self, filters: Optional[Dict] = None) -> List[Dict]:
         """List all documents."""
         documents = []
         
@@ -146,9 +162,7 @@ class FileSystemStorage:
                 metadata_path = doc_dir / "metadata.json"
                 if metadata_path.exists():
                     try:
-                        metadata = await asyncio.get_event_loop().run_in_executor(
-                            None, self._read_json, metadata_path
-                        )
+                        metadata = self._read_json(metadata_path)
                         
                         if not filters or self._matches_filters(metadata, filters):
                             documents.append(metadata)
@@ -158,18 +172,16 @@ class FileSystemStorage:
         
         return documents
     
-    async def delete_document(self, doc_id: str) -> bool:
+    def delete_document(self, doc_id: str) -> bool:
         """Delete document from filesystem."""
         doc_dir = self.converted_docs_path / doc_id
         if doc_dir.exists():
-            await asyncio.get_event_loop().run_in_executor(
-                None, shutil.rmtree, doc_dir
-            )
+            shutil.rmtree(doc_dir)
             return True
         return False
     
     # Artifact operations
-    async def save_artifact(self, artifact_data: bytes, doc_id: str, 
+    def save_artifact(self, artifact_data: bytes, doc_id: str, 
                            ref_item: str, artifact_type: str, 
                            metadata: Optional[Dict] = None) -> str:
         """Save artifact to filesystem using Docling naming convention."""
@@ -208,9 +220,7 @@ class FileSystemStorage:
         doc_path = images_dir / filename
         
         if not doc_path.exists():
-            await asyncio.get_event_loop().run_in_executor(
-                None, self._write_bytes, doc_path, artifact_data
-            )
+            self._write_bytes(doc_path, artifact_data)
         
         # Save metadata
         meta_data = {
@@ -227,13 +237,11 @@ class FileSystemStorage:
         }
         
         metadata_path = images_dir / f"{artifact_id}.json"
-        await asyncio.get_event_loop().run_in_executor(
-            None, self._write_json, metadata_path, meta_data
-        )
+        self._write_json(metadata_path, meta_data)
         
         return artifact_id
     
-    async def load_artifact(self, artifact_id: str) -> Optional[Tuple[bytes, Dict]]:
+    def load_artifact(self, artifact_id: str) -> Optional[Tuple[bytes, Dict]]:
         """Load artifact from filesystem."""
         # Search through all document directories
         if self.converted_docs_path.exists():
@@ -246,17 +254,15 @@ class FileSystemStorage:
                         
                         if artifact_path.exists() and metadata_path.exists():
                             try:
-                                metadata, data = await asyncio.gather(
-                                    asyncio.get_event_loop().run_in_executor(None, self._read_json, metadata_path),
-                                    asyncio.get_event_loop().run_in_executor(None, self._read_bytes, artifact_path)
-                                )
+                                metadata = self._read_json(metadata_path)
+                                data = self._read_bytes(artifact_path)
                                 return data, metadata
                             except Exception as e:
                                 print(f"Error loading artifact {artifact_id} from {images_dir}: {e}")
         
         return None
     
-    async def list_artifacts(self, doc_id: Optional[str] = None, 
+    def list_artifacts(self, doc_id: Optional[str] = None, 
                             artifact_type: Optional[str] = None) -> List[Dict]:
         """List artifacts with optional filters."""
         artifacts = []
@@ -282,9 +288,7 @@ class FileSystemStorage:
         for images_dir in search_dirs:
             for metadata_file in images_dir.glob("*.json"):
                 try:
-                    metadata = await asyncio.get_event_loop().run_in_executor(
-                        None, self._read_json, metadata_file
-                    )
+                    metadata = self._read_json(metadata_file)
                     
                     if artifact_type and metadata.get('artifact_type') != artifact_type:
                         continue
@@ -295,7 +299,7 @@ class FileSystemStorage:
         
         return artifacts
     
-    async def delete_artifact(self, artifact_id: str) -> bool:
+    def delete_artifact(self, artifact_id: str) -> bool:
         """Delete artifact from filesystem."""
         # Search through all document images directories
         if self.converted_docs_path.exists():
@@ -309,8 +313,8 @@ class FileSystemStorage:
                         if metadata_path.exists():
                             try:
                                 if artifact_path.exists():
-                                    await asyncio.get_event_loop().run_in_executor(None, artifact_path.unlink)
-                                await asyncio.get_event_loop().run_in_executor(None, metadata_path.unlink)
+                                    artifact_path.unlink()
+                                metadata_path.unlink()
                                 return True
                             except Exception as e:
                                 print(f"Error deleting artifact {artifact_id}: {e}")
@@ -318,7 +322,7 @@ class FileSystemStorage:
         return False
     
     # Utility operations
-    async def cleanup(self) -> Dict[str, int]:
+    def cleanup(self) -> Dict[str, int]:
         """Cleanup orphaned files."""
         stats = {'documents_removed': 0, 'artifacts_removed': 0}
         
@@ -332,10 +336,10 @@ class FileSystemStorage:
         
         return stats
     
-    async def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """Get storage statistics."""
-        docs = await self.list_documents()
-        artifacts = await self.list_artifacts()
+        docs = self.list_documents()
+        artifacts = self.list_artifacts()
         
         total_size = 0
         for path in self.base_path.rglob("*"):

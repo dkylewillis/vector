@@ -4,7 +4,7 @@ A powerful document processing and AI-powered analysis tool with both command-li
 
 ## Features
 
-- **Document Processing**: Supports PDF, DOCX, TXT, and Markdown files with Docling converter
+- **Document Processing**: Supports PDF, DOCX, and DOC files with Docling converter
 - **Pipeline Options**: Choose between VLM Pipeline (better quality) or PDF Pipeline (faster processing)
 - **Artifact Processing**: Optional indexing of images and tables with `--no-artifacts` for faster processing
 - **Directory Processing**: Process entire directories recursively with duplicate detection
@@ -89,8 +89,14 @@ All commands support the `--collection` or `-c` flag to specify which collection
 python -m vector create-collection "Legal Documents Q1 2024" --description "Q1 legal documents"
 python -m vector create-collection "Technical Manuals" --description "Engineering manuals and specs"
 
+# Create with short flag
+python -m vector create-collection "Engineering Specs" -d "Engineering specifications and standards"
+
 # List all collection pairs
 python -m vector collections
+
+# List with verbose output
+python -m vector collections --verbose
 
 # Rename a collection pair's display name
 python -m vector rename-collection "Legal Docs Q1" "Legal Documents Q1 2024"
@@ -98,7 +104,7 @@ python -m vector rename-collection "Legal Docs Q1" "Legal Documents Q1 2024"
 # Delete a collection pair (requires --force for safety)
 python -m vector delete-collection "Old Collection" --force
 
-# Process individual documents (supports PDF, DOCX, TXT, MD)
+# Process individual documents (supports PDF, DOCX, DOC)
 python -m vector process "data\Coweta\ordinances\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
 
 # Process documents without indexing artifacts (faster processing)
@@ -114,6 +120,13 @@ python -m vector process "data\large_batch\*.pdf" --no-artifacts --use-pdf-pipel
 python -m vector process "data\zoning\zoning_ordinance.docx" --collection "Legal Documents"
 python -m vector process "data\utilities\utility_standards.pdf" -c "Technical Manuals"
 
+# Process with source type specification
+python -m vector process "data\Coweta\ordinances\*.docx" -c "Legal Documents" --source ordinances
+python -m vector process "data\manuals\*.pdf" -c "Technical Manuals" --source manuals
+
+# Force reprocessing of existing documents
+python -m vector process "data\updated_manual.pdf" --force
+
 # Process multiple files (use wildcards or specify each file)
 python -m vector process "data\Coweta\ordinances\*.docx" -c "Legal Documents"
 
@@ -125,15 +138,34 @@ python -m vector search "setback requirements" --collection "Legal Documents"
 python -m vector search "flow chart" --type artifacts --collection "Technical Manuals"
 python -m vector search "diagram" --type both --collection "Engineering Specs"
 
+# Search with custom result count
+python -m vector search "zoning regulations" --top-k 10 --collection "Legal Documents"
+
+# Search with metadata filtering (JSON format)
+python -m vector search "requirements" --metadata-filter '{"source": "ordinances"}'
+
 # Ask AI questions with different response lengths
 python -m vector ask "What are the parking regulations?"
 python -m vector ask "What is a setback?" --length short
 python -m vector ask "Explain zoning regulations in detail" --length long
 python -m vector ask "What are pipe sizing requirements?" --collection "Engineering Specs"
 
+# Ask with metadata filtering
+python -m vector ask "What are the requirements?" --metadata-filter '{"filename": "zoning.pdf"}'
+
+# Convert documents without indexing (file conversion only)
+python -m vector convert "documents/*.pdf" --output ./converted --format markdown
+python -m vector convert "manual.pdf" --output ./output --format json --save-to-storage
+
+# Convert with different pipeline options
+python -m vector convert "documents/*.pdf" --use-pdf-pipeline --no-artifacts --output ./converted
+
 # Show knowledge base status
 python -m vector info
 python -m vector info --collection "Legal Documents"
+
+# Show with verbose output
+python -m vector info --collection "Legal Documents" --verbose
 
 # Show metadata for collections
 python -m vector metadata
@@ -152,6 +184,14 @@ python -m vector models -p openai
 # Clear knowledge base
 python -m vector clear
 python -m vector clear --collection "Temporary Collection"
+
+# Clear with force flag (skip confirmation)
+python -m vector clear --collection "Test Collection" --force
+
+# Enable verbose output for any command
+python -m vector process "document.pdf" --verbose
+python -m vector search "requirements" --verbose
+python -m vector ask "What is this?" --verbose
 ```
 
 **Note**: If you encounter permission errors when processing directories, process individual files instead or run as administrator.
@@ -159,33 +199,96 @@ python -m vector clear --collection "Temporary Collection"
 ## Commands
 
 ### Collection Management Commands
-- **`collections`** - List all collection pairs with metadata and display names
-- **`create-collection <display_name>`** - Create new collection pair with friendly name
-  - Automatically creates both chunks and artifacts collections linked together
-  - `--description` - Optional description
-- **`rename-collection <old_name> <new_name>`** - Change collection pair display name
-- **`delete-collection <display_name>`** - Delete collection pair and all data
-  - `--force` - Required flag to confirm deletion
+
+#### `collections`
+List all collection pairs with metadata and display names.
+- `--verbose`, `-v` - Enable verbose output
+
+#### `create-collection <display_name>`
+Create new collection pair with friendly name. Automatically creates both chunks and artifacts collections linked together.
+- `<display_name>` - Human-readable name for the collection pair (required)
+- `--description`, `-d` - Optional description for the collection pair
+- `--verbose`, `-v` - Enable verbose output
+
+#### `rename-collection <old_name> <new_name>`
+Change collection pair display name.
+- `<old_name>` - Current display name of the collection (required)
+- `<new_name>` - New display name for the collection (required)
+- `--verbose`, `-v` - Enable verbose output
+
+#### `delete-collection <display_name>`
+Delete collection pair and all its data.
+- `<display_name>` - Display name of the collection to delete (required)
+- `--force` - Skip confirmation prompt (required for safety)
+- `--verbose`, `-v` - Enable verbose output
 
 ### Document Processing & Search Commands
-- **`--collection <name>`** - Global flag to specify collection pair (works with all commands)
-- **`process <files/dirs>`** - Add documents to knowledge base (supports directories)
-  - Automatically stores chunks in the chunks collection and artifacts in the artifacts collection
-  - `--no-artifacts` - Skip indexing of images and tables for faster processing
-  - `--use-pdf-pipeline` - Use PDF Pipeline instead of VLM Pipeline (faster but less accurate)
-  - `--force` - Force reprocessing of existing documents
-  - `--source <type>` - Specify document source type (ordinances, manuals, checklists, other)
-- **`search <query>`** - Search for relevant content using semantic similarity
-- **`ask <question>`** - Get AI-powered answers with document context
-  - `--length short|medium|long` - Response length (150/500/1500 tokens)
-- **`info`** - Show knowledge base information and statistics
-- **`metadata`** - Show document metadata and source information
-- **`delete <key> <value>`** - Delete documents matching metadata filter
-  - `<key>` - Metadata field to filter by (filename, source, heading, etc.)
-  - `<value>` - Value to match for deletion
-- **`models`** - List available AI models for the specified provider
-  - `--provider openai` - Specify AI provider (currently supports: openai)
-- **`clear`** - Clear all chunks from knowledge base
+
+#### `search <query>`
+Search documents for relevant content using semantic similarity.
+- `<query>` - Search query (required)
+- `--collection`, `-c` - Collection name (default: from config)
+- `--type`, `-t` - Type of content to search: chunks (text), artifacts (images/tables), or both (choices: chunks, artifacts, both; default: chunks)
+- `--top-k`, `-k` - Number of results to return (default: 5)
+- `--metadata-filter` - JSON string for metadata filtering
+- `--verbose`, `-v` - Enable verbose output
+
+#### `ask <question>`
+Ask AI a question about the documents.
+- `<question>` - Question to ask (required)
+- `--collection`, `-c` - Collection name (default: from config)
+- `--length`, `-l` - Response length (choices: short, medium, long; default: medium)
+- `--metadata-filter` - JSON string for metadata filtering
+- `--verbose`, `-v` - Enable verbose output
+
+#### `process <files>`
+Process and index documents. Automatically stores chunks in the chunks collection and artifacts in the artifacts collection.
+- `<files>` - Files or directories to process (required, supports multiple files)
+- `--collection`, `-c` - Collection name (default: from config)
+- `--source`, `-s` - Source type for documents (choices: ordinances, manuals, checklists, other)
+- `--force`, `-f` - Force reprocessing of existing documents
+- `--no-artifacts` - Skip indexing of images and tables (faster processing)
+- `--use-pdf-pipeline` - Use PDF Pipeline instead of VLM Pipeline (faster but less accurate)
+- `--verbose`, `-v` - Enable verbose output
+
+#### `convert <files>`
+Convert documents to text (without indexing to vector database).
+- `<files>` - Files or directories to convert (required, supports multiple files)
+- `--output`, `-o` - Output directory for converted files (default: current directory)
+- `--source`, `-s` - Source type for documents (choices: ordinances, manuals, checklists, other)
+- `--no-artifacts` - Skip artifact extraction (faster processing)
+- `--use-pdf-pipeline` - Use PDF Pipeline instead of VLM Pipeline (faster but less accurate)
+- `--format`, `-f` - Output format: markdown or json (choices: markdown, json; default: markdown)
+- `--verbose`, `-v` - Enable verbose output
+- `--save-to-storage` - Save documents to filesystem storage in addition to output files
+
+#### `info`
+Show collection information.
+- `--collection`, `-c` - Collection name (default: from config)
+- `--verbose`, `-v` - Enable verbose output
+
+#### `metadata`
+Show metadata summary for documents in collection.
+- `--collection`, `-c` - Collection name (default: from config)
+- `--verbose`, `-v` - Enable verbose output
+
+#### `delete <key> <value>`
+Delete documents matching metadata filter.
+- `<key>` - Metadata key to filter by (e.g., filename, source) (required)
+- `<value>` - Metadata value to match (required)
+- `--collection`, `-c` - Collection name (default: from config)
+- `--verbose`, `-v` - Enable verbose output
+
+#### `clear`
+Clear collection (with confirmation).
+- `--collection`, `-c` - Collection name (default: from config)
+- `--force` - Skip confirmation prompt
+- `--verbose`, `-v` - Enable verbose output
+
+#### `models`
+List available AI models for the specified provider.
+- `--provider`, `-p` - AI provider to list models for (choices: openai; default: openai)
+- `--verbose`, `-v` - Enable verbose output
 
 ## Collection Examples by Use Case
 
@@ -270,7 +373,7 @@ vector/
 │   │   ├── converter.py  # Document conversion with Docling
 │   │   ├── database.py   # Vector database operations
 │   │   ├── embedder.py   # Text embeddings
-│   │   ├── filesystem.py # File system storage management
+│   │   ├── filesystem.py # Synchronous file system storage management
 │   │   ├── processor.py  # Document processing engine
 │   │   └── models.py     # Data models
 │   ├── ai/               # AI model implementations
@@ -299,6 +402,7 @@ Vector follows a clean architecture with separated concerns:
 
 2. **DocumentProcessor** (`core/processor.py`)
    - Manages document processing and indexing with modular pipeline architecture
+   - Synchronous pipeline execution for simplified error handling and debugging
    - **execute_processing_pipeline()**: Main orchestration method for the 3-step process
    - **convert_documents()**: Handles Docling conversion with VLM/PDF pipeline options
    - **chunk_and_embed()**: Text chunking and vector embedding generation
@@ -443,6 +547,11 @@ python -m vector process manuals/*.pdf -c "Manuals" --use-pdf-pipeline
 The tool uses cloud vector database with local fallback and works with OpenAI for AI features. The modular architecture ensures maintainability and allows for easy testing and extension.
 
 ## Recent Improvements
+
+- **Synchronous Architecture**: Removed async/await from document processing and filesystem operations for simplified code and better maintainability
+- **Enhanced Convert Command**: Added dedicated document conversion without vector database indexing
+- **Improved Error Handling**: Better error messages and validation throughout the processing pipeline
+- **Optimized File I/O**: Direct synchronous file operations for improved performance and reduced complexity
 
 ### Refactored Processing Pipeline
 - **Modular Design**: Clean separation of Convert → Chunk → Embed → Store steps

@@ -1,0 +1,35 @@
+{
+  "collection_pairs": {
+    "cp_01K4JHXNZKKEXA0W134E13WSB7": {
+      "display_name": "GSMM_Test",
+      "ulid": "01K4JHXNZKKEXA0W134E13WSB7",
+      "chunks_collection": "c_01K4JHXNZKKEXA0W134E13WSB7__chunks",
+      "artifacts_collection": "c_01K4JHXNZKKEXA0W134E13WSB7__artifacts",
+      "description": "",
+      "created_at": "2025-09-07T13:00:02.419975",
+      "status": "active",
+      "document_count": 1
+    }
+  },
+  "display_name_to_pair": {
+    "GSMM_Test": "cp_01K4JHXNZKKEXA0W134E13WSB7"
+  },
+  "documents": {
+    "doc_01K4JHYKWAZ749CYD3EEZTKH1A": {
+      "ulid": "01K4JHYKWAZ749CYD3EEZTKH1A",
+      "file_hash": "bf9345120a19ee4110d3221c40a1636580e1c96429f2d12e2cd09dbc82429d85",
+      "in_collections": {
+        "cp_01K4JHXNZKKEXA0W134E13WSB7": {
+          "added_at": "2025-09-07T13:00:33.034819"
+        }
+      },
+      "metadata": {
+        "filename": "gsmm_75_85.pdf",
+        "source": "manuals",
+        "file_path": "data\\source_documents\\GSMM\\gsmm_75_85.pdf"
+      }
+    }
+  },
+  "created_at": "2025-09-07T13:00:02.419939",
+  "updated_at": "2025-09-07T13:00:33.034826"
+}

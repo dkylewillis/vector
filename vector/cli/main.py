@@ -19,6 +19,8 @@ from docling_core.types.doc import ImageRefMode
 from ..core.filesystem import FileSystemStorage
 from ..core.artifacts import ArtifactProcessor
 
+import asyncio
+
 
 class VectorCLI:
     """Main CLI coordinator for Vector."""
@@ -454,9 +456,6 @@ class VectorCLI:
             source = kwargs.get('source')
             no_artifacts = kwargs.get('no_artifacts', False)
             use_pdf_pipeline = kwargs.get('use_pdf_pipeline', False)
-            output_format = kwargs.get('format', 'markdown')
-            verbose = kwargs.get('verbose', False)
-            save_to_storage = kwargs.get('save_to_storage', False)
             
             if not files:
                 return "❌ No files specified for conversion"
@@ -471,24 +470,23 @@ class VectorCLI:
             
             # Determine pipeline type
             pipeline_type = PipelineType.PDF if use_pdf_pipeline else PipelineType.VLM
-            
-            # Use the new convert_documents_to_files method
-            results = temp_processor.convert_documents_to_files(
+
+            doc_results = temp_processor.convert_documents(
                 files=files,
                 pipeline_type=pipeline_type,
                 include_artifacts=not no_artifacts,
-                output_dir=output_path,
-                output_format=output_format,
-                save_to_storage=save_to_storage,
-                source=source,
-                verbose=verbose
+                force=True,
+                source=source
             )
+
+            temp_processor.save_document_results(doc_results)
+
             
             # Format final output
-            if results:
-                return f"📄 Document Conversion Results ({len(results)} files):\n" + "\n".join(results)
-            else:
-                return "📄 No files were processed"
+            # if results:
+            #     return f"📄 Document Conversion Results ({len(results)} files):\n" + "\n".join(results)
+            # else:
+            #     return "📄 No files were processed"
                 
         except Exception as e:
             return f"❌ Convert command error: {e}"
