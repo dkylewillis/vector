@@ -1,8 +1,8 @@
-"""Core business logic modules for Vector."""
+"""Core processing modules for Vector."""
 
-from .agent import ResearchAgent
 from .embedder import Embedder
 from .database import VectorDatabase
 from .processor import DocumentProcessor
+from .collection_manager import CollectionManager
 
-__all__ = ['ResearchAgent', 'Embedder', 'VectorDatabase', 'DocumentProcessor']
+__all__ = ['Embedder', 'VectorDatabase', 'DocumentProcessor', 'CollectionManager']

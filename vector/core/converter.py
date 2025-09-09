@@ -41,51 +41,45 @@ class DocumentConverter:
         self.use_vlm_pipeline = use_vlm_pipeline
 
         # Configure pipeline options based on pipeline type
-        use_vlm_pipeline = None
         if use_vlm_pipeline:
             pipeline_options = VlmPipelineOptions()
-
-            #Configure VLM options if available
-
-            # pipeline_options.enable_remote_services = True
-            # pipeline_options.vlm_options = ApiVlmOptions(
-            #     url="https://api.openai.com/v1/chat/completions",  # OpenAI-compatible
-            #     params={"model": "gpt-5"},  # <= GPT-5 here
-            #     prompt="OCR full page to markdown.",
-            #     timeout=300,
-            #     response_format=ResponseFormat.MARKDOWN,
-            #     headers={
-            #         "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"
-            #     },
-            #     temperature=1,
-            # )
             pipeline_cls = VlmPipeline
         else:
             pipeline_options = PdfPipelineOptions()
-            pipeline_cls = None  # Default pipeline for PDF
+            pipeline_cls = None
 
-        if generate_artifacts:
-            pipeline_options.images_scale = 2.0
-            pipeline_options.generate_picture_images = True
-            pipeline_options.generate_table_images = True
-        else:
-            # Disable artifact generation for faster processing
-            pipeline_options.images_scale = 1.0
-            pipeline_options.generate_picture_images = False
-            #pipeline_options.generate_table_images = False
+        # Configure artifact generation
+        if hasattr(pipeline_options, 'images_scale'):
+            if generate_artifacts:
+                pipeline_options.images_scale = 2.0
+                pipeline_options.generate_picture_images = True
+                if hasattr(pipeline_options, 'generate_table_images'):
+                    pipeline_options.generate_table_images = True
+            else:
+                pipeline_options.images_scale = 1.0
+                pipeline_options.generate_picture_images = False
 
-        # Create converter with appropriate pipeline
+        # Create converter with PDF format options (supports most formats)
         format_options = {
-            InputFormat.PDF: PdfFormatOption(
-                pipeline_options=pipeline_options,
-            )
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
         }
 
-        # Only add pipeline_cls if using VLM pipeline
         if use_vlm_pipeline:
             format_options[InputFormat.PDF].pipeline_cls = pipeline_cls
 
         self.converter = DoclingConverter(format_options=format_options)
+
+    def _get_file_type(self, file_path: Path) -> str:
+        """Get file type for logging purposes."""
+        suffix = file_path.suffix.lower()
+        type_mapping = {
+            '.pdf': 'PDF',
+            '.docx': 'DOCX', '.doc': 'DOC',
+            '.png': 'IMAGE', '.jpg': 'IMAGE', '.jpeg': 'IMAGE', '.gif': 'IMAGE',
+            '.html': 'HTML', '.htm': 'HTML',
+            '.txt': 'TEXT', '.md': 'TEXT'
+        }
+        return type_mapping.get(suffix, 'PDF')
 
     @classmethod
     def create_for_pipeline(cls, pipeline_type: 'PipelineType', include_artifacts: bool) -> 'DocumentConverter':
@@ -113,10 +107,11 @@ class DocumentConverter:
         Raises:
             ProcessingError: If conversion fails
         """
+        file_type = self._get_file_type(file_path)
         pipeline_type = "VLM" if self.use_vlm_pipeline else "PDF"
-        print(f"Converting: {file_path} (pipeline: {pipeline_type}, artifacts: {'enabled' if self.generate_artifacts else 'disabled'})")
+        print(f"Converting: {file_path} (type: {file_type}, pipeline: {pipeline_type}, artifacts: {'enabled' if self.generate_artifacts else 'disabled'})")
 
-        # Convert document using Docling
+        # Convert document using Docling - it auto-detects format
         doc = self.converter.convert(str(file_path)).document
         if not doc:
             raise ProcessingError(f"Failed to convert {file_path}")

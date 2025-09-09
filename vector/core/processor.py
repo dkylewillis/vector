@@ -374,19 +374,27 @@ class DocumentProcessor:
             self.artifacts_vector_db.create_collection(vector_size=vector_size)
             self.artifacts_vector_db.ensure_indexes()
         
-        # Add document to collection pair metadata if we have pair info
+        # Add all documents to collection pair metadata if we have pair info
         if self.pair_info and self.collection_manager and chunks_with_embeddings:
-            doc_metadata = chunks_with_embeddings[0][0].metadata.model_dump()
-            document_id = doc_metadata.get('file_hash', doc_metadata.get('filename', 'unknown'))
-            self.collection_manager.add_document_to_pair(
-                self.pair_info['pair_id'], 
-                document_id, 
-                {
-                    'filename': doc_metadata.get('filename'),
-                    'source': doc_metadata.get('source'),
-                    'file_path': doc_metadata.get('file_path')
-                }
-            )
+            # Extract unique documents from chunks
+            unique_documents = {}
+            for chunk, _ in chunks_with_embeddings:
+                doc_metadata = chunk.metadata.model_dump()
+                file_hash = doc_metadata.get('file_hash')
+                if file_hash and file_hash not in unique_documents:
+                    unique_documents[file_hash] = {
+                        'filename': doc_metadata.get('filename'),
+                        'source': doc_metadata.get('source'),
+                        'file_path': doc_metadata.get('file_path')
+                    }
+            
+            # Add each unique document to the collection pair
+            for document_id, metadata in unique_documents.items():
+                self.collection_manager.add_document_to_pair(
+                    self.pair_info['pair_id'], 
+                    document_id, 
+                    metadata
+                )
         
         # Use batch storage from database
         self.chunks_vector_db.store_chunks_batch(chunks_with_embeddings, batch_size=self.BATCH_SIZE)
@@ -417,14 +425,16 @@ class DocumentProcessor:
             # Ensure indexes exist before filtering
             self.chunks_vector_db.ensure_indexes()
             
-            # Search for documents with this file hash
+            # Search for documents with this file hash using proper Filter model
+            from qdrant_client.models import Filter
+            scroll_filter = Filter(
+                must=[
+                    {"key": "file_hash", "match": {"value": file_hash}}
+                ]
+            )
             scroll_result = self.chunks_vector_db.client.scroll(
                 collection_name=self.chunks_vector_db.collection_name,
-                scroll_filter={
-                    "must": [
-                        {"key": "file_hash", "match": {"value": file_hash}}
-                    ]
-                },
+                scroll_filter=scroll_filter,
                 limit=1,
                 with_payload=True,
                 with_vectors=False
@@ -460,14 +470,16 @@ class DocumentProcessor:
                     # Ensure indexes exist before filtering
                     vector_db.ensure_indexes()
                     
-                    # Find all points with this file hash
+                    # Find all points with this file hash using proper Filter model
+                    from qdrant_client.models import Filter
+                    scroll_filter = Filter(
+                        must=[
+                            {"key": "file_hash", "match": {"value": file_hash}}
+                        ]
+                    )
                     scroll_result = vector_db.client.scroll(
                         collection_name=vector_db.collection_name,
-                        scroll_filter={
-                            "must": [
-                                {"key": "file_hash", "match": {"value": file_hash}}
-                            ]
-                        },
+                        scroll_filter=scroll_filter,
                         limit=self.MAX_CHUNKS_PER_FILE,  # Assume no more than 10k chunks per file
                         with_payload=False,
                         with_vectors=False

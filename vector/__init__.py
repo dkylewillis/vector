@@ -6,7 +6,7 @@ __description__ = "AI-Powered Document Processing & Search"
 
 # Main API exports
 from .config import Config
-from .core.agent import ResearchAgent
+from .agent import ResearchAgent
 from .exceptions import VectorError
 
 __all__ = [

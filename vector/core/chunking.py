@@ -19,6 +19,7 @@ from docling_core.transforms.chunker.hierarchical_chunker import (
 from docling_core.transforms.serializer.markdown import MarkdownParams
 from docling_core.types.doc.base import ImageRefMode
 
+# needed to add ImageItem to chunk metadata
 class ImgPlaceholderSerializerProvider(ChunkingSerializerProvider):
     def get_serializer(self, doc):
         return ChunkingDocSerializer(

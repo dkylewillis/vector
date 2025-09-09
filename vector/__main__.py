@@ -1,7 +1,6 @@
-"""Main entry point for Vector CLI when run as python -m vector."""
+"""Entry point for python -m vector - delegates to core CLI."""
 
-import sys
-from .cli.main import main
+from .core.cli import main
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
