@@ -173,38 +173,71 @@ def main():
                 print(f"🔧 Output: {args.output_dir}")
                 print(f"🔧 Artifacts: {'enabled' if include_artifacts else 'disabled'}")
             
-            # Process each file
+            # Convert files to specified format
+            files_to_convert = []
             for file_path in args.files:
                 path_obj = Path(file_path)
                 if path_obj.is_file() and processor.is_supported_file(str(path_obj)):
-                    result = processor._convert_single_document_to_file(
-                        file_path=path_obj,
-                        source=None,
-                        include_artifacts=include_artifacts,
-                        use_vlm=(pipeline_type == PipelineType.VLM),
-                        output_dir=args.output_dir,
-                        output_format=args.format,
-                        save_to_storage=args.save_storage,
-                        verbose=args.verbose
-                    )
-                    print(result)
+                    files_to_convert.append(path_obj)
                 elif path_obj.is_dir():
                     # Process directory recursively
                     for file_in_dir in path_obj.rglob("*"):
                         if file_in_dir.is_file() and processor.is_supported_file(str(file_in_dir)):
-                            result = processor._convert_single_document_to_file(
-                                file_path=file_in_dir,
-                                source=None,
-                                include_artifacts=include_artifacts,
-                                use_vlm=(pipeline_type == PipelineType.VLM),
-                                output_dir=args.output_dir,
-                                output_format=args.format,
-                                save_to_storage=args.save_storage,
-                                verbose=args.verbose
-                            )
-                            print(result)
+                            files_to_convert.append(file_in_dir)
                 else:
                     print(f"⚠️  Skipping {file_path}: unsupported or not found")
+            
+            # Process each file
+            for file_path in files_to_convert:
+                try:
+                    # Convert using normal pipeline but without vector storage
+                    doc_results = processor.convert_documents([str(file_path)], pipeline_type, include_artifacts, False, None)
+                    
+                    if not doc_results:
+                        print(f"⚠️  Failed to convert {file_path}")
+                        continue
+                    
+                    doc_result = doc_results[0]
+                    
+                    # Handle artifacts if enabled and save-storage requested
+                    if include_artifacts and args.save_storage:
+                        import asyncio
+                        asyncio.run(processor._handle_artifacts([doc_result], save_to_storage=True, save_to_vector=False))
+                    
+                    # Generate output file
+                    base_name = file_path.stem
+                    if args.format == 'markdown':
+                        output_file = args.output_dir / f"{base_name}.md"
+                        # Save as markdown
+                        from docling_core.types.doc import ImageRefMode
+                        doc_result.document.save_as_markdown(
+                            str(output_file), 
+                            image_mode=ImageRefMode.REFERENCED
+                        )
+                        print(f"✅ Converted to markdown: {output_file}")
+                    elif args.format == 'json':
+                        output_file = args.output_dir / f"{base_name}.json"
+                        # Save document data as JSON
+                        import json
+                        doc_data = {
+                            'filename': file_path.name,
+                            'source_category': doc_result.source_category,
+                            'file_hash': doc_result.file_hash,
+                            'content': doc_result.document.export_to_markdown()
+                        }
+                        with open(output_file, 'w', encoding='utf-8') as f:
+                            json.dump(doc_data, f, indent=2, ensure_ascii=False)
+                        print(f"✅ Converted to JSON: {output_file}")
+                    
+                    # Save to storage if requested
+                    if args.save_storage:
+                        processor.save_document_results([doc_result])
+                        
+                except Exception as e:
+                    print(f"❌ Failed to process {file_path.name}: {e}")
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
 
     except KeyboardInterrupt:
         print("\n❌ Cancelled by user")

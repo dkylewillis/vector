@@ -115,7 +115,7 @@ class ArtifactProcessor:
         thumbnail_data = None
         try:
             if hasattr(item, 'image') and item.image:
-                raw_data = self._extract_image_data(item, doc)
+                raw_data = item.image.export_as_bytes()
                 
                 # Generate thumbnail if requested
                 if self.generate_thumbnails and raw_data:
@@ -154,25 +154,12 @@ class ArtifactProcessor:
         embedding = None
         if self.embedder:
             embedding = self.embedder.embed_text(full_text)
-
-        # Extract raw image data
-        raw_data = None
-        thumbnail_data = None
-        try:
-            if hasattr(item, 'image') and item.image:
-                raw_data = self._extract_image_data(item, doc)
-
-                # Generate thumbnail if requested
-                if self.generate_thumbnails and raw_data:
-                    thumbnail_data = self._generate_thumbnail_bytes(raw_data)
-        except Exception as e:
-            self._debug_print(f"Error extracting image data: {e}")
         
         return ProcessedArtifact(
             ref_item=item.self_ref,
             artifact_type="table",
             raw_data=table_text.encode('utf-8') if table_text else None,
-            thumbnail_data=thumbnail_data,  # Tables don't have thumbnails
+            thumbnail_data=None,  # Tables don't have thumbnails
             embedding=embedding,
             metadata=metadata,
             caption=full_text
@@ -295,51 +282,6 @@ class ArtifactProcessor:
         except Exception as e:
             self._debug_print(f"Error extracting table text: {e}")
             return ""
-        
-    def _extract_image_data(self, item, doc: DoclingDocument) -> Optional[bytes]:
-        """Extract raw image data from any artifact item.
-        
-        Args:
-            item: Artifact item (PictureItem or TableItem)
-            doc: Docling document
-            
-        Returns:
-            Raw image bytes or None if not available
-        """
-        try:
-            # Try nested image object
-            if hasattr(item, 'image') and item.image:
-                
-                try:
-                    pil_img = getattr(item.image, 'pil_image', None)
-                except Exception as e:
-                    pil_img = None
-                    
-                # Verify it's actually a PIL Image
-                if isinstance(pil_img, PILImage.Image):
-                    # Convert PIL Image to bytes    
-                    buffer = io.BytesIO()
-                    pil_img.save(buffer, format='PNG')
-                    return buffer.getvalue()
-                
-                # Check for URI
-                if hasattr(item.image, 'uri'):
-                    uri = item.image.uri
-                    
-                    if isinstance(uri, Path):
-                        artifacts_dir = Path(self.config.artifacts_dir)
-                        image_path = artifacts_dir / uri
-                        try:
-                            with open(image_path, 'rb') as f:
-                                return f.read()
-                        except Exception as e:
-                            self._debug_print(f"Error loading image from {image_path}: {e}")
-            return None
-            
-        except Exception as e:
-            self._debug_print(f"Error extracting image data for {item.self_ref}: {e}")
-            return None
-
     
     def _debug_print(self, message: str):
         """Print debug message if debug mode enabled."""

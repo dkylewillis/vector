@@ -49,6 +49,7 @@ dev = [
 
 [project.scripts]
 vector = "vector.cli.main:main"
+vector-core = "vector.core.cli:main"
 vector-web = "vector.web.main:main"
 
 [project.urls]

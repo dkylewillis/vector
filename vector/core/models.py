@@ -60,4 +60,18 @@ class DocumentResult(BaseModel):
         arbitrary_types_allowed = True  # For Path and DoclingDocument types
 
 
+class ProcessedArtifact(BaseModel):
+    """A processed artifact with all extracted data."""
+    ref_item: str
+    artifact_type: str  # "image" | "table"
+    raw_data: Optional[bytes] = None  # Original image/table data
+    thumbnail_data: Optional[bytes] = None  # Generated thumbnail
+    embedding: Optional[List[float]] = None  # Vector embedding
+    metadata: Dict[str, Any]  # Extracted metadata
+    caption: str  # Text for embedding
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+
 

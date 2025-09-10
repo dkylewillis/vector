@@ -146,15 +146,8 @@ class DocumentConverter:
             file_hash=file_hash
         )
 
-        # Index artifacts if requested and processor provided
-        if self.generate_artifacts and artifact_processor:
-            if run_async:
-                import asyncio
-                asyncio.run(artifact_processor.index_artifacts(doc_result))
-            else:
-                # For synchronous execution, we'll skip async artifact processing
-                # The caller should handle this separately
-                pass
+        # Note: Artifact processing is deferred to the DocumentProcessor pipeline
+        # The converter only handles document conversion, not artifact processing
 
         return doc_result
 

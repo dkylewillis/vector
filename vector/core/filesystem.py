@@ -183,63 +183,105 @@ class FileSystemStorage:
     # Artifact operations
     def save_artifact(self, artifact_data: bytes, doc_id: str, 
                            ref_item: str, artifact_type: str, 
-                           metadata: Optional[Dict] = None) -> str:
-        """Save artifact to filesystem using Docling naming convention."""
-        from .utils import extract_ref_id, image_to_hexhash
-        from PIL import Image as PILImage
+                           metadata: Optional[Dict] = None,
+                           simple_mode: bool = False) -> str:
+        """Save artifact to filesystem.
         
-        # Get ref_id and calculate hex hash (Docling style)
-        ref_id = extract_ref_id(ref_item)
+        Args:
+            artifact_data: Raw artifact data
+            doc_id: Document ID/hash for organization
+            ref_item: Reference item ID
+            artifact_type: Type of artifact (image, table, thumbnail)
+            metadata: Optional metadata dict
+            simple_mode: If True, use simple naming without hash calculation
+            
+        Returns:
+            Artifact ID
+        """
+        if simple_mode:
+            # Simple mode for pure processing - just save the data
+            artifact_dir = self.converted_docs_path / doc_id / "artifacts"
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Sanitize ref_item for file path (replace problematic characters)
+            safe_ref_item = ref_item.replace('#/', '').replace('/', '_').replace('\\', '_')
+            
+            # Determine file extension
+            if artifact_type == "image":
+                ext = ".jpg"
+            elif artifact_type == "thumbnail":
+                ext = ".thumb.jpg"
+            elif artifact_type == "table":
+                ext = ".txt"
+            else:
+                ext = ".dat"
+            
+            # Save artifact data with simple naming
+            artifact_path = artifact_dir / f"{safe_ref_item}{ext}"
+            self._write_bytes(artifact_path, artifact_data)
+            
+            # Generate simple artifact ID
+            artifact_id = f"{doc_id}_{safe_ref_item}"
+            return artifact_id
         
-        # Calculate hex hash using the same method as Docling
-        try:
-            image = PILImage.open(io.BytesIO(artifact_data))
-            hexhash = image_to_hexhash(image)
-        except Exception:
-            # Fallback to content hash if not an image
-            hasher = hashlib.sha256(usedforsecurity=False)
-            hasher.update(artifact_data)
-            hexhash = hasher.hexdigest()
-        
-        if not hexhash:
-            hexhash = "unknown"
-        
-        # Use Docling naming convention: {type}_{id:06}_{hexhash}.png
-        base_type = artifact_type.replace('_thumbnail', '')
-        if 'thumbnail' in artifact_type:
-            filename = f"{base_type}_{ref_id:06}_{hexhash}_thumb.png"
         else:
-            filename = f"{base_type}_{ref_id:06}_{hexhash}.png"
-        
-        artifact_id = filename.replace('.png', '')
-        
-        # Save to document's images subdirectory
-        doc_dir = self.converted_docs_path / doc_id
-        images_dir = doc_dir / "images"
-        images_dir.mkdir(parents=True, exist_ok=True)
-        doc_path = images_dir / filename
-        
-        if not doc_path.exists():
-            self._write_bytes(doc_path, artifact_data)
-        
-        # Save metadata
-        meta_data = {
-            'artifact_id': artifact_id,
-            'doc_id': doc_id,
-            'ref_item': ref_item,
-            'ref_id': ref_id,
-            'artifact_type': artifact_type,
-            'filename': filename,
-            'hexhash': hexhash,
-            'size_bytes': len(artifact_data),
-            'created_at': datetime.now().isoformat(),
-            **(metadata or {})
-        }
-        
-        metadata_path = images_dir / f"{artifact_id}.json"
-        self._write_json(metadata_path, meta_data)
-        
-        return artifact_id
+            # Full-featured mode with Docling conventions and metadata
+            from .utils import extract_ref_id, image_to_hexhash
+            from PIL import Image as PILImage
+            
+            # Get ref_id and calculate hex hash (Docling style)
+            ref_id = extract_ref_id(ref_item)
+            
+            # Calculate hex hash using the same method as Docling
+            try:
+                image = PILImage.open(io.BytesIO(artifact_data))
+                hexhash = image_to_hexhash(image)
+            except Exception:
+                # Fallback to content hash if not an image
+                hasher = hashlib.sha256(usedforsecurity=False)
+                hasher.update(artifact_data)
+                hexhash = hasher.hexdigest()
+            
+            if not hexhash:
+                hexhash = "unknown"
+            
+            # Use Docling naming convention: {type}_{id:06}_{hexhash}.png
+            base_type = artifact_type.replace('_thumbnail', '')
+            if 'thumbnail' in artifact_type:
+                filename = f"{base_type}_{ref_id:06}_{hexhash}_thumb.png"
+            else:
+                filename = f"{base_type}_{ref_id:06}_{hexhash}.png"
+            
+            artifact_id = filename.replace('.png', '')
+            
+            # Save to document's images subdirectory
+            doc_dir = self.converted_docs_path / doc_id
+            images_dir = doc_dir / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+            doc_path = images_dir / filename
+            
+            if not doc_path.exists():
+                self._write_bytes(doc_path, artifact_data)
+            
+            # Save metadata
+            meta_data = {
+                'artifact_id': artifact_id,
+                'artifact_path': str(doc_path),
+                'doc_id': doc_id,
+                'ref_item': ref_item,
+                'ref_id': ref_id,
+                'artifact_type': artifact_type,
+                'filename': filename,
+                'hexhash': hexhash,
+                'size_bytes': len(artifact_data),
+                'created_at': datetime.now().isoformat(),
+                **(metadata or {})
+            }
+            
+            metadata_path = images_dir / f"{artifact_id}.json"
+            self._write_json(metadata_path, meta_data)
+            
+            return artifact_id
     
     def load_artifact(self, artifact_id: str) -> Optional[Tuple[bytes, Dict]]:
         """Load artifact from filesystem."""
@@ -353,6 +395,7 @@ class FileSystemStorage:
             'storage_size_mb': round(total_size / (1024 * 1024), 2),
             'base_path': str(self.base_path)
         }
+
     
     # Helper methods
     def _write_json(self, path: Path, data: Dict) -> None:

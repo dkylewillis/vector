@@ -69,9 +69,9 @@ class DocumentProcessor:
         
         self.chunker = DocumentChunker(config.embedder_model)
         
-        # Initialize artifact processor only if we have databases
-        if self.chunks_vector_db and self.artifacts_vector_db:
-            self.artifact_processor = ArtifactProcessor(self.embedder, self.artifacts_vector_db)
+        # Initialize artifact processor (pure processing, no storage)
+        if self.embedder:
+            self.artifact_processor = ArtifactProcessor(self.embedder, debug=False)
         else:
             self.artifact_processor = None
         
@@ -127,7 +127,12 @@ class DocumentProcessor:
             # Step 3: Store in vector database
             self.store_chunks(chunks_with_embeddings)
 
-            # Step 4: Save Document Results (skip if from_storage since already saved)
+            # Step 4: Process and store artifacts (if enabled and we have databases)
+            if include_artifacts and doc_results and self.artifacts_vector_db:
+                import asyncio
+                asyncio.run(self._handle_artifacts(doc_results, save_to_storage= True, save_to_vector=True))
+
+            # Step 5: Save Document Results (skip if from_storage since already saved)
             if not from_storage:
                 self.save_document_results(doc_results)
 
@@ -243,19 +248,14 @@ class DocumentProcessor:
                 if verbose:
                     print(f"💾 Using filesystem storage: {storage.base_path}")
             
-            # Initialize artifact processor for storage-only mode
-            artifact_processor = None
-            if include_artifacts and storage:
-                from .artifacts import ArtifactProcessor
-                artifact_processor = ArtifactProcessor(storage=storage, save_only=True)
-                if verbose:
-                    print("🔧 ArtifactProcessor initialized for storage-only mode")
+            # Note: Artifact processing is deferred - converter only converts documents
+            # Artifacts will be handled separately if needed
             
-            # Convert to DocumentResult with metadata and artifact processing
+            # Convert to DocumentResult with metadata
             doc_result = converter.convert_to_document_result(
                 file_path=file_path,
                 source=source,
-                artifact_processor=artifact_processor if include_artifacts else None,
+                artifact_processor=None,  # Artifacts processed separately in the pipeline
                 run_async=False  # Don't run async internally, handle it in CLI context
             )
             
@@ -337,23 +337,6 @@ class DocumentProcessor:
             print(f"⚠️  Error converting {file_path}: {e}")
             return None
 
-    def chunk_and_embed(self, doc_results: List[DocumentResult]) -> List[tuple]:
-        """Chunk documents and generate embeddings using batch processing.
-        
-        Args:
-            doc_results: List of DocumentResult objects
-            
-        Returns:
-            List of tuples (chunk, embedding_vector)
-        """
-        # Use batch chunking from chunker
-        chunks = self.chunker.chunk_documents_batch(doc_results)
-        
-        # Use batch embedding from embedder
-        chunks_with_embeddings = self.embedder.embed_chunks_batch(chunks, batch_size=32)
-        
-        return chunks_with_embeddings
-
     def store_chunks(self, chunks_with_embeddings: List[tuple]) -> None:
         """Store chunks and embeddings in vector database using batch processing.
         
@@ -398,6 +381,73 @@ class DocumentProcessor:
         
         # Use batch storage from database
         self.chunks_vector_db.store_chunks_batch(chunks_with_embeddings, batch_size=self.BATCH_SIZE)
+
+    async def _handle_artifacts(self, doc_results: List[DocumentResult], 
+                              save_to_storage: bool = False, save_to_vector: bool = True) -> None:
+        """Orchestrate artifact processing and storage.
+        
+        Args:
+            doc_results: List of document results to process
+            save_to_storage: Whether to save artifacts to filesystem storage
+            save_to_vector: Whether to save artifacts to vector database
+        """
+        if not self.artifact_processor:
+            return
+            
+        for doc_result in doc_results:
+            try:
+                # 1. Process artifacts (pure processing)
+                processed_artifacts = await self.artifact_processor.process_artifacts(doc_result)
+                
+                if not processed_artifacts:
+                    continue
+                
+                print(f"📊 Indexed {len(processed_artifacts)} artifacts from {doc_result.file_path.name}")
+                
+                # 2. Storage decisions (orchestration)
+                artifacts_stored = 0
+                
+                if save_to_storage:
+                    # Save original and thumbnail to filesystem
+                    storage = FS(self.config)
+                    for artifact in processed_artifacts:
+                        try:
+                            if artifact.raw_data:
+                                storage.save_artifact(artifact.raw_data, doc_result.file_hash, 
+                                                     artifact.ref_item, artifact.artifact_type)
+                            if artifact.thumbnail_data:
+                                storage.save_artifact(artifact.thumbnail_data, doc_result.file_hash, 
+                                                     f"{artifact.ref_item}_thumb", "thumbnail")
+                        except Exception as e:
+                            print(f"⚠️  Error saving artifact {artifact.ref_item} to storage: {e}")
+                
+                if save_to_vector and self.artifacts_vector_db:
+                    # Ensure artifacts collection exists
+                    if not self.artifacts_vector_db.collection_exists():
+                        vector_size = self.embedder.get_embedding_dimension()
+                        self.artifacts_vector_db.create_collection(vector_size=vector_size)
+                        self.artifacts_vector_db.ensure_indexes()
+                    
+                    # Prepare data for vector storage
+                    texts = []
+                    embeddings = []
+                    metadata_list = []
+                    
+                    for artifact in processed_artifacts:
+                        if artifact.embedding:  # Only store artifacts with embeddings
+                            texts.append(artifact.caption)
+                            embeddings.append(artifact.embedding)
+                            metadata_list.append(artifact.metadata)
+                            artifacts_stored += 1
+                    
+                    if texts:
+                        self.artifacts_vector_db.add_documents(texts, embeddings, metadata_list)
+                
+                if save_to_vector and artifacts_stored > 0:
+                    print(f"💾 Stored {artifacts_stored}/{len(processed_artifacts)} artifacts in vector database")
+                    
+            except Exception as e:
+                print(f"⚠️  Error processing artifacts for {doc_result.file_path.name}: {e}")
 
     def _is_file_processed(self, file_path: Path) -> bool:
         """Check if file has already been processed.
