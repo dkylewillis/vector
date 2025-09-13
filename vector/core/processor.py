@@ -357,29 +357,7 @@ class DocumentProcessor:
             self.artifacts_vector_db.create_collection(vector_size=vector_size)
             self.artifacts_vector_db.ensure_indexes()
         
-        # Add all documents to collection pair metadata if we have pair info
-        if self.pair_info and self.collection_manager and chunks_with_embeddings:
-            # Extract unique documents from chunks
-            unique_documents = {}
-            for chunk, _ in chunks_with_embeddings:
-                doc_metadata = chunk.metadata.model_dump()
-                file_hash = doc_metadata.get('file_hash')
-                if file_hash and file_hash not in unique_documents:
-                    unique_documents[file_hash] = {
-                        'filename': doc_metadata.get('filename'),
-                        'source': doc_metadata.get('source'),
-                        'file_path': doc_metadata.get('file_path')
-                    }
-            
-            # Add each unique document to the collection pair
-            for document_id, metadata in unique_documents.items():
-                self.collection_manager.add_document_to_pair(
-                    self.pair_info['pair_id'], 
-                    document_id, 
-                    metadata
-                )
-        
-        # Use batch storage from database
+        # Store chunks in vector database (auto-tracking will handle collection metadata)
         self.chunks_vector_db.store_chunks_batch(chunks_with_embeddings, batch_size=self.BATCH_SIZE)
 
     async def _handle_artifacts(self, doc_results: List[DocumentResult], 
@@ -417,7 +395,7 @@ class DocumentProcessor:
                                                      artifact.ref_item, artifact.artifact_type)
                             if artifact.thumbnail_data:
                                 storage.save_artifact(artifact.thumbnail_data, doc_result.file_hash, 
-                                                     f"{artifact.ref_item}_thumb", "thumbnail")
+                                                     artifact.ref_item, "thumbnail")
                         except Exception as e:
                             print(f"⚠️  Error saving artifact {artifact.ref_item} to storage: {e}")
                 
@@ -435,13 +413,19 @@ class DocumentProcessor:
                     
                     for artifact in processed_artifacts:
                         if artifact.embedding:  # Only store artifacts with embeddings
-                            texts.append(artifact.caption)
+                            text = (
+                                f'Headings: {" > ".join(artifact.metadata.get("headings", []))}\n'
+                                f'Before Text: {artifact.metadata.get("before_text", "")}\n'
+                                f'Caption: {artifact.caption}\n'
+                                f'After Text: {artifact.metadata.get("after_text", "")}'
+                            )
+                            texts.append(text)
                             embeddings.append(artifact.embedding)
                             metadata_list.append(artifact.metadata)
                             artifacts_stored += 1
                     
                     if texts:
-                        self.artifacts_vector_db.add_documents(texts, embeddings, metadata_list)
+                        self.artifacts_vector_db.add_artifacts(texts, embeddings, metadata_list)
                 
                 if save_to_vector and artifacts_stored > 0:
                     print(f"💾 Stored {artifacts_stored}/{len(processed_artifacts)} artifacts in vector database")

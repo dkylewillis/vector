@@ -18,7 +18,9 @@ class CLIFormatter(ResultFormatter):
             formatted.append(f"Result {i} (Score: {result.score:.3f})")
             formatted.append(f"📄 {result.filename}")
             formatted.append(f"📂 Source: {result.source}")
+            formatted.append(f"📁 Filename: {result.filename}")
             formatted.append(f"📝 Content: {result.text[:200]}...")
+            
             if result.chunk_info:
                 formatted.append(f"🔢 {result.chunk_info}")
             formatted.append("-" * 50)

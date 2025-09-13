@@ -140,6 +140,11 @@ class VectorDatabase:
 
     def _create_metadata_indexes(self):
         """Create indexes for metadata fields to enable efficient filtering."""
+        # Skip index creation for local Qdrant as it doesn't support payload indexes
+        if not self.config.use_cloud_qdrant:
+            print("ℹ️  Skipping payload index creation for local Qdrant (indexes only work with server instances)")
+            return
+            
         try:
             # Define fields that need indexing for filtering
             index_fields = [
@@ -170,14 +175,27 @@ class VectorDatabase:
         if self.collection_exists():
             self._create_metadata_indexes()
 
-    def add_documents(self, texts: List[str], vectors: List[List[float]], 
-                     metadata: List[Dict[str, Any]]) -> None:
-        """Add documents to the database.
+    def _get_pair_id_from_collection(self) -> Optional[str]:
+        """Extract pair ID from collection name."""
+        if not self.collection_manager:
+            return None
+            
+        # If collection name follows pattern c_{ulid}__chunks or c_{ulid}__artifacts
+        if self.collection_name.startswith('c_') and '__' in self.collection_name:
+            ulid_part = self.collection_name.split('__')[0][2:]  # Remove 'c_' prefix
+            return f"cp_{ulid_part}"
+        
+        return None
+
+    def add_chunks(self, texts: List[str], vectors: List[List[float]], 
+                   metadata: List[Dict[str, Any]], auto_track: bool = True) -> None:
+        """Add chunks to the database and automatically track in collection manager.
 
         Args:
             texts: List of text content
             vectors: List of embedding vectors
             metadata: List of metadata dictionaries
+            auto_track: Whether to automatically track documents in collection manager
         """
         if not (len(texts) == len(vectors) == len(metadata)):
             raise ValueError("texts, vectors, and metadata must have the same length")
@@ -191,8 +209,53 @@ class VectorDatabase:
                 points.append(PointStruct(id=point_id, vector=vector, payload=payload))
 
             self.client.upsert(collection_name=self.collection_name, points=points)
+            
+            # Automatically track in collection manager if enabled
+            if auto_track and self.collection_manager:
+                pair_id = self._get_pair_id_from_collection()
+                if pair_id:
+                    for meta in metadata:
+                        document_id = meta.get('file_hash')
+                        if document_id:
+                            self.collection_manager.track_document_in_pair(pair_id, document_id, meta)
+                            
         except Exception as e:
-            raise DatabaseError(f"Failed to add documents: {e}")
+            raise DatabaseError(f"Failed to add chunks: {e}")
+
+    def add_artifacts(self, texts: List[str], vectors: List[List[float]], 
+                      metadata: List[Dict[str, Any]], auto_track: bool = True) -> None:
+        """Add artifacts to the database and automatically track in collection manager.
+
+        Args:
+            texts: List of text content (captions/descriptions)
+            vectors: List of embedding vectors
+            metadata: List of metadata dictionaries
+            auto_track: Whether to automatically track documents in collection manager
+        """
+        if not (len(texts) == len(vectors) == len(metadata)):
+            raise ValueError("texts, vectors, and metadata must have the same length")
+
+        try:
+            points = []
+            for text, vector, meta in zip(texts, vectors, metadata):
+                point_id = str(uuid.uuid4())
+                # Add text to payload for retrieval
+                payload = {"text": text, **meta}
+                points.append(PointStruct(id=point_id, vector=vector, payload=payload))
+
+            self.client.upsert(collection_name=self.collection_name, points=points)
+            
+            # Automatically track in collection manager if enabled
+            if auto_track and self.collection_manager:
+                pair_id = self._get_pair_id_from_collection()
+                if pair_id:
+                    for meta in metadata:
+                        document_id = meta.get('file_hash')
+                        if document_id:
+                            self.collection_manager.track_document_in_pair(pair_id, document_id, meta)
+                            
+        except Exception as e:
+            raise DatabaseError(f"Failed to add artifacts: {e}")
 
     def delete_documents(self, metadata_filter: Dict[str, Any]) -> int:
         """Delete documents from the collection based on metadata filter.
@@ -285,7 +348,7 @@ class VectorDatabase:
             metadata = [chunk.metadata.model_dump() for chunk, _ in batch]
             
             # Add to vector database
-            self.add_documents(texts, vectors, metadata)
+            self.add_chunks(texts, vectors, metadata)
             print(f"📦 Stored batch: {len(batch)} chunks")
 
     def get_collection_info(self) -> Dict[str, Any]:
@@ -318,33 +381,34 @@ class VectorDatabase:
 
             points = scroll_result[0]
             
-            # Aggregate metadata
-            filenames = set()
-            sources = set()
-            headings = set()
+            # Aggregate metadata with counts
+            from collections import defaultdict
+            filename_counts = defaultdict(int)
+            source_counts = defaultdict(int)
+            heading_counts = defaultdict(int)
 
             for point in points:
                 payload = point.payload
                 if 'filename' in payload:
-                    filenames.add(payload['filename'])
+                    filename_counts[payload['filename']] += 1
                 if 'source' in payload:
-                    sources.add(payload['source'])
+                    source_counts[payload['source']] += 1
                 # Handle both 'heading' and 'headings' fields
                 if 'heading' in payload:
-                    headings.add(payload['heading'])
+                    heading_counts[payload['heading']] += 1
                 if 'headings' in payload:
                     # Handle both single strings and lists
                     heading_data = payload['headings']
                     if isinstance(heading_data, list):
                         for heading in heading_data:
-                            headings.add(heading)
+                            heading_counts[heading] += 1
                     else:
-                        headings.add(heading_data)
+                        heading_counts[heading_data] += 1
 
             return {
-                "filenames": sorted(list(filenames)),
-                "sources": sorted(list(sources)),
-                "headings": sorted(list(headings)),
+                "filenames": dict(filename_counts),
+                "sources": dict(source_counts),
+                "headings": dict(heading_counts),
                 "total_documents": len(points)
             }
         except Exception as e:

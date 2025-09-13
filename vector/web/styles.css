@@ -52,13 +52,15 @@
 }
 
 /* Target the main outer app container */
+/*
 #root, .gradio-container {
-    max-width: 900px;       /* cap the width */
-    margin-inline: auto;    /* center it horizontally */
-    width: 100%;            /* still responsive */
-    display: flex;          /* keep flex layout */
-    flex-direction: column; /* normal stacking */
+    max-width: 900px;      
+    margin-inline: auto;  
+    width: 100%;           
+    display: flex;          
+    flex-direction: column; 
 }
+*/
 
 
 .vector-button-1 {

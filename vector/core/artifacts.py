@@ -171,7 +171,8 @@ class ArtifactProcessor:
         return ProcessedArtifact(
             ref_item=item.self_ref,
             artifact_type="table",
-            raw_data=table_text.encode('utf-8') if table_text else None,
+            raw_data=raw_data,#raw_data=table_text.encode('utf-8') if table_text else None,
+            #table_text = #raw_data=table_text.encode('utf-8') if table_text else None,= 
             thumbnail_data=thumbnail_data,  # Tables don't have thumbnails
             embedding=embedding,
             metadata=metadata,

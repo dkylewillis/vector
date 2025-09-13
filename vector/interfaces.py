@@ -48,9 +48,14 @@ class VectorDB(Protocol):
         """Search for similar vectors."""
         ...
     
-    def add_documents(self, texts: List[str], vectors: List[List[float]], 
-                     metadata: List[Dict[str, Any]]) -> None:
-        """Add documents to the database."""
+    def add_chunks(self, texts: List[str], vectors: List[List[float]], 
+                   metadata: List[Dict[str, Any]]) -> None:
+        """Add chunks to the database."""
+        ...
+
+    def add_artifacts(self, texts: List[str], vectors: List[List[float]], 
+                      metadata: List[Dict[str, Any]]) -> None:
+        """Add artifacts to the database."""
         ...
 
 

@@ -2,7 +2,7 @@
 
 import json
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from ulid import new as new_ulid
 from datetime import datetime
 
@@ -92,9 +92,9 @@ class CollectionManager:
             "pair_id": pair_id
         }
     
-    def add_document_to_pair(self, pair_id: str, document_id: str, document_metadata: Dict = None) -> bool:
+    def track_document_in_pair(self, pair_id: str, document_id: str, document_metadata: Dict = None) -> bool:
         """
-        Add a document to a collection pair.
+        Track that a document exists in a collection pair (metadata only).
         
         Args:
             pair_id: Collection pair ID
@@ -102,7 +102,7 @@ class CollectionManager:
             document_metadata: Optional document metadata
             
         Returns:
-            True if added, False if pair doesn't exist
+            True if tracked, False if pair doesn't exist
         """
         if pair_id not in self.metadata["collection_pairs"]:
             return False
@@ -240,3 +240,19 @@ class CollectionManager:
             if doc_data.get("file_hash") == document_id:
                 return list(doc_data.get("in_collections", {}).keys())
         return None
+
+    def list_documents_in_pair(self, pair_id: str) -> List[Dict[str, Any]]:
+        """List all documents in a collection pair."""
+        if pair_id not in self.metadata["collection_pairs"]:
+            return []
+        
+        documents = []
+        for doc_key, doc_data in self.metadata["documents"].items():
+            if pair_id in doc_data.get("in_collections", {}):
+                documents.append({
+                    "document_id": doc_data.get("file_hash"),
+                    "ulid": doc_data.get("ulid"),
+                    "metadata": doc_data.get("metadata", {}),
+                    "added_at": doc_data["in_collections"][pair_id].get("added_at")
+                })
+        return documents

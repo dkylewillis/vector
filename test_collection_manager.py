@@ -45,13 +45,13 @@ def test_collection_manager():
         retrieved_pair = manager.get_pair_by_display_name("Test Collection")
         print(f"✅ Retrieved pair by display name: {retrieved_pair['pair_id']}")
         
-        # Test adding a document to the pair
-        success = manager.add_document_to_pair(
+        # Test tracking a document to the pair
+        success = manager.track_document_in_pair(
             pair_info['pair_id'],
             "test_doc_123",
             {"filename": "test.pdf", "source": "test"}
         )
-        print(f"✅ Added document to pair: {success}")
+        print(f"✅ Tracked document in pair: {success}")
         
         # Test listing documents in pair
         docs = manager.list_documents_in_pair(pair_info['pair_id'])
