@@ -1,9 +1,47 @@
 """Event handlers for the Vector Gradio interface."""
 
 import gradio as gr
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 from .service import VectorWebService
 
+# Add these functions (replace the existing method versions)
+
+def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents):
+    """Handle search request with thumbnails."""
+    metadata_filter = build_metadata_filter(selected_documents)
+    
+    # Debug info for the user
+    if metadata_filter:
+        filter_files = metadata_filter['filename']
+        print(f"🔍 Filtering search to {len(filter_files)} selected documents: {filter_files}")
+    else:
+        print("🔍 No document filter applied - searching all documents in collection")
+    
+    # Use the new method that returns (text, thumbnails)
+    return web_service.search_with_thumbnails(query, collection, int(top_k), metadata_filter)
+
+def ask_ai(web_service: VectorWebService, question, length, collection, selected_documents):
+    """Handle AI question request with thumbnails."""
+    metadata_filter = build_metadata_filter(selected_documents)
+    
+    # Debug info for the user
+    if metadata_filter:
+        filter_files = metadata_filter['filename']
+        print(f"💬 Filtering AI context to {len(filter_files)} selected documents: {filter_files}")
+    else:
+        print("💬 No document filter applied - using all documents in collection for context")
+    
+    # Use the new method that returns (text, thumbnails)
+    response_text, thumbnails = web_service.ask_ai_with_thumbnails(question, collection, length, metadata_filter)
+    
+    # Show which filters were applied
+    filter_info = ""
+    if metadata_filter:
+        count = len(metadata_filter['filename'])
+        filter_info = f" [Documents: {count} selected]"
+    
+    formatted_response = f"[Collection: {collection}]{filter_info}\n\n{response_text}"
+    return formatted_response, thumbnails
 
 def build_metadata_filter(selected_documents):
     """Build metadata filter from selected documents."""
@@ -37,43 +75,6 @@ def build_metadata_filter(selected_documents):
     # The _build_filter method will handle converting this to Qdrant filter format
     filters = {'filename': unique_filenames}
     return filters
-
-
-def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents):
-    """Handle search request."""
-    metadata_filter = build_metadata_filter(selected_documents)
-    
-    # Debug info for the user
-    if metadata_filter:
-        filter_files = metadata_filter['filename']
-        print(f"🔍 Filtering search to {len(filter_files)} selected documents: {filter_files}")
-    else:
-        print("🔍 No document filter applied - searching all documents in collection")
-    
-    return web_service.search(query, collection, int(top_k), metadata_filter)
-
-
-def ask_ai(web_service: VectorWebService, question, length, collection, selected_documents):
-    """Handle AI question request."""
-    metadata_filter = build_metadata_filter(selected_documents)
-    
-    # Debug info for the user
-    if metadata_filter:
-        filter_files = metadata_filter['filename']
-        print(f"💬 Filtering AI context to {len(filter_files)} selected documents: {filter_files}")
-    else:
-        print("💬 No document filter applied - using all documents in collection for context")
-    
-    response = web_service.ask_ai(question, collection, length, metadata_filter)
-    
-    # Show which filters were applied
-    filter_info = ""
-    if metadata_filter:
-        count = len(metadata_filter['filename'])
-        filter_info = f" [Documents: {count} selected]"
-    
-    return f"[Collection: {collection}]{filter_info}\n\n{response}"
-
 
 def process_files(web_service: VectorWebService, files, current_collection, source, force):
     """Handle document processing."""
@@ -177,14 +178,14 @@ def connect_events(web_service: VectorWebService, collection_dropdown, refresh_b
         fn=lambda q, k, c, docs: perform_search(web_service, q, k, c, docs),
         inputs=[search_components['search_query'], search_components['num_results'], 
                collection_dropdown, documents_checkboxgroup],
-        outputs=search_components['search_results']
+        outputs=[search_components['search_results'], search_components['search_thumbnails']]  # Add thumbnails output
     )
     
     search_components['ask_btn'].click(
         fn=lambda q, l, c, docs: ask_ai(web_service, q, l, c, docs),
         inputs=[search_components['ask_query'], search_components['response_length'],
                collection_dropdown, documents_checkboxgroup],
-        outputs=search_components['ai_response']
+        outputs=[search_components['ai_response'], search_components['ai_thumbnails']]  # Add thumbnails output
     )
     
     # Upload handlers

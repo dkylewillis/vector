@@ -1,15 +1,19 @@
 """Formatting utilities for Vector."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 from ..interfaces import SearchResult, ResultFormatter
+from ..core.models import SearchResultType, ChunkSearchResult, ArtifactSearchResult
 
 
 class CLIFormatter(ResultFormatter):
     """Formatter for CLI output."""
 
-    def format_search_results(self, results: List[SearchResult]) -> str:
-        """Format search results for CLI display."""
+    def format_search_results(self, results: List[Union[SearchResult, SearchResultType]]) -> str:
+        """Format search results for CLI display.
+        
+        Supports both legacy SearchResult and new typed search results.
+        """
         if not results:
             return "No results found."
 
@@ -19,10 +23,26 @@ class CLIFormatter(ResultFormatter):
             formatted.append(f"📄 {result.filename}")
             formatted.append(f"📂 Source: {result.source}")
             formatted.append(f"📁 Filename: {result.filename}")
+            formatted.append(f"📊 Type: {result.type}")
             formatted.append(f"📝 Content: {result.text[:200]}...")
             
-            if result.chunk_info:
+            # Handle type-specific information
+            if result.type == 'image':
+                if isinstance(result, ArtifactSearchResult):
+                    ref = result.metadata.ref_item
+                else:
+                    # Legacy SearchResult
+                    ref = result.metadata.get('ref_item', 'N/A')
+                formatted.append(f"🗂 ref_item: {ref}")
+            
+            # Handle chunk info for legacy compatibility
+            if hasattr(result, 'chunk_info') and result.chunk_info:
                 formatted.append(f"🔢 {result.chunk_info}")
+            elif isinstance(result, ChunkSearchResult) and hasattr(result.metadata, 'headings'):
+                # Show headings for new chunk results
+                if result.metadata.headings:
+                    formatted.append(f"📑 Headings: {' > '.join(result.metadata.headings[:2])}")
+            
             formatted.append("-" * 50)
 
         return "\n".join(formatted)

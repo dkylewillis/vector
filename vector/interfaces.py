@@ -11,6 +11,7 @@ class SearchResult:
     score: float
     text: str
     metadata: Dict[str, Any]
+    type: str  # 'chunk' or 'table' or 'picture'
     
     @property
     def filename(self) -> str:

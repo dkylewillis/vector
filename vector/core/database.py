@@ -11,12 +11,7 @@ from ..config import Config
 from ..interfaces import SearchResult
 from ..exceptions import DatabaseError
 from .collection_manager import CollectionManager
-
-
-# Forward declaration for type hints
-class Chunk:
-    """Forward declaration for Chunk class."""
-    pass
+from .models import ChunkSearchResult, ArtifactSearchResult, SearchResultType, ChunkMetadata, PictureMetadata, TableMetadata
 
 # Module-level shared client instance
 _shared_client = None
@@ -292,8 +287,8 @@ class VectorDatabase:
 
 
     def search(self, query_vector: List[float], top_k: int = 5, 
-               metadata_filter: Optional[Dict] = None) -> List[SearchResult]:
-        """Search for similar vectors.
+               metadata_filter: Optional[Dict] = None) -> List[SearchResultType]:
+        """Search for similar vectors with typed results using Pydantic models.
 
         Args:
             query_vector: Query vector
@@ -301,7 +296,7 @@ class VectorDatabase:
             metadata_filter: Optional metadata filter
 
         Returns:
-            List of search results
+            List of typed search results (ChunkSearchResult or ArtifactSearchResult)
         """
         try:
             filter_conditions = None
@@ -317,39 +312,46 @@ class VectorDatabase:
 
             results = []
             for scored_point in search_result:
-                payload = scored_point.payload
+                payload = scored_point.payload.copy()
                 text = payload.pop("text", "")
-                results.append(SearchResult(
-                    score=scored_point.score,
-                    text=text,
-                    metadata=payload
-                ))
+                type_ = payload.pop("type", "chunk")
+                
+                # Create typed search results using our Pydantic models
+                if type_ == "chunk":
+                    # Convert payload to ChunkMetadata
+                    chunk_metadata = ChunkMetadata(**payload)
+                    result = ChunkSearchResult(
+                        score=scored_point.score,
+                        text=text,
+                        metadata=chunk_metadata
+                    )
+                elif type_ in ["image", "table"]:
+                    # Convert payload to appropriate artifact metadata
+                    if type_ == "image":
+                        artifact_metadata = PictureMetadata(**payload)
+                    else:  # table
+                        artifact_metadata = TableMetadata(**payload)
+                    
+                    result = ArtifactSearchResult(
+                        score=scored_point.score,
+                        text=text,
+                        metadata=artifact_metadata,
+                        type=type_
+                    )
+                else:
+                    # Fallback for unknown types - treat as chunk
+                    chunk_metadata = ChunkMetadata(**payload)
+                    result = ChunkSearchResult(
+                        score=scored_point.score,
+                        text=text,
+                        metadata=chunk_metadata
+                    )
+                
+                results.append(result)
 
             return results
         except Exception as e:
             raise DatabaseError(f"Search failed: {e}")
-
-    def store_chunks_batch(self, chunks_with_embeddings: List[Tuple['Chunk', List[float]]], 
-                          batch_size: int = 100) -> None:
-        """Store chunks and embeddings in batches.
-        
-        Args:
-            chunks_with_embeddings: List of tuples (chunk, embedding_vector)
-            batch_size: Number of chunks to process in each batch
-        """
-        if not chunks_with_embeddings:
-            return
-        
-        # Process in batches
-        for i in range(0, len(chunks_with_embeddings), batch_size):
-            batch = chunks_with_embeddings[i:i + batch_size]
-            texts = [chunk.text for chunk, _ in batch]
-            vectors = [embedding for _, embedding in batch]
-            metadata = [chunk.metadata.model_dump() for chunk, _ in batch]
-            
-            # Add to vector database
-            self.add_chunks(texts, vectors, metadata)
-            print(f"📦 Stored batch: {len(batch)} chunks")
 
     def get_collection_info(self) -> Dict[str, Any]:
         """Get collection information."""

@@ -338,100 +338,60 @@ class DocumentProcessor:
             return None
 
     def store_chunks(self, chunks_with_embeddings: List[tuple]) -> None:
-        """Store chunks and embeddings in vector database using batch processing.
+        """Store chunks using consistent storage manager.
         
         Args:
             chunks_with_embeddings: List of (chunk, embedding) tuples
         """
         if not chunks_with_embeddings:
             return
-            
-        # Ensure collections exist
-        if not self.chunks_vector_db.collection_exists():
-            vector_size = self.embedder.get_embedding_dimension()
-            self.chunks_vector_db.create_collection(vector_size=vector_size)
-            self.chunks_vector_db.ensure_indexes()
         
-        if self.artifacts_vector_db != self.chunks_vector_db and not self.artifacts_vector_db.collection_exists():
-            vector_size = self.embedder.get_embedding_dimension()
-            self.artifacts_vector_db.create_collection(vector_size=vector_size)
-            self.artifacts_vector_db.ensure_indexes()
+        # Import here to avoid circular imports
+        from .chunking import ChunkStorageManager
         
-        # Store chunks in vector database (auto-tracking will handle collection metadata)
-        self.chunks_vector_db.store_chunks_batch(chunks_with_embeddings, batch_size=self.BATCH_SIZE)
+        # Create storage manager
+        storage_manager = ChunkStorageManager(self.chunks_vector_db, self.embedder)
+        
+        # Store chunks using consistent interface
+        result = storage_manager.store_chunks(chunks_with_embeddings, batch_size=self.BATCH_SIZE)
+        
+        # Report results
+        if result.stored_count > 0:
+            print(f"💾 Stored {result.stored_count}/{result.processed_count} chunks in vector database")
+        
+        for error in result.errors:
+            print(f"⚠️  {error}")
 
     async def _handle_artifacts(self, doc_results: List[DocumentResult], 
                               save_to_storage: bool = False, save_to_vector: bool = True) -> None:
-        """Orchestrate artifact processing and storage.
-        
-        Args:
-            doc_results: List of document results to process
-            save_to_storage: Whether to save artifacts to filesystem storage
-            save_to_vector: Whether to save artifacts to vector database
-        """
+        """Simplified artifact handling using dedicated storage manager."""
         if not self.artifact_processor:
             return
-            
-        for doc_result in doc_results:
-            try:
-                # 1. Process artifacts (pure processing)
-                processed_artifacts = await self.artifact_processor.process_artifacts(doc_result)
-                
-                if not processed_artifacts:
-                    continue
-                
-                print(f"📊 Indexed {len(processed_artifacts)} artifacts from {doc_result.file_path.name}")
-                
-                # 2. Storage decisions (orchestration)
-                artifacts_stored = 0
-                
-                if save_to_storage:
-                    # Save original and thumbnail to filesystem
-                    storage = FS(self.config)
-                    for artifact in processed_artifacts:
-                        try:
-                            if artifact.raw_data:
-                                storage.save_artifact(artifact.raw_data, doc_result.file_hash, 
-                                                     artifact.ref_item, artifact.artifact_type)
-                            if artifact.thumbnail_data:
-                                storage.save_artifact(artifact.thumbnail_data, doc_result.file_hash, 
-                                                     artifact.ref_item, "thumbnail")
-                        except Exception as e:
-                            print(f"⚠️  Error saving artifact {artifact.ref_item} to storage: {e}")
-                
-                if save_to_vector and self.artifacts_vector_db:
-                    # Ensure artifacts collection exists
-                    if not self.artifacts_vector_db.collection_exists():
-                        vector_size = self.embedder.get_embedding_dimension()
-                        self.artifacts_vector_db.create_collection(vector_size=vector_size)
-                        self.artifacts_vector_db.ensure_indexes()
-                    
-                    # Prepare data for vector storage
-                    texts = []
-                    embeddings = []
-                    metadata_list = []
-                    
-                    for artifact in processed_artifacts:
-                        if artifact.embedding:  # Only store artifacts with embeddings
-                            text = (
-                                f'Headings: {" > ".join(artifact.metadata.get("headings", []))}\n'
-                                f'Before Text: {artifact.metadata.get("before_text", "")}\n'
-                                f'Caption: {artifact.caption}\n'
-                                f'After Text: {artifact.metadata.get("after_text", "")}'
-                            )
-                            texts.append(text)
-                            embeddings.append(artifact.embedding)
-                            metadata_list.append(artifact.metadata)
-                            artifacts_stored += 1
-                    
-                    if texts:
-                        self.artifacts_vector_db.add_artifacts(texts, embeddings, metadata_list)
-                
-                if save_to_vector and artifacts_stored > 0:
-                    print(f"💾 Stored {artifacts_stored}/{len(processed_artifacts)} artifacts in vector database")
-                    
-            except Exception as e:
-                print(f"⚠️  Error processing artifacts for {doc_result.file_path.name}: {e}")
+        
+        # Import here to avoid circular imports
+        from .artifacts import ArtifactStorageManager
+        from .filesystem import FileSystemStorage as FS
+        
+        # Create storage manager
+        storage_manager = ArtifactStorageManager(
+            self.artifacts_vector_db,
+            FS(self.config),
+            self.embedder
+        )
+        
+        # Process and store
+        result = await storage_manager.process_and_store_artifacts(
+            doc_results, save_to_storage, save_to_vector
+        )
+        
+        # Report results
+        if result.processed_count > 0:
+            print(f"📊 Processed {result.processed_count} artifacts")
+            if result.stored_count > 0:
+                print(f"💾 Stored {result.stored_count} artifacts in vector database")
+        
+        for error in result.errors:
+            print(f"⚠️  {error}")
 
     def _is_file_processed(self, file_path: Path) -> bool:
         """Check if file has already been processed.

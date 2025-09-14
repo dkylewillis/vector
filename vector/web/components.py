@@ -81,6 +81,19 @@ def create_search_tab():
                     lines=8,
                     interactive=False
                 )
+                
+                # Add thumbnail gallery under AI response
+                components['ai_thumbnails'] = gr.Gallery(
+                    label="Related Document Pages",
+                    show_label=True,
+                    elem_id="ai_thumbnails",
+                    columns=4,
+                    rows=2,
+                    height="auto",
+                    allow_preview=True,
+                    show_share_button=False,
+                    interactive=False
+                )
             
             # Search Documents Tab
             with gr.TabItem("🔍 Search Documents"):
@@ -104,9 +117,21 @@ def create_search_tab():
                     lines=10,
                     interactive=False
                 )
+                
+                # Add thumbnail gallery under search results
+                components['search_thumbnails'] = gr.Gallery(
+                    label="Related Document Pages",
+                    show_label=True,
+                    elem_id="search_thumbnails",
+                    columns=4,
+                    rows=2,
+                    height="auto",
+                    allow_preview=True,
+                    show_share_button=False,
+                    interactive=False
+                )
     
     return components
-
 
 def create_upload_tab():
     """Create the Upload Documents tab."""

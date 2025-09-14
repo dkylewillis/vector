@@ -2,13 +2,14 @@
 
 import sys
 import io
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 from ..config import Config
 from ..core import CollectionManager, DocumentProcessor
 from ..core.processor import PipelineType
 from ..agent import ResearchAgent
 from ..exceptions import VectorError, AIServiceError
+from ..utils.thumbnails import ThumbnailPathResolver
 
 
 class VectorWebService:
@@ -18,6 +19,7 @@ class VectorWebService:
         """Initialize web service with configuration."""
         self.config = config
         self.collection_manager = CollectionManager(config)
+        self.thumbnail_resolver = ThumbnailPathResolver(config)
         self._agents = {}  # Cache agents by collection name
         self._document_processors = {}  # Cache processors by collection name
     
@@ -331,3 +333,41 @@ class VectorWebService:
             "   3. Add api_key to config.yaml under ai_model section\n"
             "   Get your API key from: https://platform.openai.com/api-keys"
         )
+    
+    def search_with_thumbnails(self, query: str, collection_name: str, top_k: int = 5, 
+                              metadata_filter: Optional[Dict] = None) -> Tuple[str, List[str]]:
+        """Search for documents and return results with thumbnails."""
+        try:
+            if not query.strip():
+                return "Search query cannot be empty.", []
+            
+            agent = self.get_agent(collection_name)
+            
+            # Get raw search results (unformatted)
+            search_results = agent.search(query, top_k, metadata_filter, 'both', format_results=False)
+            
+            # Format search results for display
+            search_text = agent.formatter.format_search_results(search_results)
+            
+            # Extract thumbnail file paths (now only returns valid paths, no None values)
+            thumbnails = self.thumbnail_resolver.extract_thumbnails_from_search_results(search_results)
+            
+            return search_text, thumbnails
+        except Exception as e:
+            return f"Search error: {e}", []
+    
+    def ask_ai_with_thumbnails(self, question: str, collection_name: str, response_length: str = 'medium',
+                              metadata_filter: Optional[Dict] = None) -> Tuple[str, List[str]]:
+        """Ask AI a question and return response with thumbnails."""
+        try:
+            # Get regular AI response
+            response_text = self.ask_ai(question, collection_name, response_length, metadata_filter)
+            
+            # For AI responses, we could extract thumbnails from the context search results
+            # but for now, we'll keep it simple and return empty thumbnails
+            # TODO: Extract thumbnails from context search if needed
+            thumbnails = []
+            
+            return response_text, thumbnails
+        except Exception as e:
+            return f"AI error: {e}", []

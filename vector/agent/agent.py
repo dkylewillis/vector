@@ -1,7 +1,7 @@
 """Simplified Research Agent for Vector."""
 
 import warnings
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 from ..config import Config
 from ..exceptions import VectorError, AIServiceError, DatabaseError
@@ -9,6 +9,7 @@ from ..interfaces import SearchResult
 from ..core.embedder import Embedder
 from ..core.database import VectorDatabase
 from ..core.collection_manager import CollectionManager
+from ..core.models import SearchResultType, ChunkSearchResult, ArtifactSearchResult
 from ..ai.factory import AIModelFactory
 from ..utils.formatting import CLIFormatter
 
@@ -112,7 +113,7 @@ class ResearchAgent:
             raise VectorError(f"Artifact search failed: {e}")
 
     def search(self, query: str, top_k: int = 5, metadata_filter: Optional[Dict] = None, 
-               search_type: str = 'both') -> str:
+               search_type: str = 'both', format_results: bool = True) -> Union[str, List[SearchResultType]]:
         """Search for relevant documents across chunks and/or artifacts.
         
         Args:
@@ -120,9 +121,10 @@ class ResearchAgent:
             top_k: Number of results to return per type
             metadata_filter: Optional metadata filter
             search_type: 'chunks', 'artifacts', or 'both'
+            format_results: If True, return formatted string; if False, return raw results list
             
         Returns:
-            Formatted search results
+            Formatted search results (str) if format_results=True, or raw results (List[SearchResultType]) if False
         """
         try:
             if not query.strip():
@@ -143,14 +145,17 @@ class ResearchAgent:
                 results.sort(key=lambda x: x.score, reverse=True)
                 results = results[:top_k * 2]  # Return up to top_k*2 results when searching both
             
-            # Format and return results
-            return self.formatter.format_search_results(results)
+            # Return formatted or raw results based on parameter
+            if format_results:
+                return self.formatter.format_search_results(results)
+            else:
+                return results
             
         except Exception as e:
             raise VectorError(f"Search failed: {e}")
 
     def _search_collection(self, query: str, database: VectorDatabase, top_k: int, 
-                          metadata_filter: Optional[Dict] = None) -> List[SearchResult]:
+                          metadata_filter: Optional[Dict] = None) -> List[SearchResultType]:
         """Helper method to search a specific collection."""
         query_vector = self.embedder.embed_text(query)
         return database.search(query_vector, top_k, metadata_filter)
@@ -252,12 +257,12 @@ class ResearchAgent:
         except Exception as e:
             return f"⚠️  Error getting model info: {e}"
 
-    def _build_context(self, search_results: List[SearchResult]) -> str:
+    def _build_context(self, search_results: List[SearchResultType]) -> str:
         """Build context string from search results."""
         context_parts = []
         for i, result in enumerate(search_results, 1):
-            # Determine result type from metadata or collection info
-            result_type = getattr(result, 'result_type', 'content')
+            # Get result type from the typed model
+            result_type = result.type
             context_parts.append(
                 f"Document {i} (Score: {result.score:.3f}, Type: {result_type}):\n"
                 f"Source: {result.filename}\n"

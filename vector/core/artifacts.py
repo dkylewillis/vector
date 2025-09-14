@@ -10,7 +10,7 @@ from datetime import datetime
 
 from docling_core.types.doc.document import RefItem, TextItem, TableItem, PictureItem, DoclingDocument, SectionHeaderItem
 
-from .models import DocumentResult, ProcessedArtifact
+from .models import DocumentResult, ProcessedArtifact, PictureMetadata, TableMetadata, ArtifactEmbeddingData, StorageResult
 from .embedder import Embedder
 from ..config import Config
 from .utils import extract_ref_id, image_to_hexhash
@@ -18,6 +18,98 @@ from .utils import extract_ref_id, image_to_hexhash
 import hashlib
 
 from PIL import Image as PILImage
+
+
+class ArtifactStorageManager:
+    """Handles artifact storage orchestration - separate from pure processing."""
+    
+    def __init__(self, artifacts_vector_db, filesystem_storage, embedder):
+        self.artifacts_vector_db = artifacts_vector_db
+        self.filesystem_storage = filesystem_storage
+        self.embedder = embedder
+    
+    async def process_and_store_artifacts(self, doc_results: List[DocumentResult], 
+                                        save_to_storage: bool = False, 
+                                        save_to_vector: bool = True) -> StorageResult:
+        """Complete artifact processing and storage pipeline."""
+        processor = ArtifactProcessor(self.embedder, debug=False)
+        
+        total_processed = 0
+        total_stored = 0
+        errors = []
+        
+        for doc_result in doc_results:
+            try:
+                # 1. Process artifacts
+                processed_artifacts = await processor.process_artifacts(doc_result)
+                if not processed_artifacts:
+                    continue
+                    
+                total_processed += len(processed_artifacts)
+                
+                # 2. Storage operations
+                if save_to_storage:
+                    self._store_to_filesystem(processed_artifacts, doc_result)
+                
+                if save_to_vector:
+                    stored_count = await self._store_to_vector(processed_artifacts)
+                    total_stored += stored_count
+                    
+            except Exception as e:
+                error_msg = f"Error processing artifacts for {doc_result.file_path.name}: {e}"
+                errors.append(error_msg)
+        
+        return StorageResult(
+            processed_count=total_processed,
+            stored_count=total_stored,
+            errors=errors
+        )
+    
+    def _store_to_filesystem(self, artifacts: List[ProcessedArtifact], doc_result: DocumentResult) -> int:
+        """Store artifacts to filesystem."""
+        stored = 0
+        for artifact in artifacts:
+            try:
+                if artifact.raw_data:
+                    self.filesystem_storage.save_artifact(
+                        artifact.raw_data, doc_result.file_hash, 
+                        artifact.ref_item, artifact.artifact_type
+                    )
+                    stored += 1
+                if artifact.thumbnail_data:
+                    self.filesystem_storage.save_artifact(
+                        artifact.thumbnail_data, doc_result.file_hash, 
+                        artifact.ref_item, "thumbnail"
+                    )
+            except Exception as e:
+                print(f"⚠️  Error saving artifact {artifact.ref_item} to storage: {e}")
+        return stored
+    
+    async def _store_to_vector(self, artifacts: List[ProcessedArtifact]) -> int:
+        """Store artifacts to vector database using consistent Pydantic models."""
+        # Ensure collection exists
+        if not self.artifacts_vector_db.collection_exists():
+            vector_size = self.embedder.get_embedding_dimension()
+            self.artifacts_vector_db.create_collection(vector_size=vector_size)
+            self.artifacts_vector_db.ensure_indexes()
+        
+        # Convert to embedding data using consistent Pydantic model
+        embedding_data_list = []
+        for artifact in artifacts:
+            embedding_data = ArtifactEmbeddingData.from_processed_artifact(artifact)
+            if embedding_data:
+                embedding_data_list.append(embedding_data)
+        
+        if embedding_data_list:
+            # Extract data for vector storage using consistent interface
+            texts = [data.text for data in embedding_data_list]
+            embeddings = [data.embedding for data in embedding_data_list]
+            metadata_list = [data.metadata.model_dump() for data in embedding_data_list]
+            
+            self.artifacts_vector_db.add_artifacts(texts, embeddings, metadata_list)
+            return len(embedding_data_list)
+        
+        return 0
 
 
 class ArtifactProcessor:
@@ -243,48 +335,46 @@ class ArtifactProcessor:
         return [heading["text"] for heading in heading_stack if heading["text"]]
     
     def _get_picture_metadata(self, item: PictureItem, doc_result: DocumentResult, 
-                             level: int, heading_stack: List[Dict], before_text: str = None, after_text: str = None) -> Dict:
+                             level: int, heading_stack: List[Dict], before_text: str = None, after_text: str = None) -> PictureMetadata:
         """Get metadata for a picture artifact."""
         doc = doc_result.document
         caption = item.caption_text(doc=doc) or "Image without description"
         headings = self._get_heading_context(heading_stack)
         
-        return {
-            'ref_item': item.self_ref,
-            'type': 'image',
-            'caption': caption,
-            'filename': doc_result.file_path.name,
-            'source': doc_result.source_category,
-            'file_path': str(doc_result.file_path),
-            'file_hash': doc_result.file_hash,
-            'level': level,
-            'headings': headings,
-            'before_text': before_text,
-            'after_text': after_text
-        }
+        return PictureMetadata(
+            ref_item=item.self_ref,
+            caption=caption,
+            filename=doc_result.file_path.name,
+            source=doc_result.source_category,
+            file_path=str(doc_result.file_path),
+            file_hash=doc_result.file_hash,
+            level=level,
+            headings=headings,
+            before_text=before_text,
+            after_text=after_text
+        )
     
     def _get_table_metadata(self, item: TableItem, doc_result: DocumentResult, 
                            level: int, heading_stack: List[Dict], before_text: str = None, 
-                           after_text: str = None, table_text: str = None) -> Dict:
+                           after_text: str = None, table_text: str = None) -> TableMetadata:
         """Get metadata for a table artifact."""
         doc = doc_result.document
         caption = item.caption_text(doc=doc) or f"Table with {len(table_text or '')} content"
         headings = self._get_heading_context(heading_stack)
 
-        return {
-            'ref_item': item.self_ref,
-            'type': 'table',
-            'caption': caption,
-            'table_text': table_text,
-            'filename': doc_result.file_path.name,
-            'source': doc_result.source_category,
-            'file_path': str(doc_result.file_path),
-            'file_hash': doc_result.file_hash,
-            'level': level,
-            'headings': headings,
-            'before_text': before_text,
-            'after_text': after_text
-        }
+        return TableMetadata(
+            ref_item=item.self_ref,
+            caption=caption,
+            table_text=table_text,
+            filename=doc_result.file_path.name,
+            source=doc_result.source_category,
+            file_path=str(doc_result.file_path),
+            file_hash=doc_result.file_hash,
+            level=level,
+            headings=headings,
+            before_text=before_text,
+            after_text=after_text
+        )
     
     def _extract_table_text(self, doc: DoclingDocument, item: TableItem) -> str:
         """Extract table text content."""
