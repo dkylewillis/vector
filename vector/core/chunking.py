@@ -135,6 +135,21 @@ class ChunkStorageManager:
         """Store chunks using consistent Pydantic models."""
         if not chunks_with_embeddings:
             return StorageResult(processed_count=0, stored_count=0)
+        
+        # Debug: Check the input format
+        if not isinstance(chunks_with_embeddings, list):
+            raise ValueError(f"Expected list, got {type(chunks_with_embeddings)}")
+        
+        if len(chunks_with_embeddings) > 0:
+            first_item = chunks_with_embeddings[0]
+            if not isinstance(first_item, tuple) or len(first_item) != 2:
+                raise ValueError(f"Expected tuple of (Chunk, List[float]), got {type(first_item)}")
+            
+            chunk, embedding = first_item
+            if not hasattr(chunk, 'text') or not hasattr(chunk, 'metadata'):
+                raise ValueError(f"First item is not a valid Chunk object: {type(chunk)}")
+            if not isinstance(embedding, list):
+                raise ValueError(f"Expected embedding as list, got {type(embedding)}")
             
         # Ensure collection exists
         if not self.chunks_vector_db.collection_exists():
@@ -144,9 +159,15 @@ class ChunkStorageManager:
         
         # Convert to embedding data using consistent Pydantic model
         embedding_data_list = []
-        for chunk, embedding in chunks_with_embeddings:
-            embedding_data = ChunkEmbeddingData.from_chunk_and_embedding(chunk, embedding)
-            embedding_data_list.append(embedding_data)
+        try:
+            for i, (chunk, embedding) in enumerate(chunks_with_embeddings):
+                try:
+                    embedding_data = ChunkEmbeddingData.from_chunk_and_embedding(chunk, embedding)
+                    embedding_data_list.append(embedding_data)
+                except Exception as e:
+                    raise ValueError(f"Error creating embedding data for chunk {i}: {e}. Chunk type: {type(chunk)}, Embedding type: {type(embedding)}")
+        except Exception as e:
+            raise ValueError(f"Error processing chunks_with_embeddings: {e}")
         
         errors = []
         stored_count = 0

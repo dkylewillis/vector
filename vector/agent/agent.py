@@ -161,7 +161,7 @@ class ResearchAgent:
         return database.search(query_vector, top_k, metadata_filter)
 
     def ask(self, question: str, response_length: str = 'medium', 
-            metadata_filter: Optional[Dict] = None, search_type: str = 'chunks') -> str:
+            metadata_filter: Optional[Dict] = None, search_type: str = 'chunks') -> tuple[str, List[SearchResultType]]:
         """Ask AI a question about the documents.
         
         Args:
@@ -171,7 +171,7 @@ class ResearchAgent:
             search_type: 'chunks', 'artifacts', or 'both' for context search
             
         Returns:
-            AI response
+            Tuple of (AI response, search results used for context)
         """
         try:
             if not question.strip():
@@ -200,16 +200,18 @@ class ResearchAgent:
             if search_type in ['artifacts', 'both']:
                 artifact_results = self._search_collection(context_search_prompt, self.artifacts_db, 20, metadata_filter)
                 
+            # Combine and sort all results by score
+            all_results = chunk_results + artifact_results
+            all_results.sort(key=lambda x: x.score, reverse=True)
             
-            # Sort by score and limit results
-            
-            chunk_results = chunk_results[:40]
+            # Limit results
+            all_results = all_results[:40]
 
-            if not chunk_results:
-                return "No relevant documents found to answer your question."
+            if not all_results:
+                return ("No relevant documents found to answer your question.", [])
             
             # Build context from search results
-            context = self._build_context(chunk_results)
+            context = self._build_context(all_results)
 
             # Get response length settings
             max_tokens = self.config.response_lengths.get(response_length, 1000)
@@ -224,12 +226,13 @@ class ResearchAgent:
                 max_tokens=max_tokens
             )
 
-            print("Artifact Results:\n")
+            # Debug output
+            print("Chunk Results Count:", len(chunk_results))
+            print("Artifact Results Count:", len(artifact_results))
+            print("Total Results Used:", len(all_results))
+            print("\n")
 
-            print(artifact_results)
-            print("\n\n")
-
-            return response
+            return (response, all_results)
 
         except AIServiceError:
             raise  # Re-raise AI service errors

@@ -8,7 +8,8 @@ from .service import VectorWebService
 from .components import (
     create_header, create_collection_selector,
     create_search_tab, create_upload_tab, create_info_tab,
-    create_management_tab, create_delete_tab
+    create_management_tab, create_delete_tab,
+    create_document_management_tab, create_collection_documents_tab
 )
 from .handlers import connect_events
 
@@ -61,14 +62,42 @@ def create_vector_app() -> gr.Blocks:
                     upload_components = create_upload_tab()
                     info_components = create_info_tab()
                     management_components = create_management_tab()
-                    delete_components = create_delete_tab()
+                    document_management_components = create_document_management_tab()
+                    collection_documents_components = create_collection_documents_tab()
+                    delete_components = create_delete_tab()  # Keep for backward compatibility
                 
                 # Connect all event handlers
                 connect_events(
                     web_service, collection_dropdown, refresh_btn,
                     search_components, upload_components, info_components,
-                    management_components, delete_components,
+                    management_components, document_management_components, 
+                    collection_documents_components, delete_components,
                     documents_checkboxgroup
+                )
+                
+                # Auto-populate document management lists on interface load
+                def initialize_document_lists():
+                    """Initialize document lists when interface loads."""
+                    try:
+                        documents = web_service.get_all_documents()
+                        return (
+                            gr.CheckboxGroup(choices=documents, value=[]),  # all_documents_list
+                            gr.CheckboxGroup(choices=documents, value=[])   # documents_to_delete
+                        )
+                    except Exception as e:
+                        print(f"Warning: Could not initialize document lists: {e}")
+                        return (
+                            gr.CheckboxGroup(choices=[], value=[]),
+                            gr.CheckboxGroup(choices=[], value=[])
+                        )
+                
+                # Set up interface load event to populate document lists
+                app.load(
+                    fn=initialize_document_lists,
+                    outputs=[
+                        document_management_components['all_documents_list'],
+                        document_management_components['documents_to_delete']
+                    ]
                 )
     
     return app

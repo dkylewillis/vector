@@ -5,7 +5,7 @@ import io
 from typing import Optional, Dict, Any, List, Tuple
 
 from ..config import Config
-from ..core import CollectionManager, DocumentProcessor
+from ..core import CollectionManager, DocumentProcessor, DocumentManager
 from ..core.processor import PipelineType
 from ..agent import ResearchAgent
 from ..exceptions import VectorError, AIServiceError
@@ -19,6 +19,7 @@ class VectorWebService:
         """Initialize web service with configuration."""
         self.config = config
         self.collection_manager = CollectionManager(config)
+        self.document_manager = DocumentManager(config, self.collection_manager)
         self.thumbnail_resolver = ThumbnailPathResolver(config)
         self._agents = {}  # Cache agents by collection name
         self._document_processors = {}  # Cache processors by collection name
@@ -116,7 +117,8 @@ class VectorWebService:
                 return "Question cannot be empty."
             
             agent = self.get_agent(collection_name)
-            return agent.ask(question, response_length, metadata_filter, 'chunks')
+            response, search_results = agent.ask(question, response_length, metadata_filter, 'chunks')
+            return response
         except AIServiceError:
             return self._show_api_key_help()
         except Exception as e:
@@ -161,10 +163,15 @@ class VectorWebService:
             agent = self.get_agent(collection_name)
             info = agent.chunks_db.get_collection_info()
             
+            # Get metadata summary to count unique documents
+            metadata_summary = agent.chunks_db.get_metadata_summary()
+            document_count = len(metadata_summary.get('filenames', {}))
+            
             # Format info
             result = f"📊 Collection Information: {collection_name}\n"
-            result += f"Documents: {info.get('count', 0)}\n"
-            result += f"Vector size: {info.get('vector_size', 'unknown')}\n"
+            result += f"Documents: {document_count}\n"
+            result += f"Chunks: {info.get('points_count', 0)}\n"
+            result += f"Vector size: {info.get('config', {}).get('size', 'unknown')}\n"
             
             # Add pair info if available
             pair = self.collection_manager.get_pair_by_display_name(collection_name)
@@ -227,15 +234,68 @@ class VectorWebService:
                 return "No files selected for deletion."
             
             agent = self.get_agent(collection_name)
+            
+            # Get the collection pair info
+            pair = self.collection_manager.get_pair_by_display_name(collection_name)
+            if not pair:
+                return f"❌ Collection '{collection_name}' not found"
+            
             deleted_count = 0
             results = []
             
             for filename in filenames:
                 try:
                     metadata_filter = {'filename': filename}
-                    agent.chunks_db.delete_documents(metadata_filter)
-                    results.append(f"✅ {filename}: Deleted successfully")
-                    deleted_count += 1
+                    
+                    # Delete from both chunks and artifacts databases
+                    chunks_deleted = agent.chunks_db.delete_documents(metadata_filter)
+                    artifacts_deleted = agent.artifacts_db.delete_documents(metadata_filter)
+                    
+                    total_deleted = chunks_deleted + artifacts_deleted
+                    if total_deleted > 0:
+                        results.append(f"✅ {filename}: Deleted {total_deleted} items ({chunks_deleted} chunks, {artifacts_deleted} artifacts)")
+                        deleted_count += 1
+                        
+                        # Update the collection manager metadata
+                        # Find the document by filename in the metadata
+                        pair_id = pair['pair_id']
+                        for doc_key, doc_data in self.collection_manager.metadata["documents"].items():
+                            if doc_data.get("metadata", {}).get("filename") == filename:
+                                # Remove this document from the pair
+                                if pair_id in doc_data.get("in_collections", {}):
+                                    del doc_data["in_collections"][pair_id]
+                                    # If document is not in any other collections, remove it entirely
+                                    if not doc_data.get("in_collections"):
+                                        del self.collection_manager.metadata["documents"][doc_key]
+                                    # Update the document count for the pair
+                                    if self.collection_manager.metadata["collection_pairs"][pair_id]["document_count"] > 0:
+                                        self.collection_manager.metadata["collection_pairs"][pair_id]["document_count"] -= 1
+                                    break
+                        
+                        # Save the updated metadata
+                        self.collection_manager._save_metadata()
+                    else:
+                        # Even if no vector items were deleted, check if we need to clean up metadata
+                        pair_id = pair['pair_id']
+                        metadata_updated = False
+                        for doc_key, doc_data in self.collection_manager.metadata["documents"].items():
+                            if doc_data.get("metadata", {}).get("filename") == filename:
+                                if pair_id in doc_data.get("in_collections", {}):
+                                    del doc_data["in_collections"][pair_id]
+                                    if not doc_data.get("in_collections"):
+                                        del self.collection_manager.metadata["documents"][doc_key]
+                                    if self.collection_manager.metadata["collection_pairs"][pair_id]["document_count"] > 0:
+                                        self.collection_manager.metadata["collection_pairs"][pair_id]["document_count"] -= 1
+                                    metadata_updated = True
+                                    break
+                        
+                        if metadata_updated:
+                            self.collection_manager._save_metadata()
+                            results.append(f"✅ {filename}: Removed from collection metadata")
+                            deleted_count += 1
+                        else:
+                            results.append(f"⚠️ {filename}: No matching documents found")
+                        
                 except Exception as e:
                     results.append(f"❌ {filename}: Error - {e}")
             
@@ -335,7 +395,7 @@ class VectorWebService:
         )
     
     def search_with_thumbnails(self, query: str, collection_name: str, top_k: int = 5, 
-                              metadata_filter: Optional[Dict] = None) -> Tuple[str, List[str]]:
+                              metadata_filter: Optional[Dict] = None, search_type: str = 'both') -> Tuple[str, List[str]]:
         """Search for documents and return results with thumbnails."""
         try:
             if not query.strip():
@@ -344,7 +404,7 @@ class VectorWebService:
             agent = self.get_agent(collection_name)
             
             # Get raw search results (unformatted)
-            search_results = agent.search(query, top_k, metadata_filter, 'both', format_results=False)
+            search_results = agent.search(query, top_k, metadata_filter, search_type, format_results=False)
             
             # Format search results for display
             search_text = agent.formatter.format_search_results(search_results)
@@ -357,17 +417,50 @@ class VectorWebService:
             return f"Search error: {e}", []
     
     def ask_ai_with_thumbnails(self, question: str, collection_name: str, response_length: str = 'medium',
-                              metadata_filter: Optional[Dict] = None) -> Tuple[str, List[str]]:
+                              metadata_filter: Optional[Dict] = None, search_type: str = 'both') -> Tuple[str, List[str]]:
         """Ask AI a question and return response with thumbnails."""
         try:
-            # Get regular AI response
-            response_text = self.ask_ai(question, collection_name, response_length, metadata_filter)
+            if not question.strip():
+                return "Question cannot be empty.", []
             
-            # For AI responses, we could extract thumbnails from the context search results
-            # but for now, we'll keep it simple and return empty thumbnails
-            # TODO: Extract thumbnails from context search if needed
-            thumbnails = []
+            agent = self.get_agent(collection_name)
+            response, search_results = agent.ask(question, response_length, metadata_filter, search_type)
             
-            return response_text, thumbnails
+            # Extract thumbnail file paths from the search results used for context
+            thumbnails = self.thumbnail_resolver.extract_thumbnails_from_search_results(search_results)
+            
+            return response, thumbnails
+        except AIServiceError:
+            return self._show_api_key_help(), []
         except Exception as e:
             return f"AI error: {e}", []
+    
+    # Document Management Methods (delegated to core DocumentManager)
+    
+    def get_all_documents(self) -> List[str]:
+        """Get all available documents across all collections."""
+        try:
+            documents = self.document_manager.get_all_documents()
+            return [doc['display_name'] for doc in documents]
+        except Exception as e:
+            return [f"Error loading documents: {e}"]
+    
+    def get_document_details(self, selected_documents: List[str]) -> str:
+        """Get detailed information about selected documents."""
+        return self.document_manager.get_document_details(selected_documents)
+    
+    def delete_documents_permanently(self, selected_documents: List[str]) -> str:
+        """Permanently delete documents from the system."""
+        return self.document_manager.delete_documents_permanently(selected_documents)
+    
+    def get_available_documents_for_collection(self, collection_name: str) -> List[str]:
+        """Get documents that are not in the specified collection."""
+        return self.document_manager.get_available_documents_for_collection(collection_name)
+    
+    def add_documents_to_collection(self, selected_documents: List[str], collection_name: str) -> str:
+        """Add selected documents to the specified collection."""
+        return self.document_manager.add_documents_to_collection(selected_documents, collection_name)
+    
+    def remove_documents_from_collection(self, selected_documents: List[str], collection_name: str) -> str:
+        """Remove selected documents from the specified collection."""
+        return self.document_manager.remove_documents_from_collection(selected_documents, collection_name)

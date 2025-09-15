@@ -6,7 +6,7 @@ from .service import VectorWebService
 
 # Add these functions (replace the existing method versions)
 
-def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents):
+def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents, search_type):
     """Handle search request with thumbnails."""
     metadata_filter = build_metadata_filter(selected_documents)
     
@@ -17,10 +17,12 @@ def perform_search(web_service: VectorWebService, query, top_k, collection, sele
     else:
         print("🔍 No document filter applied - searching all documents in collection")
     
+    print(f"🔍 Using search type: {search_type}")
+    
     # Use the new method that returns (text, thumbnails)
-    return web_service.search_with_thumbnails(query, collection, int(top_k), metadata_filter)
+    return web_service.search_with_thumbnails(query, collection, int(top_k), metadata_filter, search_type)
 
-def ask_ai(web_service: VectorWebService, question, length, collection, selected_documents):
+def ask_ai(web_service: VectorWebService, question, length, collection, selected_documents, search_type):
     """Handle AI question request with thumbnails."""
     metadata_filter = build_metadata_filter(selected_documents)
     
@@ -31,8 +33,10 @@ def ask_ai(web_service: VectorWebService, question, length, collection, selected
     else:
         print("💬 No document filter applied - using all documents in collection for context")
     
+    print(f"💬 Using search type: {search_type}")
+    
     # Use the new method that returns (text, thumbnails)
-    response_text, thumbnails = web_service.ask_ai_with_thumbnails(question, collection, length, metadata_filter)
+    response_text, thumbnails = web_service.ask_ai_with_thumbnails(question, collection, length, metadata_filter, search_type)
     
     # Show which filters were applied
     filter_info = ""
@@ -106,11 +110,31 @@ def get_metadata_summary(web_service: VectorWebService, collection):
 
 def delete_documents(web_service: VectorWebService, selected_documents, collection):
     """Delete selected documents from the collection."""
-    metadata_filter = build_metadata_filter(selected_documents)
-    if not metadata_filter:
-        return "Please select documents to delete."
+    if not selected_documents:
+        return "Please select documents to delete from the Documents in Collection section."
     
-    result = web_service.delete_documents(collection, metadata_filter)
+    # Extract filenames from the selected documents (remove chunk count)
+    filenames = []
+    for doc in selected_documents:
+        if ' (' in doc and doc.endswith('chunks)'):
+            # Handle format: "filename.pdf (15 chunks)"
+            filename = doc.split(' (')[0]
+            filenames.append(filename)
+        elif ' (' in doc:
+            # Handle other parenthetical formats
+            filename = doc.split(' (')[0]
+            filenames.append(filename)
+        else:
+            # No parentheses, use as-is
+            filenames.append(doc)
+    
+    # Remove duplicates while preserving order
+    unique_filenames = []
+    for filename in filenames:
+        if filename not in unique_filenames:
+            unique_filenames.append(filename)
+    
+    result = web_service.delete_documents(unique_filenames, collection)
     return result
 
 
@@ -154,9 +178,73 @@ def delete_collection(web_service: VectorWebService, collection_name, force_conf
     return web_service.delete_collection(collection_name)
 
 
+# Document Management Handlers
+
+def refresh_all_documents(web_service: VectorWebService):
+    """Refresh the list of all available documents."""
+    documents = web_service.get_all_documents()
+    return gr.CheckboxGroup(choices=documents, value=[])
+
+
+def view_document_details(web_service: VectorWebService, selected_documents):
+    """View details for selected documents."""
+    if not selected_documents:
+        return "Please select documents to view details."
+    
+    return web_service.get_document_details(selected_documents)
+
+
+def delete_documents_permanently(web_service: VectorWebService, selected_documents, confirmed):
+    """Permanently delete documents from the system."""
+    if not selected_documents:
+        return "Please select documents to delete."
+    
+    if not confirmed:
+        return "❌ Please confirm deletion by checking the checkbox."
+    
+    return web_service.delete_documents_permanently(selected_documents)
+
+
+def get_documents_to_delete(web_service: VectorWebService):
+    """Get list of documents that can be deleted."""
+    documents = web_service.get_all_documents()
+    return gr.CheckboxGroup(choices=documents, value=[])
+
+
+# Collection Documents Handlers
+
+def get_available_documents_for_collection(web_service: VectorWebService, collection):
+    """Get documents that are not in the current collection."""
+    available_documents = web_service.get_available_documents_for_collection(collection)
+    return gr.CheckboxGroup(choices=available_documents, value=[])
+
+
+def add_documents_to_collection(web_service: VectorWebService, selected_documents, collection):
+    """Add selected documents to the current collection."""
+    if not selected_documents:
+        return "Please select documents to add to the collection."
+    
+    if not collection:
+        return "❌ No collection selected."
+    
+    return web_service.add_documents_to_collection(selected_documents, collection)
+
+
+def remove_documents_from_collection(web_service: VectorWebService, selected_documents, collection):
+    """Remove selected documents from the current collection."""
+    if not selected_documents:
+        return "Please select documents to remove from the collection."
+    
+    if not collection:
+        return "❌ No collection selected."
+    
+    return web_service.remove_documents_from_collection(selected_documents, collection)
+
+
 def connect_events(web_service: VectorWebService, collection_dropdown, refresh_btn,
                   search_components, upload_components, info_components,
-                  management_components, delete_components,
+                  management_components, document_management_components,
+                  collection_documents_components, delete_components,
                   documents_checkboxgroup):
     """Connect all event handlers to UI components."""
     
@@ -175,16 +263,16 @@ def connect_events(web_service: VectorWebService, collection_dropdown, refresh_b
     
     # Search & Ask handlers
     search_components['search_btn'].click(
-        fn=lambda q, k, c, docs: perform_search(web_service, q, k, c, docs),
+        fn=lambda q, k, c, docs, search_type: perform_search(web_service, q, k, c, docs, search_type),
         inputs=[search_components['search_query'], search_components['num_results'], 
-               collection_dropdown, documents_checkboxgroup],
+               collection_dropdown, documents_checkboxgroup, search_components['search_search_type']],
         outputs=[search_components['search_results'], search_components['search_thumbnails']]  # Add thumbnails output
     )
     
     search_components['ask_btn'].click(
-        fn=lambda q, l, c, docs: ask_ai(web_service, q, l, c, docs),
+        fn=lambda q, l, c, docs, search_type: ask_ai(web_service, q, l, c, docs, search_type),
         inputs=[search_components['ask_query'], search_components['response_length'],
-               collection_dropdown, documents_checkboxgroup],
+               collection_dropdown, documents_checkboxgroup, search_components['ask_search_type']],
         outputs=[search_components['ai_response'], search_components['ai_thumbnails']]  # Add thumbnails output
     )
     
@@ -242,4 +330,66 @@ def connect_events(web_service: VectorWebService, collection_dropdown, refresh_b
         inputs=[management_components['delete_collection_name'], 
                management_components['delete_force_checkbox']],
         outputs=management_components['delete_collection_output']
+    )
+    
+    # Document Management handlers
+    document_management_components['refresh_docs_btn'].click(
+        fn=lambda: refresh_all_documents(web_service),
+        outputs=document_management_components['all_documents_list']
+    )
+    
+    document_management_components['view_doc_details_btn'].click(
+        fn=lambda docs: view_document_details(web_service, docs),
+        inputs=[document_management_components['all_documents_list']],
+        outputs=document_management_components['document_details']
+    )
+    
+    document_management_components['delete_documents_btn'].click(
+        fn=lambda docs, confirmed: delete_documents_permanently(web_service, docs, confirmed),
+        inputs=[document_management_components['documents_to_delete'], 
+               document_management_components['confirm_delete_checkbox']],
+        outputs=document_management_components['delete_documents_output']
+    ).then(
+        # After deletion, refresh all document lists
+        fn=lambda: refresh_all_documents(web_service),
+        outputs=document_management_components['all_documents_list']
+    ).then(
+        fn=lambda: refresh_all_documents(web_service),
+        outputs=document_management_components['documents_to_delete']
+    ).then(
+        # Also refresh the collection documents list
+        fn=lambda collection: update_collection_documents(web_service, collection),
+        inputs=[collection_dropdown],
+        outputs=documents_checkboxgroup
+    ).then(
+        # And refresh available documents for collection
+        fn=lambda collection: get_available_documents_for_collection(web_service, collection),
+        inputs=[collection_dropdown],
+        outputs=collection_documents_components['available_documents']
+    )
+    
+    # Auto-populate documents_to_delete when refresh button is clicked
+    document_management_components['refresh_docs_btn'].click(
+        fn=lambda: refresh_all_documents(web_service),
+        outputs=document_management_components['documents_to_delete']
+    )
+    
+    # Collection Documents handlers
+    collection_documents_components['add_to_collection_btn'].click(
+        fn=lambda docs, collection: add_documents_to_collection(web_service, docs, collection),
+        inputs=[collection_documents_components['available_documents'], collection_dropdown],
+        outputs=collection_documents_components['add_to_collection_output']
+    )
+    
+    collection_documents_components['remove_from_collection_btn'].click(
+        fn=lambda docs, collection: remove_documents_from_collection(web_service, docs, collection),
+        inputs=[documents_checkboxgroup, collection_dropdown],
+        outputs=collection_documents_components['remove_from_collection_output']
+    )
+    
+    # Update available documents when collection changes
+    collection_dropdown.change(
+        fn=lambda collection: get_available_documents_for_collection(web_service, collection),
+        inputs=[collection_dropdown],
+        outputs=[collection_documents_components['available_documents']]
     )

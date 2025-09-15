@@ -73,7 +73,15 @@ def create_search_tab():
                     components['response_length'] = gr.Radio(
                         choices=["short", "medium", "long"],
                         value="medium",
-                        label="Response Length"
+                        label="Response Length",
+                        scale=1
+                    )
+                    components['ask_search_type'] = gr.Radio(
+                        choices=["chunks", "artifacts", "both"],
+                        value="both",
+                        label="Search Type",
+                        info="chunks: text content, artifacts: images/tables, both: combined",
+                        scale=1
                     )
                 
                 components['ai_response'] = gr.Textbox(
@@ -110,6 +118,13 @@ def create_search_tab():
                     components['num_results'] = gr.Slider(
                         minimum=1, maximum=20, value=5, step=1,
                         label="Number of Results", scale=1
+                    )
+                    components['search_search_type'] = gr.Radio(
+                        choices=["chunks", "artifacts", "both"],
+                        value="both",
+                        label="Search Type",
+                        info="chunks: text content, artifacts: images/tables, both: combined",
+                        scale=1
                     )
                 
                 components['search_results'] = gr.Textbox(
@@ -294,8 +309,110 @@ def create_management_tab():
     return components
 
 
+def create_document_management_tab():
+    """Create the Document Management tab."""
+    components = {}
+    
+    with gr.TabItem("📄 Document Management"):
+        with gr.Tabs():
+            # Sub-tab: All Documents
+            with gr.TabItem("📋 All Documents"):
+                with gr.Row():
+                    components['refresh_docs_btn'] = gr.Button("🔄 Refresh Documents", variant="secondary")
+                    components['view_doc_details_btn'] = gr.Button("🔍 View Details", variant="primary")
+                
+                components['all_documents_list'] = gr.CheckboxGroup(
+                    label="Available Documents",
+                    choices=[],
+                    interactive=True,
+                    elem_classes="document-checkbox-group"
+                )
+                
+                components['document_details'] = gr.Textbox(
+                    label="Document Details",
+                    lines=10,
+                    interactive=False,
+                    placeholder="Select documents and click 'View Details' to see information..."
+                )
+            
+            # Sub-tab: Delete Documents
+            with gr.TabItem("🗑️ Delete Documents"):
+                gr.Markdown("### ⚠️ Permanently Delete Documents")
+                gr.Markdown("**Warning:** This will delete the converted documents from disk and remove them from ALL collections!")
+                
+                components['documents_to_delete'] = gr.CheckboxGroup(
+                    label="Select Documents to Delete",
+                    choices=[],
+                    interactive=True,
+                    info="These documents will be permanently removed from the system"
+                )
+                
+                components['confirm_delete_checkbox'] = gr.Checkbox(
+                    label="I understand this action cannot be undone",
+                    value=False,
+                    info="Check this box to confirm deletion"
+                )
+                
+                with gr.Row():
+                    components['delete_documents_btn'] = gr.Button("🗑️ Delete Selected Documents", variant="stop")
+                
+                components['delete_documents_output'] = gr.Textbox(
+                    label="Deletion Log",
+                    lines=8,
+                    interactive=False,
+                    placeholder="Select documents and confirm to delete..."
+                )
+    
+    return components
+
+
+def create_collection_documents_tab():
+    """Create the Collection Documents tab (replaces current Delete Documents tab)."""
+    components = {}
+    
+    with gr.TabItem("📚 Collection Documents"):
+        with gr.Tabs():
+            # Sub-tab: Add Documents
+            with gr.TabItem("➕ Add to Collection"):
+                gr.Markdown("### Add Documents to Current Collection")
+                
+                components['available_documents'] = gr.CheckboxGroup(
+                    label="Available Documents (not in current collection)",
+                    choices=[],
+                    interactive=True,
+                    info="Select documents to add to the current collection"
+                )
+                
+                with gr.Row():
+                    components['add_to_collection_btn'] = gr.Button("➕ Add to Collection", variant="primary")
+                
+                components['add_to_collection_output'] = gr.Textbox(
+                    label="Add Documents Log",
+                    lines=6,
+                    interactive=False,
+                    placeholder="Select documents and click 'Add to Collection'..."
+                )
+            
+            # Sub-tab: Remove from Collection
+            with gr.TabItem("➖ Remove from Collection"):
+                gr.Markdown("### Remove Documents from Current Collection")
+                gr.Markdown("**Note:** This only removes documents from the collection, not from the system.")
+                
+                with gr.Row():
+                    components['remove_from_collection_btn'] = gr.Button("➖ Remove Selected Documents", variant="secondary", scale=1)
+                
+                components['remove_from_collection_output'] = gr.Textbox(
+                    label="Remove Documents Log",
+                    lines=6,
+                    interactive=False,
+                    placeholder="Select documents from the left panel, then click 'Remove Selected Documents'..."
+                )
+    
+    return components
+
+
 def create_delete_tab():
-    """Create the Delete Documents tab."""
+    """Create the Delete Documents tab (DEPRECATED - Use create_collection_documents_tab instead)."""
     components = {}
     
     with gr.TabItem("🗑️ Delete Documents"):
@@ -303,29 +420,22 @@ def create_delete_tab():
         gr.Markdown("**Warning:** This action cannot be undone. Please select files carefully.")
         
         with gr.Row():
-            with gr.Column(scale=1):
-                gr.Markdown("**Select Files to Delete**")
-                components['delete_filename_dropdown'] = gr.Dropdown(
-                    choices=[],
-                    multiselect=True,
-                    show_label=False,
-                    interactive=True,
-                    elem_classes="vector-dropdown",
-                    info="Select one or more files to delete from the collection"
-                )
-            
-            with gr.Column(scale=1):
-                gr.Markdown("**Actions**")
+            with gr.Column():
+                gr.Markdown("""
+                **Instructions:**
+                1. Select documents from the **"Documents in Collection"** section on the left
+                2. Click the delete button below
+                3. The selected documents will be permanently removed from the collection
+                """)
+                
                 with gr.Row():
-                    components['refresh_delete_btn'] = gr.Button("🔄 Refresh Files", variant="secondary", size="sm")
-                with gr.Row():
-                    components['delete_btn'] = gr.Button("🗑️ Delete Selected Files", variant="stop", scale=1)
+                    components['delete_btn'] = gr.Button("🗑️ Delete Selected Documents", variant="stop", scale=1)
         
         components['delete_output'] = gr.Textbox(
             label="Deletion Log",
             lines=8,
             interactive=False,
-            placeholder="Deletion results will appear here..."
+            placeholder="Select documents from the left panel, then click 'Delete Selected Documents'..."
         )
     
     return components

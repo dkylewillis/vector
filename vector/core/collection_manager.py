@@ -36,6 +36,10 @@ class CollectionManager:
         with open(self.metadata_file, 'w') as f:
             json.dump(self.metadata, f, indent=2)
     
+    def save_metadata(self):
+        """Public method to save metadata (for use by other managers)."""
+        self._save_metadata()
+    
     def _generate_collection_pair(self, base_name: str) -> Tuple[str, str, str]:
         """Generate a paired collection (chunks + artifacts) with shared ULID."""
         ulid_str = str(new_ulid())
@@ -124,6 +128,17 @@ class CollectionManager:
                 "in_collections": {},
                 "metadata": document_metadata or {}
             }
+        
+        # Ensure in_collections is a dictionary (fix legacy list format)
+        if isinstance(self.metadata["documents"][doc_ulid_key]["in_collections"], list):
+            # Convert from legacy list format to dictionary format
+            old_collections = self.metadata["documents"][doc_ulid_key]["in_collections"]
+            self.metadata["documents"][doc_ulid_key]["in_collections"] = {}
+            # Re-add any existing collections with timestamps
+            for collection_id in old_collections:
+                self.metadata["documents"][doc_ulid_key]["in_collections"][collection_id] = {
+                    "added_at": datetime.now().isoformat()
+                }
         
         # Check if document is already in this specific pair
         if pair_id in self.metadata["documents"][doc_ulid_key]["in_collections"]:
@@ -256,3 +271,230 @@ class CollectionManager:
                     "added_at": doc_data["in_collections"][pair_id].get("added_at")
                 })
         return documents
+    
+    # New public API methods for document operations
+    
+    def get_metadata(self) -> Dict:
+        """Get a copy of the current metadata.
+        
+        Returns:
+            Copy of metadata dictionary
+        """
+        return self.metadata.copy()
+    
+    def get_document_by_filename(self, filename: str) -> Optional[Tuple[str, Dict]]:
+        """Find document by filename across all collections.
+        
+        Args:
+            filename: Original filename to search for
+            
+        Returns:
+            Tuple of (document_id, document_info) if found, None otherwise
+        """
+        from .document_utils import DocumentUtils
+        return DocumentUtils.find_document_by_filename(self.metadata, filename)
+    
+    def get_document_by_hash(self, file_hash: str) -> Optional[Tuple[str, Dict]]:
+        """Find document by file hash.
+        
+        Args:
+            file_hash: File hash to search for
+            
+        Returns:
+            Tuple of (document_id, document_info) if found, None otherwise
+        """
+        from .document_utils import DocumentUtils
+        return DocumentUtils.find_document_by_hash(self.metadata, file_hash)
+    
+    def get_all_documents(self) -> List[Dict[str, Any]]:
+        """Get all active documents across all collections.
+        
+        Returns:
+            List of document information dictionaries
+        """
+        from .document_utils import DocumentUtils
+        documents = []
+        
+        for doc_id, doc_info in self.metadata.get('documents', {}).items():
+            if doc_info.get('status', 'active') == 'active':
+                collections = DocumentUtils.ensure_collections_dict_format(
+                    doc_info.get('in_collections', {})
+                )
+                collection_count = len(collections)
+                
+                documents.append({
+                    'id': doc_id,
+                    'filename': doc_info.get('metadata', {}).get('filename', doc_id),
+                    'collection_count': collection_count,
+                    'display_name': f"{doc_info.get('metadata', {}).get('filename', doc_id)} ({DocumentUtils.get_collection_count_display(collection_count)})",
+                    'created_at': doc_info.get('created_at'),
+                    'source': doc_info.get('metadata', {}).get('source'),
+                    'file_hash': doc_info.get('file_hash'),
+                    'ulid': doc_info.get('ulid')
+                })
+        
+        return sorted(documents, key=lambda x: x['filename'])
+    
+    def add_document_to_collection(self, filename: str, collection_id: str) -> bool:
+        """Add a document to a collection (metadata only).
+        
+        Args:
+            filename: Document filename
+            collection_id: Collection pair ID
+            
+        Returns:
+            True if added successfully, False otherwise
+        """
+        doc_info = self.get_document_by_filename(filename)
+        if not doc_info:
+            return False
+        
+        doc_id, doc_data = doc_info
+        
+        # Ensure collections are in dict format
+        from .document_utils import DocumentUtils
+        collections = DocumentUtils.ensure_collections_dict_format(
+            doc_data.get('in_collections', {})
+        )
+        
+        # Check if already in collection
+        if collection_id in collections:
+            return True  # Already added
+        
+        # Add to collection
+        from datetime import datetime
+        collections[collection_id] = {"added_at": datetime.now().isoformat()}
+        self.metadata['documents'][doc_id]['in_collections'] = collections
+        
+        # Update document count for the collection
+        if collection_id in self.metadata["collection_pairs"]:
+            self.metadata["collection_pairs"][collection_id]["document_count"] += 1
+        
+        self._save_metadata()
+        return True
+    
+    def remove_document_from_collection(self, filename: str, collection_id: str) -> bool:
+        """Remove a document from a collection (metadata only).
+        
+        Args:
+            filename: Document filename
+            collection_id: Collection pair ID
+            
+        Returns:
+            True if removed successfully, False otherwise
+        """
+        doc_info = self.get_document_by_filename(filename)
+        if not doc_info:
+            return False
+        
+        doc_id, doc_data = doc_info
+        
+        # Ensure collections are in dict format
+        from .document_utils import DocumentUtils
+        collections = DocumentUtils.ensure_collections_dict_format(
+            doc_data.get('in_collections', {})
+        )
+        
+        # Remove from collection if present
+        if collection_id in collections:
+            del collections[collection_id]
+            self.metadata['documents'][doc_id]['in_collections'] = collections
+            
+            # Update document count for the collection
+            if collection_id in self.metadata["collection_pairs"]:
+                self.metadata["collection_pairs"][collection_id]["document_count"] = max(0, 
+                    self.metadata["collection_pairs"][collection_id]["document_count"] - 1)
+            
+            self._save_metadata()
+            return True
+        
+        return False
+    
+    def delete_document_permanently(self, filename: str) -> bool:
+        """Permanently delete a document from all collections (metadata only).
+        
+        Args:
+            filename: Document filename
+            
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        doc_info = self.get_document_by_filename(filename)
+        if not doc_info:
+            return False
+        
+        doc_id, doc_data = doc_info
+        
+        # Update document counts for all collections this document was in
+        from .document_utils import DocumentUtils
+        collections = DocumentUtils.ensure_collections_dict_format(
+            doc_data.get('in_collections', {})
+        )
+        
+        for collection_id in collections.keys():
+            if collection_id in self.metadata["collection_pairs"]:
+                self.metadata["collection_pairs"][collection_id]["document_count"] = max(0,
+                    self.metadata["collection_pairs"][collection_id]["document_count"] - 1)
+        
+        # Remove document from metadata
+        del self.metadata['documents'][doc_id]
+        self._save_metadata()
+        return True
+    
+    def get_documents_not_in_collection(self, collection_name: str) -> List[str]:
+        """Get documents that are not in the specified collection.
+        
+        Args:
+            collection_name: Display name of the collection
+            
+        Returns:
+            List of filenames not in the collection
+        """
+        collection_pair = self.get_pair_by_display_name(collection_name)
+        if not collection_pair:
+            return []
+        
+        collection_id = f"cp_{collection_pair['ulid']}"
+        available_documents = []
+        
+        from .document_utils import DocumentUtils
+        for doc_id, doc_info in self.metadata.get('documents', {}).items():
+            if doc_info.get('status', 'active') == 'active':
+                if not DocumentUtils.is_document_in_collection(doc_info, collection_id):
+                    filename = doc_info.get('metadata', {}).get('filename', doc_id)
+                    available_documents.append(filename)
+        
+        return sorted(available_documents)
+    
+    def fix_document_counts(self) -> Dict[str, Dict[str, int]]:
+        """Fix document count discrepancies in collection metadata.
+        
+        Returns:
+            Dictionary with collection names and their count corrections
+        """
+        corrections = {}
+        
+        for pair_id, pair_info in self.metadata["collection_pairs"].items():
+            # Count actual documents in this collection
+            actual_count = 0
+            for doc_data in self.metadata["documents"].values():
+                if pair_id in doc_data.get("in_collections", {}):
+                    actual_count += 1
+            
+            stored_count = pair_info.get("document_count", 0)
+            display_name = pair_info.get("display_name", pair_id)
+            
+            if stored_count != actual_count:
+                corrections[display_name] = {
+                    "stored_count": stored_count,
+                    "actual_count": actual_count,
+                    "correction": actual_count - stored_count
+                }
+                
+                # Fix the count
+                self.metadata["collection_pairs"][pair_id]["document_count"] = actual_count
+        
+        if corrections:
+            self._save_metadata()
+            
+        return corrections

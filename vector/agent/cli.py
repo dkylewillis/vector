@@ -106,13 +106,22 @@ def main():
             if metadata_filter and args.verbose:
                 print(f"🔧 Filters: {metadata_filter}")
             
-            response = agent.ask(
+            response, search_results = agent.ask(
                 question=args.question,
                 response_length=args.length,
                 metadata_filter=metadata_filter,
                 search_type=args.type
             )
+            
             print(response)
+            
+            if args.verbose:
+                print(f"\n📊 Context Results: {len(search_results)} documents used")
+                print("🔍 Context Sources:")
+                for i, result in enumerate(search_results[:5], 1):  # Show first 5 sources
+                    print(f"   {i}. {result.filename} (Score: {result.score:.3f}, Type: {result.type})")
+                if len(search_results) > 5:
+                    print(f"   ... and {len(search_results) - 5} more results")
 
         elif args.command == "search":
             if args.verbose:

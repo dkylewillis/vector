@@ -1,257 +1,215 @@
 {
   "collection_pairs": {
-    "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
+    "cp_01K54HG7KWJM8PJYP75GZD01G6": {
       "display_name": "Coweta",
-      "ulid": "01K4VAY67CYHN0FHCT08WADMZQ",
-      "chunks_collection": "c_01K4VAY67CYHN0FHCT08WADMZQ__chunks",
-      "artifacts_collection": "c_01K4VAY67CYHN0FHCT08WADMZQ__artifacts",
+      "ulid": "01K54HG7KWJM8PJYP75GZD01G6",
+      "chunks_collection": "c_01K54HG7KWJM8PJYP75GZD01G6__chunks",
+      "artifacts_collection": "c_01K54HG7KWJM8PJYP75GZD01G6__artifacts",
       "description": "",
-      "created_at": "2025-09-10T22:51:08.908585",
+      "created_at": "2025-09-14T12:39:01.500266",
       "status": "active",
-      "document_count": 8
+      "document_count": 4
     },
-    "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
+    "cp_01K54PAWDDWPAS24KKB9D9GJ9D": {
       "display_name": "Fayette",
-      "ulid": "01K50B9YK7V4YN2EDXN1KXRC3Z",
-      "chunks_collection": "c_01K50B9YK7V4YN2EDXN1KXRC3Z__chunks",
-      "artifacts_collection": "c_01K50B9YK7V4YN2EDXN1KXRC3Z__artifacts",
+      "ulid": "01K54PAWDDWPAS24KKB9D9GJ9D",
+      "chunks_collection": "c_01K54PAWDDWPAS24KKB9D9GJ9D__chunks",
+      "artifacts_collection": "c_01K54PAWDDWPAS24KKB9D9GJ9D__artifacts",
       "description": "",
-      "created_at": "2025-09-12T21:33:46.471749",
+      "created_at": "2025-09-14T14:03:29.069088",
       "status": "active",
-      "document_count": 6
+      "document_count": 1
     },
-    "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-      "display_name": "Test_Consistency",
-      "ulid": "01K531CCYQEVASEA8HCV5GM33Z",
-      "chunks_collection": "c_01K531CCYQEVASEA8HCV5GM33Z__chunks",
-      "artifacts_collection": "c_01K531CCYQEVASEA8HCV5GM33Z__artifacts",
+    "cp_01K55EFBC3BY9TENEX1SYVTF0J": {
+      "display_name": "GSMM",
+      "ulid": "01K55EFBC3BY9TENEX1SYVTF0J",
+      "chunks_collection": "c_01K55EFBC3BY9TENEX1SYVTF0J__chunks",
+      "artifacts_collection": "c_01K55EFBC3BY9TENEX1SYVTF0J__artifacts",
       "description": "",
-      "created_at": "2025-09-13T22:38:04.247728",
+      "created_at": "2025-09-14T21:05:21.283950",
       "status": "active",
-      "document_count": 6
+      "document_count": 1
     }
   },
   "display_name_to_pair": {
-    "Coweta": "cp_01K4VAY67CYHN0FHCT08WADMZQ",
-    "Fayette": "cp_01K50B9YK7V4YN2EDXN1KXRC3Z",
-    "Test_Consistency": "cp_01K531CCYQEVASEA8HCV5GM33Z"
+    "Coweta": "cp_01K54HG7KWJM8PJYP75GZD01G6",
+    "Fayette": "cp_01K54PAWDDWPAS24KKB9D9GJ9D",
+    "GSMM": "cp_01K55EFBC3BY9TENEX1SYVTF0J"
   },
   "documents": {
-    "doc_01K4VAZA0KTFRY2NCKP82911X0": {
-      "ulid": "01K4VAZA0KTFRY2NCKP82911X0",
+    "doc_01K54NMP0AV85YPT2XTYB23P57": {
+      "ulid": "01K54NMP0AV85YPT2XTYB23P57",
       "file_hash": "e853258870ef9f72a07541fc1da392f44db61bf8b77bc9aaec669ca150c3b4ae",
       "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-10T22:51:45.555027"
-        },
-        "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-          "added_at": "2025-09-13T22:38:40.481054"
+        "cp_01K54HG7KWJM8PJYP75GZD01G6": {
+          "added_at": "2025-09-14T13:51:21.610725"
         }
       },
       "metadata": {
+        "doc_items": [
+          "#/texts/1",
+          "#/texts/2",
+          "#/texts/3"
+        ],
+        "type": "chunk",
         "filename": "APPENDIX_A___ZONING_AND_DEVELOPMENT.docx",
-        "source": "ordinances",
-        "file_path": "data\\source_documents\\Coweta\\ordinances\\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx"
+        "headings": [
+          "APPENDIX A\u00a0ZONING AND DEVELOPMENT"
+        ],
+        "source": "manuals",
+        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\3d8b2990ce809111ec38e24590e1693c44b65a1eb5b95e23afa76e0db1b1051e\\APPENDIX_A___ZONING_AND_DEVELOPMENT.docx",
+        "file_hash": "e853258870ef9f72a07541fc1da392f44db61bf8b77bc9aaec669ca150c3b4ae",
+        "picture_items": [],
+        "table_items": []
       }
     },
-    "doc_01K4VAZA0KD2NTWY8VPB6SX134": {
-      "ulid": "01K4VAZA0KD2NTWY8VPB6SX134",
+    "doc_01K54NMR9H2EANES1T46ZP7CZN": {
+      "ulid": "01K54NMR9H2EANES1T46ZP7CZN",
       "file_hash": "597bcf0486a27067ee8d2d679c0d7642f3b5999fc718c10fd5d2f9702848c3ec",
       "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-10T22:51:45.555479"
-        },
-        "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-          "added_at": "2025-09-13T22:38:42.678765"
+        "cp_01K54HG7KWJM8PJYP75GZD01G6": {
+          "added_at": "2025-09-14T13:51:23.953990"
         }
       },
       "metadata": {
+        "doc_items": [
+          "#/texts/5",
+          "#/texts/6",
+          "#/texts/7",
+          "#/texts/8",
+          "#/texts/9",
+          "#/texts/10",
+          "#/texts/11",
+          "#/texts/12",
+          "#/texts/13",
+          "#/texts/14",
+          "#/texts/15",
+          "#/texts/16"
+        ],
+        "type": "chunk",
         "filename": "Chapter_14___BUILDINGS_AND_BUILDING_REGULATIONS.docx",
-        "source": "ordinances",
-        "file_path": "data\\source_documents\\Coweta\\ordinances\\Chapter_14___BUILDINGS_AND_BUILDING_REGULATIONS.docx"
+        "headings": [
+          "Sec. 14-1.\u00a0Administration"
+        ],
+        "source": "manuals",
+        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\94311abfe3f4d1012812a147735ea7e679488c2d98042d110b77a840da961dd2\\Chapter_14___BUILDINGS_AND_BUILDING_REGULATIONS.docx",
+        "file_hash": "597bcf0486a27067ee8d2d679c0d7642f3b5999fc718c10fd5d2f9702848c3ec",
+        "picture_items": [],
+        "table_items": []
       }
     },
-    "doc_01K4VAZA0K7PHDA63FG54E432Y": {
-      "ulid": "01K4VAZA0K7PHDA63FG54E432Y",
-      "file_hash": "38a7594a4f8111f6a7d5c7ea3059c50196680ec4266b67bc406d424ff2b75d66",
-      "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-10T22:51:45.555851"
-        },
-        "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-          "added_at": "2025-09-13T22:38:42.963041"
-        }
-      },
-      "metadata": {
-        "filename": "Chapter_30___ENVIRONMENT.docx",
-        "source": "ordinances",
-        "file_path": "data\\source_documents\\Coweta\\ordinances\\Chapter_30___ENVIRONMENT.docx"
-      }
-    },
-    "doc_01K4VAZA0M3TJ82VERGZ85VGG4": {
-      "ulid": "01K4VAZA0M3TJ82VERGZ85VGG4",
+    "doc_01K54NMRWAWR8NZT1FYKWMZAYE": {
+      "ulid": "01K54NMRWAWR8NZT1FYKWMZAYE",
       "file_hash": "9bb78eb9c449c2b53663c84a5cb855f86741c45244dd3edb8f9dcb56bdf93f84",
       "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-10T22:51:45.556230"
-        },
-        "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-          "added_at": "2025-09-13T22:38:43.246506"
+        "cp_01K54HG7KWJM8PJYP75GZD01G6": {
+          "added_at": "2025-09-14T13:51:24.554285"
         }
       },
       "metadata": {
+        "doc_items": [
+          "#/texts/5",
+          "#/texts/6",
+          "#/texts/7"
+        ],
+        "type": "chunk",
         "filename": "Chapter_34___FIRE_PREVENTION_AND_PROTECTION.docx",
-        "source": "ordinances",
-        "file_path": "data\\source_documents\\Coweta\\ordinances\\Chapter_34___FIRE_PREVENTION_AND_PROTECTION.docx"
+        "headings": [
+          "Sec. 34-1.\u00a0Duties of the fire rescue department."
+        ],
+        "source": "manuals",
+        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\27c3418854c9bc4a9e9147bc547efb53fd9bee619d0498f6223012ba5d038482\\Chapter_34___FIRE_PREVENTION_AND_PROTECTION.docx",
+        "file_hash": "9bb78eb9c449c2b53663c84a5cb855f86741c45244dd3edb8f9dcb56bdf93f84",
+        "picture_items": [],
+        "table_items": []
       }
     },
-    "doc_01K4VAZA0MB29NDKQ2KQCPRYW8": {
-      "ulid": "01K4VAZA0MB29NDKQ2KQCPRYW8",
-      "file_hash": "a2c3ea3e06ea02cd143310d737ae56b60100cf62e14c7a28d48a5cf7397a142a",
-      "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-10T22:51:45.556629"
-        },
-        "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-          "added_at": "2025-09-13T22:38:43.247314"
-        }
-      },
-      "metadata": {
-        "filename": "Chapter_54___ROADS_AND_BRIDGES.docx",
-        "source": "ordinances",
-        "file_path": "data\\source_documents\\Coweta\\ordinances\\Chapter_54___ROADS_AND_BRIDGES.docx"
-      }
-    },
-    "doc_01K4VAZA0NQJY6NAVTRHMG0B4A": {
-      "ulid": "01K4VAZA0NQJY6NAVTRHMG0B4A",
+    "doc_01K54NMRWBHKR9EJ8SDV7Z1BWV": {
+      "ulid": "01K54NMRWBHKR9EJ8SDV7Z1BWV",
       "file_hash": "eb177267916da6c48df87017a373584d28819fc8735337bf7b978247d8cd3471",
       "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-10T22:51:45.557046"
-        },
-        "cp_01K531CCYQEVASEA8HCV5GM33Z": {
-          "added_at": "2025-09-13T22:38:43.248142"
+        "cp_01K54HG7KWJM8PJYP75GZD01G6": {
+          "added_at": "2025-09-14T13:51:24.555404"
         }
       },
       "metadata": {
+        "doc_items": [
+          "#/texts/5"
+        ],
+        "type": "chunk",
         "filename": "Chapter_78___UTILITIES.docx",
-        "source": "ordinances",
-        "file_path": "data\\source_documents\\Coweta\\ordinances\\Chapter_78___UTILITIES.docx"
-      }
-    },
-    "doc_01K4XSKN2DHDRPKATMNEYBDWQK": {
-      "ulid": "01K4XSKN2DHDRPKATMNEYBDWQK",
-      "file_hash": "bf9345120a19ee4110d3221c40a1636580e1c96429f2d12e2cd09dbc82429d85",
-      "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-11T21:46:01.165953"
-        }
-      },
-      "metadata": {
-        "filename": "gsmm_75_85.pdf",
-        "source": "manual",
-        "file_path": "data\\source_documents\\GSMM\\gsmm_75_85.pdf"
-      }
-    },
-    "doc_01K4ZZV56C9B3Z2N0NFJ1996ZR": {
-      "ulid": "01K4ZZV56C9B3Z2N0NFJ1996ZR",
-      "file_hash": "0717b8e535cf6878c6e2ec36c90a2f2d1625a2f7ac2fae040aa14b1a91922506",
-      "in_collections": {
-        "cp_01K4VAY67CYHN0FHCT08WADMZQ": {
-          "added_at": "2025-09-12T18:13:27.372050"
-        }
-      },
-      "metadata": {
-        "filename": "p453.pdf",
+        "headings": [
+          "Sec. 78-1.\u00a0Provisions relating to residential, commercial and industrial users incorporated by reference."
+        ],
         "source": "manuals",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\62d93f911c08290f047c28cf359b04c076c139e9d1a58eb20772118f114ba84a\\p453.pdf"
+        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\99e3fe10654c1d3ddbd2d160ed9b685d3dd62a34b163be5ce334d2043a947d36\\Chapter_78___UTILITIES.docx",
+        "file_hash": "eb177267916da6c48df87017a373584d28819fc8735337bf7b978247d8cd3471",
+        "picture_items": [],
+        "table_items": []
       }
     },
-    "doc_01K50BKWGR820GXGKRVG51RAM7": {
-      "ulid": "01K50BKWGR820GXGKRVG51RAM7",
-      "file_hash": "4390f2aedb77efd070e964467fb923ad4f96638aadfe3444f5a7754cd44f45f6",
-      "in_collections": {
-        "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
-          "added_at": "2025-09-12T21:39:12.024600"
-        }
-      },
-      "metadata": {
-        "filename": "Chapter_12___FIRE_PREVENTION_AND_PROTECTION.docx",
-        "source": "ordinances",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\bce22507710cc0c809f53e2aaae4acd4b87f2bd1c1e18d02e6b441b6f92cc059\\Chapter_12___FIRE_PREVENTION_AND_PROTECTION.docx"
-      }
-    },
-    "doc_01K50BKWGS2RBP7HR4V2CX5CTB": {
-      "ulid": "01K50BKWGS2RBP7HR4V2CX5CTB",
-      "file_hash": "1764c205e52ef4039e3e73d28c183b1e93126e119da21fe635689d2f87256870",
-      "in_collections": {
-        "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
-          "added_at": "2025-09-12T21:39:12.025343"
-        }
-      },
-      "metadata": {
-        "filename": "Chapter_20___ROADS_AND_BRIDGES.docx",
-        "source": "ordinances",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\bfe9a4bc0ab8a60695647cbc8854cb9d3f1c61a0fa2b3048151ca45f777d04c3\\Chapter_20___ROADS_AND_BRIDGES.docx"
-      }
-    },
-    "doc_01K50BKWGSMDHVP41X6JMV3RZJ": {
-      "ulid": "01K50BKWGSMDHVP41X6JMV3RZJ",
-      "file_hash": "49f2a6a593602d91ea48027c62972a1c158fd651649b64bcbb8b5f9e2904415a",
-      "in_collections": {
-        "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
-          "added_at": "2025-09-12T21:39:12.026004"
-        }
-      },
-      "metadata": {
-        "filename": "Chapter_28___UTILITIES.docx",
-        "source": "ordinances",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\83fff6f20faf0436a47a694849d9b214f61e4f9c748388ae12c0ff6ac8b8a578\\Chapter_28___UTILITIES.docx"
-      }
-    },
-    "doc_01K50BKWGTQ01RXRKV98TK5ZPE": {
-      "ulid": "01K50BKWGTQ01RXRKV98TK5ZPE",
+    "2fdf008529a83b44217840270fc888bc908058bbcecf60e6b1fb64ca82960a1e": {
+      "ulid": "01K54PBAFWW4AWJTVB2HCP0M35",
       "file_hash": "2fdf008529a83b44217840270fc888bc908058bbcecf60e6b1fb64ca82960a1e",
+      "status": "active",
+      "created_at": "2025-09-14T14:02:53.467119",
       "in_collections": {
-        "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
-          "added_at": "2025-09-12T21:39:12.026839"
+        "cp_01K54PAWDDWPAS24KKB9D9GJ9D": {
+          "added_at": "2025-09-14T14:18:06.182811"
         }
       },
+      "file_path": "E:\\02-regscout\\data\\source_documents\\Fayette\\ordinances\\Chapter_104___DEVELOPMENT_REGULATIONS.docx",
       "metadata": {
         "filename": "Chapter_104___DEVELOPMENT_REGULATIONS.docx",
-        "source": "ordinances",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\f785c742e28e51cb24e38be9c4e2005d9cc1d00d366879efa01f3da66b8cbd73\\Chapter_104___DEVELOPMENT_REGULATIONS.docx"
+        "source": "ordinances"
       }
     },
-    "doc_01K50BKWGVPFJXXZ801Q2RKKN1": {
-      "ulid": "01K50BKWGVPFJXXZ801Q2RKKN1",
-      "file_hash": "3e1e30c50b5a06df82daed5bb3b553d8948284891b6f9c6da8cb250a63ccb7c5",
+    "doc_01K55EGXSZC6DBXKQ7QPZV8CFT": {
+      "ulid": "01K55EGXSZC6DBXKQ7QPZV8CFT",
+      "file_hash": "bf9345120a19ee4110d3221c40a1636580e1c96429f2d12e2cd09dbc82429d85",
       "in_collections": {
-        "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
-          "added_at": "2025-09-12T21:39:12.027551"
+        "cp_01K55EFBC3BY9TENEX1SYVTF0J": {
+          "added_at": "2025-09-14T21:06:12.927049"
         }
       },
       "metadata": {
-        "filename": "Chapter_110___ZONING.docx",
-        "source": "ordinances",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\a7732050c95cba9caa00c219d5addb535f85a75340860a4d7be7b4e9d9b30c28\\Chapter_110___ZONING.docx"
-      }
-    },
-    "doc_01K50BKWGWPMV3X5S0YAJCKBF6": {
-      "ulid": "01K50BKWGWPMV3X5S0YAJCKBF6",
-      "file_hash": "bb473384451ee077eadd01614c2432160ac438ff3f963c1b1b8d9f11d444f291",
-      "in_collections": {
-        "cp_01K50B9YK7V4YN2EDXN1KXRC3Z": {
-          "added_at": "2025-09-12T21:39:12.028266"
-        }
-      },
-      "metadata": {
-        "filename": "Subpart_B___LAND_DEVELOPMENT_AND_LAND_USE.docx",
-        "source": "ordinances",
-        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\a78e8d3475f21e21d51b7d4a135a70befd31e4d64ae13e0c401d7880b92df557\\Subpart_B___LAND_DEVELOPMENT_AND_LAND_USE.docx"
+        "doc_items": [
+          "#/texts/4",
+          "#/texts/5",
+          "#/texts/6",
+          "#/texts/7",
+          "#/texts/8",
+          "#/texts/9",
+          "#/texts/10",
+          "#/texts/11",
+          "#/texts/12",
+          "#/texts/13",
+          "#/texts/14",
+          "#/texts/15",
+          "#/texts/16",
+          "#/texts/17",
+          "#/texts/18",
+          "#/texts/19",
+          "#/texts/20",
+          "#/texts/21",
+          "#/texts/22",
+          "#/tables/0"
+        ],
+        "type": "chunk",
+        "filename": "gsmm_75_85.pdf",
+        "headings": [
+          "3.1.1 Introduction to Hydrologic Methods"
+        ],
+        "source": "manuals",
+        "file_path": "C:\\Users\\dkyle\\AppData\\Local\\Temp\\gradio\\3da4f91ea4a8abf1c6f433d8f4585bf5869cce020cc98001eefa88a41272dd8f\\gsmm_75_85.pdf",
+        "file_hash": "bf9345120a19ee4110d3221c40a1636580e1c96429f2d12e2cd09dbc82429d85",
+        "picture_items": [],
+        "table_items": [
+          "#/tables/0"
+        ]
       }
     }
   },
-  "created_at": "2025-09-10T22:51:08.908490",
-  "updated_at": "2025-09-13T22:38:43.248148"
+  "created_at": "2025-09-14T12:38:54.029874",
+  "updated_at": "2025-09-14T21:06:12.927060"
 }

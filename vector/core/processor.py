@@ -15,6 +15,7 @@ from .collection_manager import CollectionManager
 from .artifacts import ArtifactProcessor
 from .models import Chunk, ChunkMetadata, DocumentResult
 from .filesystem import FileSystemStorage as FS
+from .document_utils import DocumentUtils
 
 
 class PipelineType(Enum):
@@ -406,9 +407,8 @@ class DocumentProcessor:
         if not self.chunks_vector_db:
             return False
             
-        # Use a temporary converter instance to calculate hash
-        temp_converter = DocumentConverter()
-        file_hash = temp_converter._calculate_file_hash(file_path)
+        # Use DocumentUtils to calculate hash
+        file_hash = DocumentUtils.calculate_file_hash(file_path)
         
         # Check in-memory cache first
         if file_hash in self.processed_files:
@@ -416,16 +416,13 @@ class DocumentProcessor:
         
         # Check for existing documents by file_hash in chunks database
         try:
-            # Ensure indexes exist before filtering
             self.chunks_vector_db.ensure_indexes()
             
-            # Search for documents with this file hash using proper Filter model
             from qdrant_client.models import Filter
             scroll_filter = Filter(
-                must=[
-                    {"key": "file_hash", "match": {"value": file_hash}}
-                ]
+                must=[{"key": "file_hash", "match": {"value": file_hash}}]
             )
+            
             scroll_result = self.chunks_vector_db.client.scroll(
                 collection_name=self.chunks_vector_db.collection_name,
                 scroll_filter=scroll_filter,
@@ -434,10 +431,10 @@ class DocumentProcessor:
                 with_vectors=False
             )
             
-            if scroll_result[0]:  # If any documents found
+            if scroll_result[0]:
                 self.processed_files.add(file_hash)
                 return True
-        except Exception as e:
+        except Exception:
             # If database check fails, proceed with processing
             pass
         
@@ -454,27 +451,23 @@ class DocumentProcessor:
             return
             
         try:
-            # Use a temporary converter instance to calculate hash
-            temp_converter = DocumentConverter()
-            file_hash = temp_converter._calculate_file_hash(file_path)
+            # Use DocumentUtils to calculate hash
+            file_hash = DocumentUtils.calculate_file_hash(file_path)
             
             # Remove from both chunks and artifacts collections
             for db_name, vector_db in [("chunks", self.chunks_vector_db), ("artifacts", self.artifacts_vector_db)]:
                 try:
-                    # Ensure indexes exist before filtering
                     vector_db.ensure_indexes()
                     
-                    # Find all points with this file hash using proper Filter model
                     from qdrant_client.models import Filter
                     scroll_filter = Filter(
-                        must=[
-                            {"key": "file_hash", "match": {"value": file_hash}}
-                        ]
+                        must=[{"key": "file_hash", "match": {"value": file_hash}}]
                     )
+                    
                     scroll_result = vector_db.client.scroll(
                         collection_name=vector_db.collection_name,
                         scroll_filter=scroll_filter,
-                        limit=self.MAX_CHUNKS_PER_FILE,  # Assume no more than 10k chunks per file
+                        limit=10000,  # Large limit to get all matching points
                         with_payload=False,
                         with_vectors=False
                     )
@@ -487,9 +480,7 @@ class DocumentProcessor:
                             collection_name=vector_db.collection_name,
                             points_selector=PointIdsList(points=points_to_delete)
                         )
-                        if points_to_delete:  # Only log if we actually deleted something
-                            print(f"🗑️  Removed {len(points_to_delete)} existing {db_name} for {file_path.name}")
-                            
+                        print(f"   🗑️  Removed {len(points_to_delete)} existing {db_name} for {file_path.name}")
                 except Exception as e:
                     print(f"⚠️  Warning: Could not remove existing {db_name} for {file_path.name}: {e}")
                     
