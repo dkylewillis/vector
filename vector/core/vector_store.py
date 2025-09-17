@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchAny, MatchValue
 from typing import Dict, List, Any, Optional, Generator
 from pydantic import BaseModel, Field
 from pathlib import Path
@@ -113,10 +113,10 @@ class VectorStore(BaseModel):
 
         filter_ = Filter(
             must=[
-            {
-                "key": "document_id",
-                "match": {"any": document_ids}
-            }
+                FieldCondition(
+                    key="document_id",
+                    match=MatchAny(any=document_ids)
+                )
             ]
         )
 
@@ -128,17 +128,27 @@ class VectorStore(BaseModel):
                 query_filter=filter_,
             )
 
-    def delete_point(self, collection: str, point_id: str) -> None:
-        """Delete a point from a collection."""
+    def delete_document(self, collection: str, document_id: str) -> None:
+        """Delete a document from a collection."""
+
+        filter_ = Filter(
+            must=[
+                FieldCondition(
+                    key="doc_id",
+                    match=MatchValue(value=document_id)
+                )
+            ]
+        )
+
         with self.get_client() as client:
             try:
                 client.delete(
                     collection_name=collection,
-                    points_selector=[point_id],
+                    points_selector=filter_
                 )
-                print(f"Point {point_id} deleted successfully from {collection}.")
+                print(f"Document {document_id} deleted successfully from {collection}.")
             except Exception as e:
-                print(f"Error deleting point {point_id}: {e}")
+                print(f"Error deleting document {document_id}: {e}")
 
 if __name__ == "__main__":
     print("Starting vector store script...")
