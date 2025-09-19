@@ -7,13 +7,9 @@ from typing import List
 def create_header():
     """Create the main header."""
     return gr.HTML("""
-        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
         <div style="text-align: center; padding: 20px;">
-            <h1>
-            <span style="color:#3b82f6; font-size:50px; position:relative; top:4px;">●</span>
-            Vector
-            </h1>
-            <p>AI-Powered Document Processing & Search</p>
+            <h1>Vector - Placeholder Mode</h1>
+            <p>Web interface temporarily disabled during core refactoring</p>
         </div>
         """)
 
@@ -23,32 +19,328 @@ def create_collection_selector(collections: List[str], default_collection: str, 
     if initial_documents is None:
         initial_documents = []
         
-    with gr.Column(elem_id="dropdown_column"):
-        with gr.Row(elem_id="collection_selector_top"):
-            gr.Markdown("**Collection**", elem_id="bottom_md")
-            refresh_btn = gr.Button("Refresh Collections", size="sm", scale=1, 
-                                  elem_classes="icon-btn", elem_id="refresh_btn")
-        with gr.Row():
-            collection_dropdown = gr.Dropdown(
-                choices=collections,
-                value=default_collection,
-                show_label=False,
-                scale=3
-            )
-        
-        # Documents section
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("**Documents in Collection**", elem_classes="filter_label")
-                documents_checkboxgroup = gr.CheckboxGroup(
-                    choices=initial_documents,
-                    label="",
-                    show_label=False,
-                    interactive=True,
-                    elem_classes="vector-checkbox-group"
-                )
+    with gr.Column():
+        gr.Markdown("**Collection Selector** (Placeholder)")
+        collection_dropdown = gr.Dropdown(
+            choices=["placeholder"],
+            value="placeholder",
+            label="Collection",
+            interactive=False
+        )
+        refresh_btn = gr.Button("Refresh (Disabled)", interactive=False)
+        documents_checkboxgroup = gr.CheckboxGroup(
+            choices=[],
+            label="Documents",
+            interactive=False
+        )
     
     return collection_dropdown, refresh_btn, documents_checkboxgroup
+
+
+def create_search_tab():
+    """Create search tab components."""
+    with gr.TabItem("🔍 Search", elem_id="search_tab"):
+        gr.Markdown("### Search Functionality (Placeholder)")
+        
+        with gr.Row():
+            with gr.Column(scale=3):
+                query_input = gr.Textbox(
+                    label="Search Query",
+                    placeholder="Search functionality disabled during refactoring",
+                    interactive=False
+                )
+            with gr.Column(scale=1):
+                top_k_input = gr.Number(
+                    label="Results",
+                    value=5,
+                    interactive=False
+                )
+        
+        search_type = gr.Radio(
+            choices=["chunks", "artifacts", "both"],
+            value="both",
+            label="Search Type",
+            interactive=False
+        )
+        
+        search_btn = gr.Button("Search (Disabled)", interactive=False)
+        ask_btn = gr.Button("Ask AI (Disabled)", interactive=False)
+        
+        length_radio = gr.Radio(
+            choices=["short", "medium", "long"],
+            value="medium",
+            label="Response Length",
+            interactive=False
+        )
+        
+        results_output = gr.Textbox(
+            label="Results",
+            value="Search functionality temporarily disabled",
+            interactive=False
+        )
+        
+        thumbnails_gallery = gr.Gallery(
+            label="Related Images",
+            show_label=True,
+            interactive=False
+        )
+    
+    return {
+        'query_input': query_input,
+        'top_k_input': top_k_input,
+        'search_type': search_type,
+        'search_btn': search_btn,
+        'ask_btn': ask_btn,
+        'length_radio': length_radio,
+        'results_output': results_output,
+        'thumbnails_gallery': thumbnails_gallery
+    }
+
+
+def create_upload_tab():
+    """Create upload tab components."""
+    with gr.TabItem("📤 Upload", elem_id="upload_tab"):
+        gr.Markdown("### File Upload (Placeholder)")
+        
+        file_upload = gr.File(
+            label="Select Files",
+            file_count="multiple",
+            interactive=False
+        )
+        
+        source_textbox = gr.Textbox(
+            label="Source",
+            placeholder="Upload disabled during refactoring",
+            interactive=False
+        )
+        
+        force_checkbox = gr.Checkbox(
+            label="Force Reprocess",
+            interactive=False
+        )
+        
+        upload_btn = gr.Button("Upload (Disabled)", interactive=False)
+        upload_output = gr.Textbox(
+            label="Upload Status",
+            value="Upload functionality temporarily disabled",
+            interactive=False
+        )
+    
+    return {
+        'file_upload': file_upload,
+        'source_textbox': source_textbox,
+        'force_checkbox': force_checkbox,
+        'upload_btn': upload_btn,
+        'upload_output': upload_output
+    }
+
+
+def create_info_tab():
+    """Create info tab components."""
+    with gr.TabItem("ℹ️ Info", elem_id="info_tab"):
+        gr.Markdown("### Collection Information (Placeholder)")
+        
+        info_btn = gr.Button("Get Info (Disabled)", interactive=False)
+        info_output = gr.Textbox(
+            label="Collection Info",
+            value="Info functionality temporarily disabled",
+            interactive=False
+        )
+        
+        metadata_btn = gr.Button("Get Metadata (Disabled)", interactive=False)
+        metadata_output = gr.Textbox(
+            label="Metadata Summary",
+            value="Metadata functionality temporarily disabled",
+            interactive=False
+        )
+    
+    return {
+        'info_btn': info_btn,
+        'info_output': info_output,
+        'metadata_btn': metadata_btn,
+        'metadata_output': metadata_output
+    }
+
+
+def create_management_tab():
+    """Create management tab components."""
+    with gr.TabItem("⚙️ Management", elem_id="management_tab"):
+        gr.Markdown("### Collection Management (Placeholder)")
+        
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("**Create Collection**")
+                new_name_input = gr.Textbox(
+                    label="Display Name",
+                    placeholder="Management disabled during refactoring",
+                    interactive=False
+                )
+                new_desc_input = gr.Textbox(
+                    label="Description",
+                    interactive=False
+                )
+                create_btn = gr.Button("Create (Disabled)", interactive=False)
+            
+            with gr.Column():
+                gr.Markdown("**Rename Collection**")
+                old_name_input = gr.Textbox(
+                    label="Current Name",
+                    interactive=False
+                )
+                rename_input = gr.Textbox(
+                    label="New Name",
+                    interactive=False
+                )
+                rename_btn = gr.Button("Rename (Disabled)", interactive=False)
+        
+        gr.Markdown("**Delete Collection**")
+        delete_name_input = gr.Textbox(
+            label="Collection to Delete",
+            interactive=False
+        )
+        force_delete_checkbox = gr.Checkbox(
+            label="Force Delete",
+            interactive=False
+        )
+        delete_btn = gr.Button("Delete (Disabled)", interactive=False)
+        
+        management_output = gr.Textbox(
+            label="Management Status",
+            value="Management functionality temporarily disabled",
+            interactive=False
+        )
+        
+        refresh_management_btn = gr.Button("Refresh (Disabled)", interactive=False)
+        collections_list_output = gr.Textbox(
+            label="Available Collections",
+            value="Collection listing temporarily disabled",
+            interactive=False
+        )
+    
+    return {
+        'new_name_input': new_name_input,
+        'new_desc_input': new_desc_input,
+        'create_btn': create_btn,
+        'old_name_input': old_name_input,
+        'rename_input': rename_input,
+        'rename_btn': rename_btn,
+        'delete_name_input': delete_name_input,
+        'force_delete_checkbox': force_delete_checkbox,
+        'delete_btn': delete_btn,
+        'management_output': management_output,
+        'refresh_management_btn': refresh_management_btn,
+        'collections_list_output': collections_list_output
+    }
+
+
+def create_document_management_tab():
+    """Create document management tab components."""
+    with gr.TabItem("📄 Documents", elem_id="document_management_tab"):
+        gr.Markdown("### Document Management (Placeholder)")
+        
+        refresh_docs_btn = gr.Button("Refresh Documents (Disabled)", interactive=False)
+        
+        all_documents_list = gr.CheckboxGroup(
+            label="All Documents",
+            choices=[],
+            interactive=False
+        )
+        
+        view_details_btn = gr.Button("View Details (Disabled)", interactive=False)
+        document_details_output = gr.Textbox(
+            label="Document Details",
+            value="Document management temporarily disabled",
+            interactive=False
+        )
+        
+        documents_to_delete = gr.CheckboxGroup(
+            label="Select Documents to Delete",
+            choices=[],
+            interactive=False
+        )
+        
+        delete_docs_btn = gr.Button("Delete Selected (Disabled)", interactive=False)
+        delete_docs_output = gr.Textbox(
+            label="Delete Status",
+            value="Document deletion temporarily disabled",
+            interactive=False
+        )
+    
+    return {
+        'refresh_docs_btn': refresh_docs_btn,
+        'all_documents_list': all_documents_list,
+        'view_details_btn': view_details_btn,
+        'document_details_output': document_details_output,
+        'documents_to_delete': documents_to_delete,
+        'delete_docs_btn': delete_docs_btn,
+        'delete_docs_output': delete_docs_output
+    }
+
+
+def create_collection_documents_tab():
+    """Create collection documents tab components."""
+    with gr.TabItem("📋 Collection Docs", elem_id="collection_documents_tab"):
+        gr.Markdown("### Collection Documents (Placeholder)")
+        
+        available_docs_list = gr.CheckboxGroup(
+            label="Available Documents",
+            choices=[],
+            interactive=False
+        )
+        
+        add_to_collection_btn = gr.Button("Add to Collection (Disabled)", interactive=False)
+        remove_from_collection_btn = gr.Button("Remove from Collection (Disabled)", interactive=False)
+        
+        collection_docs_output = gr.Textbox(
+            label="Collection Documents Status",
+            value="Collection document management temporarily disabled",
+            interactive=False
+        )
+    
+    return {
+        'available_docs_list': available_docs_list,
+        'add_to_collection_btn': add_to_collection_btn,
+        'remove_from_collection_btn': remove_from_collection_btn,
+        'collection_docs_output': collection_docs_output
+    }
+
+
+def create_delete_tab():
+    """Create delete tab components."""
+    with gr.TabItem("🗑️ Delete", elem_id="delete_tab"):
+        gr.Markdown("### Delete Operations (Placeholder)")
+        
+        delete_collection_dropdown = gr.Dropdown(
+            label="Collection",
+            choices=["placeholder"],
+            interactive=False
+        )
+        
+        delete_documents_list = gr.CheckboxGroup(
+            label="Documents to Delete",
+            choices=[],
+            interactive=False
+        )
+        
+        confirm_delete_checkbox = gr.Checkbox(
+            label="Confirm Deletion",
+            interactive=False
+        )
+        
+        delete_selected_btn = gr.Button("Delete Selected (Disabled)", interactive=False)
+        delete_output = gr.Textbox(
+            label="Delete Status",
+            value="Delete functionality temporarily disabled",
+            interactive=False
+        )
+    
+    return {
+        'delete_collection_dropdown': delete_collection_dropdown,
+        'delete_documents_list': delete_documents_list,
+        'confirm_delete_checkbox': confirm_delete_checkbox,
+        'delete_selected_btn': delete_selected_btn,
+        'delete_output': delete_output
+    }
 
 
 def create_search_tab():

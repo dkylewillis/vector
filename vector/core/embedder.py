@@ -1,0 +1,50 @@
+"""Simplified text embedder for Vector."""
+
+from sentence_transformers import SentenceTransformer
+import numpy as np
+from typing import List, Union
+
+
+class Embedder:
+    """Text embedder using sentence transformers."""
+
+    def __init__(self):
+        """Initialize the embedder."""
+
+        self.model_name = "sentence-transformers/all-MiniLM-L6-v2"
+        self.model = SentenceTransformer(self.model_name)
+
+    def embed_text(self, text: str) -> List[float]:
+        """Generate embedding for a single text.
+
+        Args:
+            text: Text string to embed
+
+        Returns:
+            List of float values representing the embedding
+        """
+        embedding = self.model.encode([text])[0]
+        return embedding.tolist()
+
+    def embed_texts(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for multiple texts.
+
+        Args:
+            texts: List of text strings to embed
+
+        Returns:
+            List of embeddings, each as a list of float values
+        """
+        if not texts:
+            return []
+        
+        embeddings = self.model.encode(texts)
+        return [embedding.tolist() for embedding in embeddings]
+
+    def get_embedding_dimension(self) -> int:
+        """Get the dimension of the embeddings.
+
+        Returns:
+            Integer dimension of embeddings
+        """
+        return self.model.get_sentence_embedding_dimension()
