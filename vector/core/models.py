@@ -16,16 +16,18 @@ from docling_core.types.doc.document import (
 )
 
 class Artifact(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+    
     artifact_id: str
     type: Literal["picture", "table"]
     ref_item: str                     # e.g., "#/table/0"
     file_ref: str                     # relative path to PNG
     headings: List[str] = Field(default_factory=list)
+    image: Optional[PILImage.Image] = None  # Loaded image (not serialized)
     before_text: Optional[str] = None
     after_text: Optional[str] = None
     caption: Optional[str] = None
     page_number: Optional[int] = None
-
 
 class Chunk(BaseModel):
     chunk_id: str
@@ -140,12 +142,16 @@ class ConvertedDocument(BaseModel):
         
         # Get caption
         caption = item.caption_text(doc=self.doc) or "Image without description"
+
+        # Extract image
+        image = item.get_image(doc=self.doc)
         
         return Artifact(
             artifact_id=item.self_ref,
             type="picture",
             ref_item=item.self_ref,
             file_ref="",  # Will be set later when saved
+            image=image,
             headings=self._get_heading_context(heading_stack),
             before_text=before_text,
             after_text=after_text,
@@ -168,6 +174,9 @@ class ConvertedDocument(BaseModel):
         # Extract table text
         table_text = self._extract_table_text(self.doc, item)
         
+        # Extract image if available
+        image = item.get_image(doc=self.doc)
+        
         # Get caption
         caption = item.caption_text(doc=self.doc) or f"Table with {len(table_text)} content"
         
@@ -179,7 +188,8 @@ class ConvertedDocument(BaseModel):
             headings=self._get_heading_context(heading_stack),
             before_text=before_text,
             after_text=after_text,
-            caption=caption
+            caption=caption,
+            image=image
         )
     
     def _get_context_text(self, items: List[Tuple], current_idx: int, direction: str, max_chars: int = 200) -> Optional[str]:

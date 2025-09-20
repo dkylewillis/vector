@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchAny, MatchValue
-from typing import Dict, List, Any, Optional, Generator
+from typing import Dict, List, Any, Optional, Generator, Union
 from pydantic import BaseModel, Field
 from pathlib import Path
 import json
@@ -125,8 +125,8 @@ class VectorStore(BaseModel):
     def insert(
         self,
         collection_name: str,
-        point_id: str,
-        vectors: Dict[str, List[float]],
+        point_id: Union[str, int],
+        vector: List[float],
         payload: Dict[str, Any],
     ) -> None:
         """Insert a point into a collection."""
@@ -135,7 +135,7 @@ class VectorStore(BaseModel):
                 try:
                     client.upsert(
                         collection_name=collection_name,
-                        points=[PointStruct(id=point_id, vector=vectors, payload=payload)],
+                        points=[PointStruct(id=point_id, vector=vector, payload=payload)],
                     )
                     print(f"Point {point_id} inserted successfully into {collection_name}.")
                 except Exception as e:

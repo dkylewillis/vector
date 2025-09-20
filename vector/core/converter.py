@@ -17,7 +17,7 @@ from .models import ConvertedDocument
 class DocumentConverter:
     """Handles document conversion using Docling."""
 
-    def __init__(self, generate_artifacts: bool = True, use_vlm_pipeline: bool = True):
+    def __init__(self, generate_artifacts: bool = True, use_vlm_pipeline: bool = False):
         """Initialize the document converter with configurable artifact generation.
 
         Args:
@@ -27,13 +27,28 @@ class DocumentConverter:
         self.generate_artifacts = generate_artifacts
         self.use_vlm_pipeline = use_vlm_pipeline
 
-        pdf_format_options = PdfFormatOption(
-            pipeline_cls=VlmPipeline if use_vlm_pipeline else None,
-            pipeline_options=VlmPipelineOptions() if use_vlm_pipeline else PdfPipelineOptions()
-        )
+        if use_vlm_pipeline:
+            pdf_pipeline_options = VlmPipelineOptions()
+            pipeline_cls = VlmPipeline
+        else:
+            pdf_pipeline_options = PdfPipelineOptions()
+            pipeline_cls = None
 
+        if generate_artifacts:
+            pdf_pipeline_options.images_scale = 2.0
+            pdf_pipeline_options.generate_picture_images = True
+            pdf_pipeline_options.generate_table_images = True
+        else:
+            pdf_pipeline_options.images_scale = 1.0
+            pdf_pipeline_options.generate_picture_images = False
 
-        self.converter = DocumentConverter(  # all of the below is optional, has internal defaults.
+        # Fix: Create PdfFormatOption with pipeline_options (not a dict)
+        pdf_format_option = PdfFormatOption(pipeline_options=pdf_pipeline_options)
+        
+        if use_vlm_pipeline:
+            pdf_format_option.pipeline_cls = pipeline_cls
+
+        self.converter = DoclingConverter(
             allowed_formats=[
                 InputFormat.PDF,
                 InputFormat.IMAGE,
@@ -43,12 +58,12 @@ class DocumentConverter:
                 InputFormat.ASCIIDOC,
                 InputFormat.CSV,
                 InputFormat.MD,
-            ],  # whitelist formats, non-matching files are ignored.
+                InputFormat.JSON_DOCLING,
+            ],
             format_options={
-                InputFormat.PDF: pdf_format_options
+                InputFormat.PDF: pdf_format_option  # Fix: Use the correct format option
             },
         )
-
 
     def convert_document(self, file_path: Path) -> DoclingDocument:
         """Convert a document file to DoclingDocument.
@@ -63,8 +78,7 @@ class DocumentConverter:
             ProcessingError: If conversion fails
         """
         file_type = self._get_file_type(file_path)
-        pipeline_type = "VLM" if self.use_vlm_pipeline else "PDF"
-        print(f"Converting: {file_path} (type: {file_type}, pipeline: {pipeline_type}, artifacts: {'enabled' if self.generate_artifacts else 'disabled'})")
+        print(f"Converting: {file_path} (type: {file_type}, artifacts: {'enabled' if self.generate_artifacts else 'disabled'})")
 
         # Convert document using Docling - it auto-detects format
         doc = self.converter.convert(str(file_path)).document
