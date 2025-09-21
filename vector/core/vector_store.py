@@ -6,62 +6,6 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 import json
 
-from .models import DocumentMetadataRecord
-
-class VectorMetadataStore:
-    def __init__(self, path: Path):
-        self.path = path
-        self._data: Dict[str, DocumentMetadataRecord] = {}
-        if path.exists():
-            self._load()
-
-    def _load(self):
-        try:
-            content = self.path.read_text().strip()
-            if not content:
-                # Empty file, initialize with empty dict
-                return
-            raw = json.loads(content)
-            self._data = {doc_id: DocumentMetadataRecord(**meta) for doc_id, meta in raw.items()}
-        except (json.JSONDecodeError, FileNotFoundError):
-            # Invalid JSON or file doesn't exist, start with empty data
-            self._data = {}
-
-    def _save(self):
-        raw = {doc_id: rec.model_dump(mode='json') for doc_id, rec in self._data.items()}
-        self.path.write_text(json.dumps(raw, indent=2))
-
-    # CRUD
-    def add(self, record: DocumentMetadataRecord):
-        self._data[record.doc_id] = record
-        self._save()
-
-    def get(self, doc_id: str) -> DocumentMetadataRecord:
-        return self._data[doc_id]
-    
-    # --- Lookup by display_name ---
-    def get_by_display_name(self, name: str) -> List[DocumentMetadataRecord]:
-        return [rec for rec in self._data.values() if rec.display_name == name]
-    
-    def get_by_tag(self, tag: str):
-        return self.get_by_tags([tag])
-
-    def get_by_tags(self, tags: List[str], match_all: bool = False) -> List[DocumentMetadataRecord]:
-        results = []
-        for rec in self._data.values():
-            if match_all and all(tag in rec.tags for tag in tags):
-                results.append(rec)
-            elif not match_all and any(tag in rec.tags for tag in tags):
-                results.append(rec)
-        return results
-    
-    def list(self):
-        return list(self._data.values())
-
-    def delete(self, doc_id: str):
-        if doc_id in self._data:
-            del self._data[doc_id]
-            self._save()
 
 class VectorStore(BaseModel):
     """A Pydantic model for managing Qdrant vector store operations."""
@@ -191,7 +135,7 @@ class VectorStore(BaseModel):
         filter_ = Filter(
             must=[
                 FieldCondition(
-                    key="doc_id",
+                    key="document_id",
                     match=MatchValue(value=document_id)
                 )
             ]
@@ -206,4 +150,16 @@ class VectorStore(BaseModel):
                 print(f"Document {document_id} deleted successfully from {collection}.")
             except Exception as e:
                 print(f"Error deleting document {document_id}: {e}")
+
+    
+    def list_documents(self, collection: str) -> List[Any]:
+        with self.get_client() as client:
+            result = client.facet(
+                collection_name=collection,
+                key="document_id",
+            )
+
+            # Extract doc_id values from facet response
+            hits = result.get("response", {}).get("hits", [])
+            return [hit["value"] for hit in hits]
 

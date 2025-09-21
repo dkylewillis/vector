@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional, List, Literal, Union, Tuple
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import json
 import io
 from datetime import datetime, timezone
@@ -14,6 +14,64 @@ from docling_core.types.doc.document import (
     PictureItem,
     SectionHeaderItem,
 )
+
+class DocumentRecord(BaseModel):
+    """Pydantic model for document registry records."""
+    
+    document_id: str
+    display_name: str
+    original_path: str
+    file_extension: str
+    registered_date: datetime
+    last_updated: datetime
+    has_artifacts: bool = False
+    artifact_count: int = 0
+    chunk_count: int = 0
+    collection_name: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    
+    @classmethod
+    def create_new(cls, file_path: Path, document_name: str) -> "DocumentRecord":
+        """Create a new document record for registration.
+        
+        Args:
+            file_path: Original file path
+            document_name: Document name used for identification
+            
+        Returns:
+            New DocumentRecord instance
+        """
+        now = datetime.now(timezone.utc)
+        return cls(
+            document_id=document_name,
+            display_name=file_path.name,
+            original_path=str(file_path.absolute()),
+            file_extension=file_path.suffix.lower(),
+            registered_date=now,
+            last_updated=now,
+        )
+    
+    def add_tags(self, tags: List[str]) -> None:
+        """Add tags to the document.
+        
+        Args:
+            tags: List of tags to add
+        """
+        current_tags = set(self.tags)
+        current_tags.update(tags)
+        self.tags = list(current_tags)
+        self.last_updated = datetime.now(timezone.utc)
+    
+    def remove_tags(self, tags: List[str]) -> None:
+        """Remove tags from the document.
+        
+        Args:
+            tags: List of tags to remove
+        """
+        current_tags = set(self.tags)
+        current_tags.difference_update(tags)
+        self.tags = list(current_tags)
+        self.last_updated = datetime.now(timezone.utc)
 
 class Artifact(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
@@ -35,56 +93,20 @@ class Chunk(BaseModel):
     page_number: Optional[int] = None
     headings: List[str] = Field(default_factory=list)
     doc_items: List[str] = Field(default_factory=list)  # links to artifacts
-    picture_items: List[str] = Field(default_factory=list)  # ref_item IDs
-    table_items: List[str] = Field(default_factory=list)  # ref_item IDs
-
-
-class DocumentMetadataRecord(BaseModel):
-    doc_id: str                          # same ID used in vector store
-    display_name: str                     # alias for UI (human-friendly name)
-    source_file_name: str
-    artifacts_collection: Optional[str] = None
-    chunks_collection: Optional[str] = None
-    aliases: Optional[List[str]] = Field(default_factory=list)
-    description: Optional[str] = None
-    tags: Optional[List[str]] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class FileInfo(BaseModel):
-    filename: str
-    size: Optional[int] = None
-    format: str                       # e.g., "pdf", "docx"
-    hash: str
-
-
-class DocumentMetadata(BaseModel):
-    page_count: int
-    conversion_date: str              # ISO string
-    pipeline_options: dict = Field(default_factory=dict)
+    picture_items: List[str] = Field(default_factory=list)  # auto-filtered from doc_items
+    table_items: List[str] = Field(default_factory=list)  # auto-filtered from doc_items
+    
+    @model_validator(mode="after")
+    def _derive_picture_and_table_items(self):
+        lowered = [s.lower() for s in self.doc_items]
+        self.picture_items = [s for s, l in zip(self.doc_items, lowered) if "pictures" in l]
+        self.table_items = [s for s, l in zip(self.doc_items, lowered) if "table" in l]
+        return self
+    
 
 
 class ConvertedDocument(BaseModel):
     doc: DoclingDocument
-    
-    # ---- Helpers ----
-    def get_images(self) -> List[Artifact]:
-        return []
-    
-    def get_image_by_ref(self, ref_item: str) -> Optional[Artifact]:
-        return None
-
-    def get_tables(self) -> List[Artifact]:
-        return []
-    
-    def get_table_by_ref(self, ref_item: str) -> Optional[Artifact]:
-        return None
-    
-    def get_chunks(self) -> List[Chunk]:
-        from .chunker import DocumentChunker
-        return DocumentChunker().chunk_document(self.doc)
-    
-    def embed(self) -> None:
-        pass
     
     @classmethod
     def load_converted_document(cls, filename: Union[str, Path]) -> ConvertedDocument:
@@ -101,6 +123,10 @@ class ConvertedDocument(BaseModel):
             return cls(doc=doc)
         except Exception as e:
             raise ValueError(f"Failed to load document from {filename}: {e}")
+        
+    def get_chunks(self) -> List[Chunk]:
+        from .chunker import DocumentChunker
+        return DocumentChunker().chunk_document(self.doc)
 
     def get_artifacts(self) -> List[Artifact]:
         """Process artifacts and return structured data.
