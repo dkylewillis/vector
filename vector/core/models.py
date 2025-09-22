@@ -27,30 +27,10 @@ class DocumentRecord(BaseModel):
     has_artifacts: bool = False
     artifact_count: int = 0
     chunk_count: int = 0
-    collection_name: Optional[str] = None
+    chunk_collection: Optional[str] = None
+    artifact_collection: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    
-    @classmethod
-    def create_new(cls, file_path: Path, document_name: str) -> "DocumentRecord":
-        """Create a new document record for registration.
-        
-        Args:
-            file_path: Original file path
-            document_name: Document name used for identification
-            
-        Returns:
-            New DocumentRecord instance
-        """
-        now = datetime.now(timezone.utc)
-        return cls(
-            document_id=document_name,
-            display_name=file_path.name,
-            original_path=str(file_path.absolute()),
-            file_extension=file_path.suffix.lower(),
-            registered_date=now,
-            last_updated=now,
-        )
-    
+
     def add_tags(self, tags: List[str]) -> None:
         """Add tags to the document.
         
@@ -75,7 +55,7 @@ class DocumentRecord(BaseModel):
 
 class Artifact(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
-    
+
     artifact_id: str
     type: Literal["picture", "table"]
     ref_item: str                     # e.g., "#/table/0"

@@ -154,12 +154,39 @@ class VectorStore(BaseModel):
     
     def list_documents(self, collection: str) -> List[Any]:
         with self.get_client() as client:
-            result = client.facet(
-                collection_name=collection,
-                key="document_id",
-            )
-
-            # Extract doc_id values from facet response
-            hits = result.get("response", {}).get("hits", [])
-            return [hit["value"] for hit in hits]
+            try:
+                result = client.facet(
+                    collection_name=collection,
+                    key="document_id",
+                )
+                
+                # Handle different possible response structures
+                if hasattr(result, 'hits'):
+                    return [hit.value for hit in result.hits]
+                elif isinstance(result, dict) and "hits" in result:
+                    return [hit["value"] for hit in result["hits"]]
+                else:
+                    # Fallback: scroll through all points to get unique document_ids
+                    points, _ = client.scroll(
+                        collection_name=collection,
+                        limit=10000,  # Large number to get all points
+                        with_payload=True
+                    )
+                    document_ids = set()
+                    for point in points:
+                        if point.payload and "document_id" in point.payload:
+                            document_ids.add(point.payload["document_id"])
+                    return list(document_ids)
+            except Exception as e:
+                # Fallback method if facet doesn't work
+                points, _ = client.scroll(
+                    collection_name=collection,
+                    limit=10000,
+                    with_payload=True
+                )
+                document_ids = set()
+                for point in points:
+                    if point.payload and "document_id" in point.payload:
+                        document_ids.add(point.payload["document_id"])
+                return list(document_ids)
 

@@ -1,8 +1,9 @@
-"""Web interface main entry point for Vector (placeholder during core refactoring)."""
+"""Web interface main entry point for Vector."""
 
 import gradio as gr
 from pathlib import Path
 
+from ..config import Config
 from .service import VectorWebService
 from .components import (
     create_header, create_collection_selector,
@@ -14,26 +15,37 @@ from .handlers import connect_events
 
 
 def create_vector_app() -> gr.Blocks:
-    """Create the main Gradio application (placeholder)."""
+    """Create the main Gradio application."""
     
-    # Initialize Vector web service (placeholder mode)
-    web_service = VectorWebService(config=None)
+    # Initialize Vector web service with config
+    config = Config()
+    web_service = VectorWebService(config=config)
     
-    with gr.Blocks(title="Vector - Placeholder Mode") as app:
+    # Get initial documents from registry
+    initial_documents = web_service.get_registry_documents()
+    
+    with gr.Blocks(title="Vector - Document Search & AI") as app:
         
         # Header
         create_header()
         
-        # Collection selector
+        # Main interface without collection selector
         with gr.Row():
             with gr.Column(scale=1):
-                collection_dropdown, refresh_btn, documents_checkboxgroup = create_collection_selector(
-                    ["placeholder"], "placeholder", []
+                # Documents list
+                gr.Markdown("**Documents**")
+                documents_checkboxgroup = gr.CheckboxGroup(
+                    label="Select Documents",
+                    choices=initial_documents,
+                    value=[],
+                    interactive=True
                 )
+                refresh_docs_btn = gr.Button("Refresh Documents", interactive=True)
+                
             with gr.Column(scale=3):
                 # Main tabs
                 with gr.Tabs():
-                    # Create all tabs (all disabled/placeholder)
+                    # Create all tabs
                     search_components = create_search_tab()
                     upload_components = create_upload_tab()
                     info_components = create_info_tab()
@@ -42,9 +54,9 @@ def create_vector_app() -> gr.Blocks:
                     collection_documents_components = create_collection_documents_tab()
                     delete_components = create_delete_tab()
                 
-                # Connect event handlers (placeholder - no actual connections)
+                # Connect event handlers
                 connect_events(
-                    web_service, collection_dropdown, refresh_btn,
+                    web_service, None, refresh_docs_btn,
                     search_components, upload_components, info_components,
                     management_components, document_management_components, 
                     collection_documents_components, delete_components,
@@ -55,9 +67,8 @@ def create_vector_app() -> gr.Blocks:
 
 
 def main():
-    """Main entry point for web interface (placeholder)."""
-    print("🚀 Starting Vector Web Interface in Placeholder Mode...")
-    print("⚠️  All functionality disabled during core refactoring")
+    """Main entry point for web interface."""
+    print("🚀 Starting Vector Web Interface...")
     print("📍 Navigate to: http://127.0.0.1:7860")
     
     app = create_vector_app()

@@ -1,7 +1,9 @@
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Optional, Union
 from datetime import datetime, timezone
+import uuid
 from .models import Chunk, Artifact, DocumentRecord
 
 class VectorRegistry:
@@ -15,21 +17,30 @@ class VectorRegistry:
         """
         self.registry_path = Path(registry_path)
         self.registry_path.mkdir(parents=True, exist_ok=True)
-    
+
+
     def register_document(self, file_path: Path, document_name: str) -> DocumentRecord:
-        """Register a new document in the registry.
+        """Register a new document with unique display name handling."""
+        # Generate unique display name
+        unique_display_name = self._generate_unique_display_name(file_path.name, document_name)
+        document_id = uuid.uuid4().hex
         
-        Args:
-            file_path: Original file path
-            document_name: Document name used for identification
-            
-        Returns:
-            Created DocumentRecord instance
-        """
-        document_record = DocumentRecord.create_new(file_path, document_name)
+        document_record = DocumentRecord(
+            document_id=document_id,
+            display_name=unique_display_name,  # Use unique name
+            original_path=str(file_path.absolute()),
+            file_extension=file_path.suffix.lower(),
+            registered_date=datetime.now(timezone.utc),
+            last_updated=datetime.now(timezone.utc),
+            has_artifacts=False,
+            artifact_count=0,
+            chunk_count=0,
+            collection_name=None,
+            tags=[]
+        )
         
-        self._save_document_record(document_name, document_record)
-        print(f"✅ Registered document: {document_name}")
+        self._save_document_record(document_id, document_record)
+        print(f"✅ Registered document: {unique_display_name}")
         return document_record
         
     def get_document_info(self, document_id: str) -> Optional[DocumentRecord]:
@@ -95,10 +106,7 @@ class VectorRegistry:
                     data['registered_date'] = datetime.fromisoformat(data['registered_date'])
                     data['last_updated'] = datetime.fromisoformat(data['last_updated'])
                     document_record = DocumentRecord(**data)
-                    
-                    # Apply status filter if specified
-                    if status is None or document_record.status == status:
-                        documents.append(document_record)
+                    documents.append(document_record)
                         
             except Exception as e:
                 print(f"Error reading record file {record_file}: {e}")
@@ -220,3 +228,51 @@ class VectorRegistry:
         except Exception as e:
             print(f"Error saving document record for {document_id}: {e}")
             return False
+
+    def update_display_name(self, document_id: str, new_display_name: str) -> bool:
+        """Update display name ensuring uniqueness.
+        
+        Args:
+            document_id: Document to update
+            new_display_name: Desired new display name
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        document_record = self.get_document_info(document_id)
+        if not document_record:
+            return False
+        
+        # Generate unique version of the desired name
+        unique_name = self._generate_unique_display_name(new_display_name, document_id)
+        
+        document_record.display_name = unique_name
+        return self.update_document(document_record)
+
+    def _generate_unique_display_name(self, base_display_name: str, document_id: str) -> str:
+        """Generate a unique display name by adding suffix if needed.
+        
+        Args:
+            base_display_name: Original display name
+            document_id: ID of the current document (to exclude from conflict check)
+            
+        Returns:
+            Unique display name
+        """
+        # Check if base name is already unique
+        existing_docs = self.list_documents()
+        #existing_names = [doc.display_name for doc in existing_docs if doc.document_id != document_id]
+        existing_names = [doc.display_name for doc in existing_docs]
+        
+        if base_display_name not in existing_names:
+            return base_display_name
+        
+        # Generate unique name with counter
+        base_name, extension = os.path.splitext(base_display_name)
+        counter = 1
+        
+        while True:
+            candidate_name = f"{base_name} ({counter}){extension}"
+            if candidate_name not in existing_names:
+                return candidate_name
+            counter += 1

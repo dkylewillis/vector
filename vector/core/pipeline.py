@@ -72,8 +72,13 @@ class VectorPipeline:
         print(f"✅ Generated embeddings for {len(embeddings)} chunks")
         return embeddings
 
-    def store_chunks(self, chunks: List[Chunk], embeddings: List[List[float]], 
-                    document_record: DocumentRecord, collection_name: str = "documents") -> None:
+    def store_chunks(
+        self,
+        chunks: List[Chunk],
+        embeddings: List[List[float]],
+        document_record: DocumentRecord,
+        collection_name: str = "chunks"
+        ) -> None:
         """Store chunks with document metadata in payload."""
         
         for chunk, embedding in zip(chunks, embeddings):
@@ -82,23 +87,68 @@ class VectorPipeline:
                 "chunk_id": chunk.chunk_id,
                 "text": chunk.text,
                 "headings": chunk.headings,
-                "doc_items": chunk.doc_items,
+                'pictures': chunk.picture_items,
+                'tables': chunk.table_items,
                 "page_number": chunk.page_number,
                 
                 # Document-level metadata (from registry)
                 "document_id": document_record.document_id,
-                "display_name": document_record.display_name,
-                "tags": document_record.tags,
                 "registered_date": document_record.registered_date.isoformat(),
             }
             
             self.store.insert(collection_name, str(uuid.uuid4()), embedding, payload)
 
     def embed_artifacts(self, artifacts: List[Artifact]) -> List[List[float]]:
-        pass
+        """Generate embeddings for artifacts.
+        
+        Args:
+            artifacts: List of Artifact objects
+            
+        Returns:
+            List of embeddings
+        """
+        artifact_texts = []
+        for artifact in artifacts:
+            artifact_text = (
+                f"Headings: {artifact.headings or ''}\n"
+                f"Caption: {artifact.caption or ''}\n"
+                f"Before Text: {artifact.before_text or ''}\n"
+                f"After Text: {artifact.after_text or ''}"
+            )
+            artifact_texts.append(artifact_text)
+            
+        embeddings = self.embedder.embed_texts(artifact_texts)
+        print(f"✅ Generated embeddings for {len(embeddings)} artifacts")
+        return embeddings
 
-    def store_artifacts(self, artifacts: List[Artifact], document_record: DocumentRecord, collection_name: str = "artifacts") -> None:
-        pass
+    def store_artifacts(
+        self,
+        artifacts: List[Artifact],
+        embeddings: List[List[float]],
+        document_record: DocumentRecord,
+        collection_name: str = "artifacts"
+    ) -> None:
+        """Store artifacts with document metadata in payload."""
+        
+        for artifact, embedding in zip(artifacts, embeddings):
+            payload = {
+                # Artifact-specific data
+                "artifact_id": artifact.artifact_id,
+                "type": artifact.type,
+                "ref_item": artifact.ref_item,
+                "file_ref": artifact.file_ref,
+                "headings": artifact.headings,
+                "before_text": artifact.before_text,
+                "after_text": artifact.after_text,
+                "caption": artifact.caption,
+                "page_number": artifact.page_number,
+                
+                # Document-level metadata (from registry)
+                "document_id": document_record.document_id,
+                "registered_date": document_record.registered_date.isoformat(),
+            }
+            
+            self.store.insert(collection_name, str(uuid.uuid4()), embedding, payload)
 
     def create_thumbnail(self, image: Image.Image, thumbnail_size: tuple = (200, 200)) -> Image.Image:
         """Create a thumbnail from a PIL image.
@@ -195,12 +245,11 @@ class VectorPipeline:
         except Exception as e:
             print(f"❌ Failed to save converted document: {e}")
 
-    def run(self, file_path: str, collection_name: str = "test_collection") -> str:
+    def run(self, file_path: str) -> str:
         """Process a file through the complete pipeline.
 
         Args:
             file_path: Path to the file to process.
-            collection_name: Name of the collection to store in.
 
         Returns:
             Document ID (derived from file stem).
@@ -208,6 +257,8 @@ class VectorPipeline:
         file_path = Path(file_path)
         document_name = file_path.stem
         base_path = "data/converted_documents"
+        chunk_collection = "chunks"
+        artifact_collection = "artifacts"
 
         converted_doc = self.convert(str(file_path))
         chunks, artifacts = self.chunk(converted_doc)
@@ -231,21 +282,22 @@ class VectorPipeline:
 
         # Register document in registry
         document_record = self.registry.register_document(file_path, document_name)
-        document_record.document_id = uuid.uuid4().hex
-        document_record.display_name = file_path.name
-        document_record.original_path = str(file_path.absolute())
-        document_record.file_extension = file_path.suffix.lower()
-        document_record.registered_date = datetime.now(timezone.utc)
-        document_record.last_updated = datetime.now(timezone.utc)
         document_record.has_artifacts = len(artifacts) > 0
         document_record.artifact_count = len(artifacts)
         document_record.chunk_count = len(chunks)
-        document_record.collection_name = collection_name
+        document_record.chunk_collection = chunk_collection
+        document_record.artifact_collection = artifact_collection
         document_record.tags = []
         self.registry.update_document(document_record)
 
-        embeddings = self.embed_chunks(chunks)
-        self.store_chunks(chunks, embeddings, document_record, collection_name=collection_name)
+        chunk_embeddings = self.embed_chunks(chunks)
+        self.store_chunks(chunks, chunk_embeddings, document_record, collection_name=chunk_collection)
+
+        if artifacts:
+            artifact_embeddings = self.embed_artifacts(artifacts)
+            self.store_artifacts(artifacts, artifact_embeddings, document_record, collection_name=artifact_collection)
+
 
         print(f"✅ Pipeline completed for {file_path.name}")
         return file_path.stem
+    

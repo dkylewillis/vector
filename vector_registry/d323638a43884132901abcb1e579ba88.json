@@ -1,13 +1,14 @@
 {
-  "document_id": "55d421469ddc4b41adda4a36377cb96d",
+  "document_id": "d323638a43884132901abcb1e579ba88",
   "display_name": "gsmm_75_85.pdf",
   "original_path": "E:\\02-regscout\\data\\source_documents\\GSMM\\gsmm_75_85.pdf",
   "file_extension": ".pdf",
-  "registered_date": "2025-09-21T03:00:30.226385+00:00",
-  "last_updated": "2025-09-21T03:00:30.226409+00:00",
+  "registered_date": "2025-09-21T19:52:51.035741+00:00",
+  "last_updated": "2025-09-21T19:52:51.036172+00:00",
   "has_artifacts": true,
   "artifact_count": 10,
   "chunk_count": 24,
-  "collection_name": "text_chunks",
+  "chunk_collection": "chunks",
+  "artifact_collection": "artifacts",
   "tags": []
 }
