@@ -15,6 +15,23 @@ from docling_core.types.doc.document import (
     SectionHeaderItem,
 )
 
+
+def get_item_by_ref(doc: DoclingDocument, ref: str):
+    """Find a document item by its reference string.
+    
+    Args:
+        doc: DoclingDocument to search
+        ref: Reference string to find (e.g., "#/table/0")
+        
+    Returns:
+        The matching item or None if not found
+    """
+    for item, _ in doc.iterate_items():
+        if getattr(item, "self_ref", None) == ref:
+            return item
+    return None
+
+
 class DocumentRecord(BaseModel):
     """Pydantic model for document registry records."""
     
@@ -56,16 +73,58 @@ class DocumentRecord(BaseModel):
 class Artifact(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
-    artifact_id: str
-    type: Literal["picture", "table"]
-    ref_item: str                     # e.g., "#/table/0"
-    file_ref: str                     # relative path to PNG
-    headings: List[str] = Field(default_factory=list)
-    image: Optional[PILImage.Image] = None  # Loaded image (not serialized)
+    self_ref: str
+    type: Literal["picture", "table"]                    # e.g., "#/table/0"
+    image_file_path: Optional[str] = None    # relative path to PNG
+    headings: Optional[List[str]] = Field(default_factory=list)
     before_text: Optional[str] = None
     after_text: Optional[str] = None
     caption: Optional[str] = None
     page_number: Optional[int] = None
+
+    @classmethod
+    def from_picture_item(
+        cls,
+        item: PictureItem,
+        doc: DoclingDocument,
+        headings: Optional[List[str]] = None,
+        before_text: Optional[str] = None,
+        after_text: Optional[str] = None
+    ) -> "Artifact":
+        """Create Artifact from PictureItem."""
+        caption = item.caption_text(doc=doc) or "Image without description"
+        
+        return cls(
+            self_ref=item.self_ref,
+            type="picture",
+            image_file_path="",  # Will be set later when saved
+            headings=headings if headings is not None else [],
+            before_text=before_text,
+            after_text=after_text,
+            caption=caption
+        )
+    
+    @classmethod
+    def from_table_item(
+        cls,
+        item: TableItem,
+        doc: DoclingDocument,
+        headings: Optional[List[str]] = None,
+        before_text: Optional[str] = None,
+        after_text: Optional[str] = None
+    ) -> "Artifact":
+        """Create Artifact from TableItem."""
+        caption = item.caption_text(doc=doc) or "Table without description"
+        
+        return cls(
+            self_ref=item.self_ref,
+            type="table",
+            image_file_path="",
+            headings=headings if headings is not None else [],
+            before_text=before_text,
+            after_text=after_text,
+            caption=caption,
+        )
 
 class Chunk(BaseModel):
     chunk_id: str
@@ -73,15 +132,14 @@ class Chunk(BaseModel):
     page_number: Optional[int] = None
     headings: List[str] = Field(default_factory=list)
     doc_items: List[str] = Field(default_factory=list)  # links to artifacts
-    picture_items: List[str] = Field(default_factory=list)  # auto-filtered from doc_items
-    table_items: List[str] = Field(default_factory=list)  # auto-filtered from doc_items
-    
-    @model_validator(mode="after")
-    def _derive_picture_and_table_items(self):
-        lowered = [s.lower() for s in self.doc_items]
-        self.picture_items = [s for s, l in zip(self.doc_items, lowered) if "pictures" in l]
-        self.table_items = [s for s, l in zip(self.doc_items, lowered) if "table" in l]
-        return self
+    artifacts: List[Artifact] = Field(default_factory=list)  # auto-filtered from doc_items
+
+    # @model_validator(mode="after")
+    # def _derive_picture_and_table_items(self):
+    #     lowered = [s.lower() for s in self.doc_items]
+    #     self.picture_items = [s for s, l in zip(self.doc_items, lowered) if "pictures" in l]
+    #     self.table_items = [s for s, l in zip(self.doc_items, lowered) if "table" in l]
+    #     return self
     
 
 
@@ -121,82 +179,47 @@ class ConvertedDocument(BaseModel):
         for idx, (item, level) in enumerate(items):
             if isinstance(item, SectionHeaderItem):
                 heading_stack = self._update_heading_stack(heading_stack, item, level)
-            elif isinstance(item, PictureItem):
-                artifact = self._process_picture_item(item, level, heading_stack.copy(), items, idx)
-                if artifact:
-                    artifacts.append(artifact)
-            elif isinstance(item, TableItem):
-                artifact = self._process_table_item(item, level, heading_stack.copy(), items, idx)
+            elif isinstance(item, (PictureItem, TableItem)):
+                artifact = self._process_artifact_item(item, level, heading_stack.copy(), items, idx)
                 if artifact:
                     artifacts.append(artifact)
         
         return artifacts
     
-    def _process_picture_item(
+    def _process_artifact_item(
         self,
-        item: PictureItem,
+        item: Union[PictureItem, TableItem],
         level: int,
         heading_stack: List[Dict],
         items: List,
         idx: int
     ) -> Optional[Artifact]:
-        """Process a picture item into an Artifact."""
+        """Process a picture or table item into an Artifact."""
         
         # Get context text
         before_text = self._get_context_text(items, idx, direction="before", max_chars=200)
         after_text = self._get_context_text(items, idx, direction="after", max_chars=200)
+        headings = self._get_heading_context(heading_stack)
         
-        # Get caption
-        caption = item.caption_text(doc=self.doc) or "Image without description"
-
-        # Extract image
-        image = item.get_image(doc=self.doc)
-        
-        return Artifact(
-            artifact_id=item.self_ref,
-            type="picture",
-            ref_item=item.self_ref,
-            file_ref="",  # Will be set later when saved
-            image=image,
-            headings=self._get_heading_context(heading_stack),
-            before_text=before_text,
-            after_text=after_text,
-            caption=caption
-        )
-    def _process_table_item(
-        self,
-        item: TableItem,
-        level: int,
-        heading_stack: List[Dict],
-        items: List,
-        idx: int
-    ) -> Optional[Artifact]:
-        """Process a table item into a ProcessedArtifact."""
-        
-        # Get context text
-        before_text = self._get_context_text(items, idx, direction="before", max_chars=200)
-        after_text = self._get_context_text(items, idx, direction="after", max_chars=200)
-        
-        # Extract table text
-        table_text = self._extract_table_text(self.doc, item)
-        
-        # Extract image if available
-        image = item.get_image(doc=self.doc)
-        
-        # Get caption
-        caption = item.caption_text(doc=self.doc) or f"Table with {len(table_text)} content"
-        
-        return Artifact(
-            artifact_id=item.self_ref,
-            type="table",
-            ref_item=item.self_ref,
-            file_ref="",  # Will be set later when saved
-            headings=self._get_heading_context(heading_stack),
-            before_text=before_text,
-            after_text=after_text,
-            caption=caption,
-            image=image
-        )
+        # Use appropriate factory method based on item type
+        if isinstance(item, PictureItem):
+            return Artifact.from_picture_item(
+                item=item,
+                doc=self.doc,
+                headings=headings,
+                before_text=before_text,
+                after_text=after_text
+            )
+        elif isinstance(item, TableItem):
+            return Artifact.from_table_item(
+                item=item,
+                doc=self.doc,
+                headings=headings,
+                before_text=before_text,
+                after_text=after_text
+            )
+        else:
+            return None
     
     def _get_context_text(self, items: List[Tuple], current_idx: int, direction: str, max_chars: int = 200) -> Optional[str]:
         """Extract context text before or after the current item."""

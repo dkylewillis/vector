@@ -81,7 +81,6 @@ class VectorStore(BaseModel):
                         collection_name=collection_name,
                         points=[PointStruct(id=point_id, vector=vector, payload=payload)],
                     )
-                    print(f"Point {point_id} inserted successfully into {collection_name}.")
                 except Exception as e:
                     print(f"Error inserting point: {e}")
             else:

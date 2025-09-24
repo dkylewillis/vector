@@ -276,3 +276,8 @@ class VectorRegistry:
             if candidate_name not in existing_names:
                 return candidate_name
             counter += 1
+
+
+    def get_artifact_filepath(self, ref_id: str, document_id: str) -> str:
+        """Get path to image assets."""
+        print(self.get_document_info(document_id))

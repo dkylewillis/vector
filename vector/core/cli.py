@@ -5,8 +5,8 @@ import json
 import sys
 from typing import List, Optional
 from pathlib import Path
-from ..core.vector_store import VectorStore
-from ..core.models import DocumentRecord
+from .vector_store import VectorStore
+from .models import DocumentRecord
 
 
 class VectorStoreCLI:

@@ -6,7 +6,7 @@ from vector.core.pipeline import VectorPipeline
 
 
 pipeline = VectorPipeline()
-test_file = r'data/source_documents/GSMM/gsmm_75_85.pdf'
+test_file = r'data/source_documents/Coweta/ordinances/APPENDIX_A___ZONING_AND_DEVELOPMENT.docx'
 pipeline.run(test_file)
 
 

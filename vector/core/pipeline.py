@@ -11,10 +11,11 @@ from .converter import DocumentConverter
 from .chunker import DocumentChunker
 from .embedder import Embedder
 from .vector_store import VectorStore
-from .models import ConvertedDocument, Chunk, Artifact
+from .models import ConvertedDocument, Chunk, Artifact, get_item_by_ref
 from .document_registry import VectorRegistry, DocumentRecord
 
-from docling_core.types.doc.document import ImageRefMode
+from docling_core.types.doc.document import ImageRefMode, DoclingDocument
+
 
 
 class VectorPipeline:
@@ -84,12 +85,7 @@ class VectorPipeline:
         for chunk, embedding in zip(chunks, embeddings):
             payload = {
                 # Chunk-specific data
-                "chunk_id": chunk.chunk_id,
-                "text": chunk.text,
-                "headings": chunk.headings,
-                'pictures': chunk.picture_items,
-                'tables': chunk.table_items,
-                "page_number": chunk.page_number,
+                "chunk": chunk.model_dump_json(),
                 
                 # Document-level metadata (from registry)
                 "document_id": document_record.document_id,
@@ -133,15 +129,7 @@ class VectorPipeline:
         for artifact, embedding in zip(artifacts, embeddings):
             payload = {
                 # Artifact-specific data
-                "artifact_id": artifact.artifact_id,
-                "type": artifact.type,
-                "ref_item": artifact.ref_item,
-                "file_ref": artifact.file_ref,
-                "headings": artifact.headings,
-                "before_text": artifact.before_text,
-                "after_text": artifact.after_text,
-                "caption": artifact.caption,
-                "page_number": artifact.page_number,
+                'artifact': artifact.model_dump_json(),
                 
                 # Document-level metadata (from registry)
                 "document_id": document_record.document_id,
@@ -164,7 +152,7 @@ class VectorPipeline:
         thumbnail.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
         return thumbnail
 
-    def save_artifacts(self, artifacts: List[Artifact], document_name: str, 
+    def save_artifacts(self, doc: DoclingDocument, artifacts: List[Artifact], document_name: str, 
                       base_path: str = "data/converted_documents", 
                       create_thumbnails: bool = False, 
                       thumbnail_size: tuple = (200, 200)) -> None:
@@ -190,9 +178,11 @@ class VectorPipeline:
         thumbnail_count = 0
         
         for artifact in artifacts:
-            if artifact.image is not None:
+            item = get_item_by_ref(doc, artifact.self_ref)
+            image = item.get_image(doc=doc)
+            if image is not None:
                 # Generate filename from artifact ID
-                artifact_id = artifact.artifact_id.replace("/", "_").replace("#", "")
+                artifact_id = artifact.self_ref.replace("/", "_").replace("#", "")
                 # Remove leading underscore if present
                 if artifact_id.startswith("_"):
                     artifact_id = artifact_id[1:]
@@ -201,14 +191,14 @@ class VectorPipeline:
                 
                 try:
                     # Save PIL image as PNG
-                    artifact.image.save(str(file_path), "PNG")
-                    # Update artifact's file_ref to point to saved file
-                    artifact.file_ref = str(file_path)
+                    image.save(str(file_path), "PNG")
+                    # Update artifact's image_file_path to point to saved file
+                    artifact.image_file_path = str(file_path)
                     saved_count += 1
                     
                     # Create thumbnail if requested
                     if create_thumbnails:
-                        thumbnail = self.create_thumbnail(artifact.image, thumbnail_size)
+                        thumbnail = self.create_thumbnail(image, thumbnail_size)
                         thumbnail_filename = f"thumb_{artifact_id}.png"
                         thumbnail_path = artifacts_dir / thumbnail_filename
                         
@@ -216,7 +206,7 @@ class VectorPipeline:
                         thumbnail_count += 1
                         
                 except Exception as e:
-                    print(f"❌ Failed to save artifact {artifact.artifact_id}: {e}")
+                    print(f"❌ Failed to save artifact {artifact.self_ref}: {e}")
         
         print(f"✅ Saved {saved_count} artifact images to {artifacts_dir}")
         if create_thumbnails:
@@ -273,6 +263,7 @@ class VectorPipeline:
         # Save artifacts if any
         if artifacts:
             self.save_artifacts(
+                converted_doc.doc,
                 artifacts,
                 document_name,
                 base_path=base_path,

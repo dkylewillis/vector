@@ -5,7 +5,7 @@ from .commands import main
 
 
 def cli():
-    """Vector Core CLI - Manage vector stores and operations."""
+    """Vector Core CLI - Manage vector stores and low-level operations."""
     main()
 
 

@@ -11,7 +11,7 @@ from docling_core.transforms.chunker.hierarchical_chunker import (
 )
 from docling_core.transforms.serializer.markdown import MarkdownParams
 
-from .models import Chunk
+from .models import Chunk, Artifact, get_item_by_ref
 
 
 class ImgPlaceholderSerializerProvider(ChunkingSerializerProvider):
@@ -69,8 +69,13 @@ class DocumentChunker:
         processed_chunks = []
         for doc_chunk in chunks:  # Renamed to avoid variable collision            
             doc_items = [it.self_ref for it in doc_chunk.meta.doc_items]
-            picture_items = [it.self_ref for it in doc_chunk.meta.doc_items if "pictures" in it.self_ref]
-            table_items = [it.self_ref for it in doc_chunk.meta.doc_items if "tables" in it.self_ref]
+
+            picture_items = [get_item_by_ref(doc, ref) for ref in doc_items if "pictures" in ref]
+            table_items = [get_item_by_ref(doc, ref) for ref in doc_items if "tables" in ref]
+            artifacts = (
+                [Artifact.from_picture_item(item, doc) for item in picture_items if item is not None] +
+                [Artifact.from_table_item(item, doc) for item in table_items if item is not None]
+            )
             contextualized_text = self.chunker.contextualize(chunk=doc_chunk)
 
             # Create our Chunk model
@@ -80,8 +85,7 @@ class DocumentChunker:
                 page_number=None,  # Not available in this version
                 headings=getattr(doc_chunk.meta, 'headings', []),  # Use safe attribute access
                 doc_items=doc_items,
-                picture_items=picture_items,
-                table_items=table_items
+                artifacts=artifacts,
             )
             
             processed_chunks.append(processed_chunk)

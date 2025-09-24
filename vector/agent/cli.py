@@ -12,7 +12,17 @@ def main():
     """Main entry point for vector-agent CLI."""
     parser = argparse.ArgumentParser(
         prog="vector-agent", 
-        description="Vector research agent CLI for search"
+        description="Vector Agent CLI - AI-powered search and question answering operations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  vector-agent ask "What are the parking requirements?" --type both --length medium
+  vector-agent search "building permits" --type chunks --top-k 10
+  vector-agent model-info
+  vector-agent collection-info
+
+For low-level vector operations, use 'vector-core' instead.
+        """
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands", required=True)
 

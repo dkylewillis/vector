@@ -85,6 +85,11 @@ class ResearchAgent:
                 type="chunk",
                 metadata=result.payload
             ))
+
+        for result in search_results:
+            pictures = result.metadata.get('pictures')
+            if pictures:
+                print(f"Picture URL: {pictures[0]}")
         
         return search_results
 
