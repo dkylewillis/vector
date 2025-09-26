@@ -2,7 +2,9 @@
 
 import warnings
 from typing import List, Dict, Any, Optional, Union
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
+
+from vector.core.models import Chunk, Artifact
 
 from ..config import Config
 from ..exceptions import VectorError, AIServiceError
@@ -13,15 +15,15 @@ from ..core.vector_store import VectorStore
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modules.module")
 
 
-@dataclass
-class SearchResult:
-    """Simple search result container."""
-    id: str
-    score: float
-    text: str
-    filename: str
-    type: str
-    metadata: Dict[str, Any]
+class SearchResult(BaseModel):
+    """Search result container with validation."""
+    id: str = Field(..., description="Unique identifier")
+    score: float = Field(..., ge=0.0, le=1.0, description="Relevance score")
+    text: str = Field(..., description="Result content")
+    filename: str = Field(..., description="Source filename")
+    type: str = Field(..., description="Result type (chunk/artifact)")
+    chunk: Optional[Chunk] = None
+    artifact: Optional[Artifact] = None
 
 
 class ResearchAgent:
@@ -77,19 +79,31 @@ class ResearchAgent:
         # Convert to SearchResult objects
         search_results = []
         for result in results:
+
+            try:
+                # Convert string to dictionary first, then validate
+                import json
+                chunk_data = result.payload.get('chunk', {})
+                
+                # If chunk_data is a string, parse it as JSON
+                if isinstance(chunk_data, str):
+                    chunk_data = json.loads(chunk_data)
+                
+                # Now validate with Pydantic
+                chunk = Chunk.model_validate(chunk_data)
+
+               
+            except Exception as e:
+                print(f"Warning: Could not validate chunk: {e}")
+
             search_results.append(SearchResult(
                 id=str(result.id),
                 score=result.score,
                 text=result.payload.get("text", ""),
                 filename=result.payload.get("document_id", "Unknown"),
                 type="chunk",
-                metadata=result.payload
+                chunk=chunk
             ))
-
-        for result in search_results:
-            pictures = result.metadata.get('pictures')
-            if pictures:
-                print(f"Picture URL: {pictures[0]}")
         
         return search_results
 
@@ -111,6 +125,26 @@ class ResearchAgent:
         
         # Search the artifacts database
         results = self.store.search(query_vector, self.artifacts_collection, top_k)
+
+        # Convert to SearchResult objects
+        search_results = []
+        for result in results:
+
+            try:
+                # Convert string to dictionary first, then validate
+                import json
+                artifact_data = result.payload.get('artifact', {})
+                
+                # If artifact_data is a string, parse it as JSON
+                if isinstance(artifact_data, str):
+                    artifact_data = json.loads(artifact_data)
+                
+                # Now validate with Pydantic
+                artifact = Artifact.model_validate(artifact_data)
+               
+            except Exception as e:
+                print(f"Warning: Could not validate artifact: {e}")
+
         
         # Convert to SearchResult objects
         search_results = []
@@ -132,7 +166,7 @@ class ResearchAgent:
                 text=" | ".join(text_parts) if text_parts else "Artifact",
                 filename=result.payload.get("document_id", "Unknown"),
                 type=result.payload.get("type", "artifact"),
-                metadata=result.payload
+                artifact=artifact
             ))
         
         return search_results
@@ -232,14 +266,6 @@ class ResearchAgent:
         except Exception as e:
             raise AIServiceError(f"Failed to generate AI response: {e}")
         
-        # Debug output
-        chunk_count = len([r for r in results if r.type == 'chunk'])
-        artifact_count = len([r for r in results if r.type in ['table', 'picture', 'artifact']])
-        print(f"Chunk Results Count: {chunk_count}")
-        print(f"Artifact Results Count: {artifact_count}")
-        print(f"Total Results Used: {len(results)}")
-        print()
-        
         return (response, results)
     
     def _build_context(self, search_results: List[SearchResult]) -> str:
@@ -323,3 +349,4 @@ class ResearchAgent:
             f"Artifacts collection: {self.artifacts_collection}"
         ]
         return "\n".join(info_parts)
+    

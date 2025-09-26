@@ -203,6 +203,7 @@ class VectorPipeline:
                         thumbnail_path = artifacts_dir / thumbnail_filename
                         
                         thumbnail.save(str(thumbnail_path), "PNG")
+                        artifact.image_thumbnail_path = str(thumbnail_path)
                         thumbnail_count += 1
                         
                 except Exception as e:
@@ -292,3 +293,98 @@ class VectorPipeline:
         print(f"✅ Pipeline completed for {file_path.name}")
         return file_path.stem
     
+
+    def delete_document(self, document_id: str, cleanup_files: bool = True) -> bool:
+        """Delete a document and all its associated data.
+        
+        Args:
+            document_id: Document identifier to delete
+            cleanup_files: Whether to also delete saved files (artifacts, converted docs)
+            
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        # Get document info before deletion
+        document_record = self.registry.get_document_info(document_id)
+        if not document_record:
+            print(f"❌ Document {document_id} not found in registry")
+            return False
+        
+        print(f"🗑️ Deleting document: {document_record.display_name}")
+        
+        success = True
+        
+        # Delete vectors from vector store
+        try:
+            # Delete chunks
+            if document_record.chunk_collection:
+                self.store.delete_document(
+                    collection=document_record.chunk_collection,
+                    document_id=document_id
+                )
+                print(f"✅ Deleted chunk vectors for document {document_id}")
+            
+            # Delete artifacts
+            if document_record.artifact_collection and document_record.has_artifacts:
+                self.store.delete_document(
+                    collection=document_record.artifact_collection,
+                    document_id=document_id
+                )
+                print(f"✅ Deleted artifact vectors for document {document_id}")
+                
+        except Exception as e:
+            print(f"❌ Error deleting vectors: {e}")
+            success = False
+        
+        # Delete files if requested
+        if cleanup_files:
+            try:
+                base_path = Path("data/converted_documents")
+                # Extract document name from display_name (remove counter suffix if present)
+                doc_name = document_record.display_name
+                if " (" in doc_name and doc_name.endswith(")"):
+                    doc_name = doc_name.rsplit(" (", 1)[0]
+                
+                doc_dir = base_path / doc_name
+                if doc_dir.exists():
+                    import shutil
+                    shutil.rmtree(doc_dir)
+                    print(f"✅ Deleted document files: {doc_dir}")
+            except Exception as e:
+                print(f"❌ Error deleting files: {e}")
+                success = False
+        
+        # Delete from registry (do this last)
+        if not self.registry.delete_document_record(document_id):
+            success = False
+        
+        if success:
+            print(f"✅ Successfully deleted document: {document_record.display_name}")
+        else:
+            print(f"⚠️ Document deletion completed with errors")
+        
+        return success
+
+    def delete_document_by_name(self, display_name: str, cleanup_files: bool = True) -> bool:
+        """Delete a document by its display name.
+        
+        Args:
+            display_name: Display name of document to delete
+            cleanup_files: Whether to also delete saved files
+            
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        # Find document by display name
+        documents = self.registry.list_documents()
+        matching_docs = [doc for doc in documents if doc.display_name == display_name]
+        
+        if not matching_docs:
+            print(f"❌ Document '{display_name}' not found")
+            return False
+        
+        if len(matching_docs) > 1:
+            print(f"❌ Multiple documents found with name '{display_name}'. Use document_id instead.")
+            return False
+        
+        return self.delete_document(matching_docs[0].document_id, cleanup_files)

@@ -8,6 +8,8 @@ from ..agent import ResearchAgent
 from ..core.vector_store import VectorStore
 from ..core.document_registry import VectorRegistry
 
+from ..core.models import Chunk, Artifact
+
 
 class VectorWebService:
     """Web service for Vector operations."""
@@ -69,20 +71,29 @@ class VectorWebService:
             
             results = self.agent.search(query, top_k, agent_search_type)
             
+            # Collect thumbnails from all results
+            thumbnails = []
+            for result in results:
+                # Get thumbnails from chunk if present
+                if result.chunk:
+                    chunk_thumbnails = self.get_thumbnails(result.chunk)
+                    thumbnails.extend(chunk_thumbnails)
+                
+                # Get thumbnails from artifact if present
+                if result.artifact:
+                    artifact_thumbnails = self.get_thumbnails(result.artifact)
+                    thumbnails.extend(artifact_thumbnails)
+            
             # Format results for display
             formatted_results = []
             for result in results:
-                formatted_results.append({
-                    'id': result.id,
-                    'score': result.score,
-                    'text': result.text,
-                    'filename': result.filename,
-                    'type': result.type,
-                    'metadata': result.metadata
-                })
+                formatted_results.append(f"Score: {result.score:.3f}\n"
+                                       f"Source: {result.filename}\n"
+                                       f"Type: {result.type}\n"
+                                       f"Text: {result.text[:200]}...\n\n")
             
-            summary = f"Found {len(results)} results for '{query}'"
-            return summary, formatted_results
+            summary = f"Found {len(results)} results for '{query}'\n\n" + "".join(formatted_results)
+            return summary, thumbnails
             
         except Exception as e:
             print(f"Error in search: {e}")
@@ -109,25 +120,44 @@ class VectorWebService:
                 search_type=agent_search_type,
                 top_k=20
             )
-            
-            # Format results for display
-            formatted_results = []
+
+            # Collect thumbnails from search results
+            thumbnails = []
             for result in results:
-                formatted_results.append({
-                    'id': result.id,
-                    'score': result.score,
-                    'text': result.text,
-                    'filename': result.filename,
-                    'type': result.type,
-                    'metadata': result.metadata
-                })
+                # Get thumbnails from chunk if present
+                if result.chunk:
+                    chunk_thumbnails = self.get_thumbnails(result.chunk)
+                    thumbnails.extend(chunk_thumbnails)
+                
+                # Get thumbnails from artifact if present
+                if result.artifact:
+                    artifact_thumbnails = self.get_thumbnails(result.artifact)
+                    thumbnails.extend(artifact_thumbnails)
             
-            return response, formatted_results
+            # Return the AI response text
+            response_text = response.response if hasattr(response, 'response') else str(response)
+            return response_text, thumbnails
             
         except Exception as e:
             print(f"Error in AI ask: {e}")
             return f"AI error: {str(e)}", []
-    
+
+    def get_thumbnails(self, obj: Any) -> List[str]:
+        """Return thumbnail image paths for an Artifact or Chunk."""
+        thumbnails = []
+        
+        if isinstance(obj, Artifact):
+            if getattr(obj, "image_file_path", None):
+                thumbnails = [obj.image_file_path]
+        elif isinstance(obj, Chunk):
+            thumbnails = [
+                artifact.image_file_path
+                for artifact in getattr(obj, "artifacts", [])
+                if getattr(artifact, "image_file_path", None)
+            ]
+        
+        return thumbnails
+
     def process_documents(self, files: List, collection: str, source: Optional[str], force: bool) -> str:
         """Process documents (not implemented yet)."""
         return "Document processing not yet implemented in refactored version"

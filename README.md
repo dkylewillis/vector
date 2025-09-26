@@ -1,16 +1,231 @@
-# Vector Core CLI
+# Vector CLI System
 
-A comprehensive command-line interface for managing vector databases and performing CRUD operations on collections and documents. Built with Python's argparse for zero external dependencies.
+A comprehensive command-line interface system for managing vector databases and AI-powered document operations. The system provides two complementary CLIs:
+
+- **Vector Core CLI** (`vector-core`): Low-level vector database operations
+- **Vector Agent CLI** (`vector-agent`): High-level AI-powered search and document management
 
 ## Overview
 
-The Vector Core CLI provides a complete interface for:
+The Vector CLI System provides two specialized interfaces:
+
+### Vector Core CLI
+For **low-level vector database operations**:
 - **Collection Management**: Create, delete, list, and inspect vector collections
 - **Point Operations**: Insert, search, and manage vector points
 - **Document Operations**: List and delete documents within collections
 - **Database Configuration**: Support for both local and remote Qdrant instances
 
-## Installation
+### Vector Agent CLI  
+For **high-level AI-powered operations**:
+- **Intelligent Search**: AI-powered semantic search across documents
+- **Question Answering**: Natural language questions with context-aware responses
+- **Document Management**: Complete document lifecycle with cleanup
+- **Multi-Collection Operations**: Search across chunks and artifacts simultaneously
+
+## Vector Agent CLI
+
+The Vector Agent CLI provides high-level, AI-powered operations for document management and intelligent search.
+
+### Installation
+
+The agent CLI is available after installing the package:
+
+```bash
+# Install the package in development mode
+pip install -e .
+
+# Use the agent CLI
+python -m vector.agent [command] [options]
+```
+
+### Agent Commands Reference
+
+#### Ask Questions
+Get AI-powered answers with relevant context from your document collections.
+
+```bash
+python -m vector.agent ask "your question" [options]
+```
+
+**Options:**
+- `--chunks-collection`: Chunks collection name (default: "chunks")
+- `--artifacts-collection`: Artifacts collection name (default: "artifacts") 
+- `--type`: Search type - `chunks`, `artifacts`, or `both` (default: "both")
+- `--length`: Response length - `short`, `medium`, or `long` (default: "medium")
+- `--top-k`: Number of context results (default: 20)
+- `--verbose`: Enable detailed output
+
+**Examples:**
+```bash
+# Basic question with default settings
+python -m vector.agent ask "What are the parking requirements for commercial buildings?"
+
+# Focused search on chunks only
+python -m vector.agent ask "zoning regulations" --type chunks --length short
+
+# Detailed search with verbose output
+python -m vector.agent ask "building permits" --type both --length long --top-k 30 --verbose
+```
+
+#### Search Documents
+Perform semantic search across document collections without AI processing.
+
+```bash
+python -m vector.agent search "search query" [options]
+```
+
+**Options:**
+- `--chunks-collection`: Chunks collection name (default: "chunks")
+- `--artifacts-collection`: Artifacts collection name (default: "artifacts")
+- `--type`: Search type - `chunks`, `artifacts`, or `both` (default: "both")
+- `--top-k`: Number of results to return (default: 5)
+- `--verbose`: Enable detailed output
+
+**Examples:**
+```bash
+# Search both chunks and artifacts
+python -m vector.agent search "drainage requirements" --top-k 10
+
+# Search only document chunks
+python -m vector.agent search "setback requirements" --type chunks
+
+# Search with verbose output
+python -m vector.agent search "parking standards" --type both --verbose
+```
+
+#### Delete Documents
+**NEW FEATURE** - Delete documents and all associated data (vectors, files, registry entries).
+
+```bash
+python -m vector.agent delete [options]
+```
+
+**Options (mutually exclusive):**
+- `--document-id`: Document ID to delete
+- `--name`: Document display name to delete
+
+**Additional Options:**
+- `--no-cleanup`: Don't delete saved files, only remove vector data
+- `--force`: Skip confirmation prompt
+
+**Examples:**
+```bash
+# Delete by document ID with confirmation
+python -m vector.agent delete --document-id abc123
+
+# Delete by document name without confirmation
+python -m vector.agent delete --name "Planning Ordinance 2024" --force
+
+# Delete only vector data, preserve saved files
+python -m vector.agent delete --document-id xyz789 --no-cleanup
+
+# Interactive deletion with name matching
+python -m vector.agent delete --name "Zoning Code"
+```
+
+**What Gets Deleted:**
+- All vector embeddings (chunks and artifacts) from collections
+- Document registry entry
+- Saved document files and artifacts (unless `--no-cleanup` is used)
+- Generated thumbnails and converted documents
+
+**Safety Features:**
+- Confirmation prompt (unless `--force` is used)
+- Validation that document exists before deletion
+- Clear error messages for ambiguous names
+- Complete transaction - either all data is deleted or operation fails
+
+#### Collection Information
+View details about your vector collections.
+
+```bash
+python -m vector.agent collection-info [options]
+```
+
+**Options:**
+- `--chunks-collection`: Chunks collection name (default: "chunks")
+- `--artifacts-collection`: Artifacts collection name (default: "artifacts")
+
+**Example:**
+```bash
+python -m vector.agent collection-info
+```
+
+#### Model Information
+Display AI model configuration and settings.
+
+```bash
+python -m vector.agent model-info [options]
+```
+
+**Options:**
+- `--chunks-collection`: Chunks collection name (default: "chunks")
+- `--artifacts-collection`: Artifacts collection name (default: "artifacts")
+
+**Example:**
+```bash
+python -m vector.agent model-info
+```
+
+### Agent Usage Patterns
+
+#### Document Management Workflow
+
+```bash
+# 1. Process documents (using pipeline)
+python -m vector.core pipeline process document.pdf
+
+# 2. Verify document was processed
+python -m vector.agent collection-info
+
+# 3. Search the processed content
+python -m vector.agent search "specific topic" --verbose
+
+# 4. Ask questions about the content
+python -m vector.agent ask "What does the document say about X?"
+
+# 5. Clean up when no longer needed
+python -m vector.agent delete --name "document" --force
+```
+
+#### Research and Analysis Workflow
+
+```bash
+# 1. Search for relevant information
+python -m vector.agent search "building codes" --type both --top-k 20
+
+# 2. Ask specific questions
+python -m vector.agent ask "What are the height restrictions?" --length long
+
+# 3. Get detailed context with sources
+python -m vector.agent ask "parking requirements" --verbose
+
+# 4. Search within specific document types
+python -m vector.agent search "zoning" --type artifacts --top-k 10
+```
+
+#### Data Maintenance Workflow
+
+```bash
+# 1. Check current collections
+python -m vector.agent collection-info
+
+# 2. Review model configuration
+python -m vector.agent model-info
+
+# 3. Clean up old documents
+python -m vector.agent delete --name "outdated document" --force
+
+# 4. Verify cleanup
+python -m vector.agent collection-info
+```
+
+## Vector Core CLI
+
+The Vector Core CLI handles low-level vector database operations and direct collection management.
+
+### Installation
 
 ### Option 1: Package Installation
 ```bash
@@ -34,7 +249,7 @@ The CLI uses only Python standard library modules:
 - `sys` - System interface
 - Plus the existing vector core modules
 
-## Configuration
+### Configuration
 
 ### Global Options
 
@@ -468,32 +683,90 @@ ls -la ./qdrant_db/
 # Consider using remote Qdrant instance
 ```
 
-## Integration with Vector Agent
+## CLI Integration and Workflows
 
-The CLI can be used alongside the Vector Agent system:
+The Vector Core CLI and Vector Agent CLI work together to provide a complete document management solution:
+
+### Complete Document Lifecycle
 
 ```bash
-# Prepare collections for agent use
-python vector_cli.py create-collection agent_chunks --vector-size 384
-python vector_cli.py create-collection agent_artifacts --vector-size 384
+# 1. Set up collections (Core CLI)
+python vector_cli.py create-collection documents_chunks --vector-size 384
+python vector_cli.py create-collection documents_artifacts --vector-size 384
 
-# Verify setup for agent
+# 2. Verify setup (Core CLI)
 python vector_cli.py list-collections
-python vector_cli.py collection-info agent_chunks
+python vector_cli.py collection-info documents_chunks
 
-# Use with agent commands
-python -m vector.agent search "your query" --collection agent_chunks
+# 3. Process documents (Pipeline - not CLI, but part of workflow)
+# Documents get processed and stored in collections
+
+# 4. Search and analyze (Agent CLI)
+python -m vector.agent search "building codes" --type both --verbose
+python -m vector.agent ask "What are the parking requirements?" --length medium
+
+# 5. Document cleanup (Agent CLI) - NEW DELETE FUNCTIONALITY
+python -m vector.agent delete --name "outdated document" --force
+
+# 6. Verify cleanup (Agent CLI)
+python -m vector.agent collection-info
 ```
+
+### Mixed Operations Example
+
+```bash
+# Use Core CLI for collection management
+python vector_cli.py create-collection legal_docs --vector-size 1536
+
+# Use Agent CLI for intelligent operations  
+python -m vector.agent ask "zoning requirements" --chunks-collection legal_docs
+
+# Use Core CLI for low-level inspection
+python vector_cli.py list-documents legal_docs
+python vector_cli.py collection-info legal_docs
+
+# Use Agent CLI for complete document removal (NEW)
+python -m vector.agent delete --document-id doc123 --no-cleanup
+```
+
+### When to Use Each CLI
+
+**Use Vector Core CLI (`vector-core` or `vector_cli.py`) for:**
+- Creating and configuring collections
+- Low-level vector operations
+- Direct point insertion and search
+- Database administration
+- Debugging vector operations
+
+**Use Vector Agent CLI (`python -m vector.agent`) for:**
+- Intelligent document search
+- Natural language questions
+- Complete document management (including NEW delete functionality)
+- AI-powered analysis
+- High-level document operations
 
 ## Contributing
 
-When extending the CLI:
+When extending the CLI system:
 
+**For Vector Core CLI:**
 1. Add new commands to `vector/cli/commands.py`
 2. Update argument parser in `setup_parser()`
 3. Add command handlers to the `VectorStoreCLI` class
 4. Update this README with new command documentation
-5. Add tests to verify functionality
+
+**For Vector Agent CLI:**
+1. Add new commands to `vector/agent/cli.py`
+2. Update argument parser in `main()` function
+3. Add command handlers in the main command routing
+4. Import required modules as needed (prefer lazy imports)
+5. Update this README with new command documentation
+
+**General Guidelines:**
+- Add tests to verify functionality
+- Follow existing error handling patterns
+- Use consistent help text formatting
+- Consider both interactive and scripted usage
 
 ## Support
 
@@ -502,6 +775,20 @@ For issues and questions:
 - Verify database connectivity with `list-collections`
 - Use `--help` for command-specific information
 - Test with simple operations first
+
+## Recent Updates
+
+### Document Delete Functionality (NEW)
+The Vector Agent CLI now includes comprehensive document deletion capabilities:
+
+- **Delete by ID**: `python -m vector.agent delete --document-id abc123`
+- **Delete by Name**: `python -m vector.agent delete --name "Document Name"`
+- **Safety Features**: Confirmation prompts and `--force` option
+- **Flexible Cleanup**: `--no-cleanup` to preserve files while removing vectors
+- **Complete Removal**: Deletes vectors, registry entries, and saved files
+- **Error Handling**: Clear messages for missing or ambiguous documents
+
+This feature provides a complete document lifecycle management solution when combined with the existing pipeline processing capabilities.
 
 ## Examples Repository
 

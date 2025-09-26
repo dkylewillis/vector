@@ -15,7 +15,7 @@ def perform_search(web_service: VectorWebService, query, top_k, collection, sele
         metadata_filter = build_metadata_filter(selected_documents)
         
         # Perform search
-        result_text, results = web_service.search_with_thumbnails(
+        result_text, thumbnails = web_service.search_with_thumbnails(
             query=query,
             collection=collection,
             top_k=top_k,
@@ -23,7 +23,7 @@ def perform_search(web_service: VectorWebService, query, top_k, collection, sele
             search_type=search_type
         )
         
-        return result_text, results
+        return result_text, thumbnails
         
     except Exception as e:
         return f"Search error: {str(e)}", []
@@ -39,7 +39,7 @@ def ask_ai(web_service: VectorWebService, question, length, collection, selected
         metadata_filter = build_metadata_filter(selected_documents)
         
         # Ask AI
-        response, results = web_service.ask_ai_with_thumbnails(
+        response, thumbnails = web_service.ask_ai_with_thumbnails(
             question=question,
             collection=collection,
             length=length,
@@ -47,7 +47,7 @@ def ask_ai(web_service: VectorWebService, question, length, collection, selected
             search_type=search_type
         )
         
-        return response, results
+        return response, thumbnails
         
     except Exception as e:
         return f"AI error: {str(e)}", []
@@ -123,7 +123,8 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
         'search_query' in search_components and
         'num_results' in search_components and
         'search_search_type' in search_components and
-        'search_results' in search_components):
+        'search_results' in search_components and
+        'search_thumbnails' in search_components):
         
         search_components['search_btn'].click(
             fn=lambda query, top_k, collection, selected_docs, search_type: perform_search(
@@ -136,7 +137,10 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
                 documents_checkboxgroup,
                 search_components['search_search_type']
             ],
-            outputs=search_components['search_results']
+            outputs=[
+                search_components['search_results'],
+                search_components['search_thumbnails']
+            ]
         )
     
     # AI Q&A functionality - only connect if components exist
@@ -145,7 +149,8 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
         'ask_query' in search_components and
         'response_length' in search_components and
         'ask_search_type' in search_components and
-        'ai_response' in search_components):
+        'ai_response' in search_components and
+        'ai_thumbnails' in search_components):
         
         search_components['ask_btn'].click(
             fn=lambda question, length, collection, selected_docs, search_type: ask_ai(
@@ -158,7 +163,10 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
                 documents_checkboxgroup,
                 search_components['ask_search_type']
             ],
-            outputs=search_components['ai_response']
+            outputs=[
+                search_components['ai_response'],
+                search_components['ai_thumbnails']
+            ]
         )
     
     # Info functionality - only connect if components exist

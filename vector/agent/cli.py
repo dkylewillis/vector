@@ -18,6 +18,8 @@ def main():
 Examples:
   vector-agent ask "What are the parking requirements?" --type both --length medium
   vector-agent search "building permits" --type chunks --top-k 10
+  vector-agent delete --document-id abc123 --force
+  vector-agent delete --name "My Document" --no-cleanup
   vector-agent model-info
   vector-agent collection-info
 
@@ -57,6 +59,16 @@ For low-level vector operations, use 'vector-core' instead.
     model_parser = subparsers.add_parser("model-info", help="Show AI model configuration")
     model_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
     model_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
+
+    # Delete document command
+    delete_parser = subparsers.add_parser("delete", help="Delete a document and all its data")
+    delete_group = delete_parser.add_mutually_exclusive_group(required=True)
+    delete_group.add_argument("--document-id", help="Document ID to delete")
+    delete_group.add_argument("--name", help="Document name to delete")
+    delete_parser.add_argument("--no-cleanup", action="store_true", help="Don't delete saved files, only vector data")
+    delete_parser.add_argument("--force", action="store_true", help="Skip confirmation prompt")
+    delete_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
+    delete_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
 
     args = parser.parse_args()
 
@@ -126,6 +138,35 @@ For low-level vector operations, use 'vector-core' instead.
         elif args.command == "model-info":
             info = agent.get_model_info()
             print(info)
+
+        elif args.command == "delete":
+            # Import pipeline only when needed to avoid dependency issues
+            from ..core.pipeline import VectorPipeline
+            pipeline = VectorPipeline()
+            
+            cleanup_files = not args.no_cleanup
+            
+            if args.document_id:
+                if not args.force:
+                    response = input(f"Are you sure you want to delete document '{args.document_id}'? (y/N): ")
+                    if response.lower() not in ['y', 'yes']:
+                        print("❌ Operation cancelled")
+                        sys.exit(0)
+                
+                success = pipeline.delete_document(args.document_id, cleanup_files=cleanup_files)
+                if not success:
+                    sys.exit(1)
+                    
+            elif args.name:
+                if not args.force:
+                    response = input(f"Are you sure you want to delete document '{args.name}'? (y/N): ")
+                    if response.lower() not in ['y', 'yes']:
+                        print("❌ Operation cancelled")
+                        sys.exit(0)
+                
+                success = pipeline.delete_document_by_name(args.name, cleanup_files=cleanup_files)
+                if not success:
+                    sys.exit(1)
 
     except KeyboardInterrupt:
         print("\n❌ Cancelled by user")

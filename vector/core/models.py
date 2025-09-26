@@ -76,6 +76,7 @@ class Artifact(BaseModel):
     self_ref: str
     type: Literal["picture", "table"]                    # e.g., "#/table/0"
     image_file_path: Optional[str] = None    # relative path to PNG
+    image_thumbnail_path: Optional[str] = None  # relative path to thumbnail PNG
     headings: Optional[List[str]] = Field(default_factory=list)
     before_text: Optional[str] = None
     after_text: Optional[str] = None
