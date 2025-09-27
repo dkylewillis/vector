@@ -57,7 +57,7 @@ class ResearchAgent:
             self.search_ai_model = None
             self.answer_ai_model = None
 
-    def search_chunks(self, query: str, top_k: int = 5) -> List[SearchResult]:
+    def search_chunks(self, query: str, top_k: int = 5, document_ids: Optional[List[str]] = None) -> List[SearchResult]:
         """Search for relevant document chunks.
         
         Args:
@@ -74,7 +74,7 @@ class ResearchAgent:
         query_vector = self.embedder.embed_text(query)
         
         # Search the chunks database
-        results = self.store.search(query_vector, self.chunks_collection, top_k)
+        results = self.store.search_documents(query_vector, self.chunks_collection, top_k, document_ids)
         
         # Convert to SearchResult objects
         search_results = []
@@ -107,7 +107,7 @@ class ResearchAgent:
         
         return search_results
 
-    def search_artifacts(self, query: str, top_k: int = 5) -> List[SearchResult]:
+    def search_artifacts(self, query: str, top_k: int = 5, document_ids: Optional[List[str]] = None) -> List[SearchResult]:
         """Search for relevant artifacts.
         
         Args:
@@ -124,7 +124,7 @@ class ResearchAgent:
         query_vector = self.embedder.embed_text(query)
         
         # Search the artifacts database
-        results = self.store.search(query_vector, self.artifacts_collection, top_k)
+        results = self.store.search_documents(query_vector, self.artifacts_collection, top_k, document_ids)
 
         # Convert to SearchResult objects
         search_results = []
@@ -167,7 +167,7 @@ class ResearchAgent:
         
         return search_results
 
-    def search(self, query: str, top_k: int = 5, search_type: str = 'both') -> List[SearchResult]:
+    def search(self, query: str, top_k: int = 5, search_type: str = 'both', document_ids: Optional[List[str]] = None) -> List[SearchResult]:
         """Search for relevant documents across chunks and/or artifacts.
         
         Args:
@@ -184,11 +184,11 @@ class ResearchAgent:
         results = []
         
         if search_type in ['chunks', 'both']:
-            chunk_results = self.search_chunks(query, top_k)
+            chunk_results = self.search_chunks(query, top_k, document_ids)
             results.extend(chunk_results)
         
         if search_type in ['artifacts', 'both']:
-            artifact_results = self.search_artifacts(query, top_k)
+            artifact_results = self.search_artifacts(query, top_k, document_ids)
             results.extend(artifact_results)
         
         # Sort combined results by score if searching both
@@ -198,7 +198,7 @@ class ResearchAgent:
         
         return results
 
-    def ask(self, question: str, response_length: str = 'medium', search_type: str = 'both', top_k: int = 20) -> tuple[str, List[SearchResult]]:
+    def ask(self, question: str, response_length: str = 'medium', search_type: str = 'both', top_k: int = 20, document_ids: Optional[List[str]] = None) -> tuple[str, List[SearchResult]]:
         """Ask a question about the documents and get relevant context.
         
         Args:
@@ -237,7 +237,7 @@ class ResearchAgent:
             search_query = question
         
         # Search for context based on search_type
-        results = self.search(query=search_query, top_k=top_k, search_type=search_type)
+        results = self.search(query=search_query, top_k=top_k, search_type=search_type, document_ids=document_ids)
         
         if not results:
             return ("No relevant documents found to answer your question.", [])

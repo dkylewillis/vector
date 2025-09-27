@@ -111,14 +111,16 @@ class VectorStore(BaseModel):
     ) -> List[Any]:
         """Search for similar vectors in a collection."""
 
-        filter_ = Filter(
-            must=[
-                FieldCondition(
-                    key="document_id",
-                    match=MatchAny(any=document_ids)
-                )
-            ]
-        )
+        filter_ = None
+        if document_ids is not None:
+            filter_ = Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchAny(any=document_ids)
+                    )
+                ]
+            )
 
         with self.get_client() as client:
             return client.search(

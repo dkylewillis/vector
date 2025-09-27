@@ -55,7 +55,7 @@ class VectorWebService:
             return []
     
     def search_with_thumbnails(self, query: str, collection: str, top_k: int, 
-                             metadata_filter: Optional[Dict], search_type: str) -> Tuple[str, List]:
+                             search_type: str, documents: Optional[List[str]] = None) -> Tuple[str, List]:
         """Search with thumbnails."""
         if not self.agent:
             return "Search functionality not available", []
@@ -69,8 +69,12 @@ class VectorWebService:
             else:
                 agent_search_type = search_type or "both"
             
-            results = self.agent.search(query, top_k, agent_search_type)
-            
+            results = self.agent.search(
+                query=query,
+                top_k=top_k,
+                search_type=agent_search_type,
+                document_ids=self.get_selected_documents_by_name(documents),
+            )
             # Collect thumbnails from all results
             thumbnails = []
             for result in results:
@@ -100,7 +104,7 @@ class VectorWebService:
             return f"Search error: {str(e)}", []
     
     def ask_ai_with_thumbnails(self, question: str, collection: str, length: str,
-                             metadata_filter: Optional[Dict], search_type: str) -> Tuple[str, List]:
+                            search_type: str, documents: Optional[List[str]] = None) -> Tuple[str, List]:
         """Ask AI with thumbnails."""
         if not self.agent:
             return "AI functionality not available", []
@@ -118,7 +122,8 @@ class VectorWebService:
                 question=question,
                 response_length=length,
                 search_type=agent_search_type,
-                top_k=20
+                top_k=20,
+                document_ids=self.get_selected_documents_by_name(documents)
             )
 
             # Collect thumbnails from search results
@@ -142,6 +147,24 @@ class VectorWebService:
             print(f"Error in AI ask: {e}")
             return f"AI error: {str(e)}", []
 
+    ## TODO: REFACTOR!!
+    ## NEED TO REFACTOR THESE AFTER CREATING NEW METHODS IN VECTOR STORE AND REGISTRY FOR SEARCHING BY ID##
+    ## I DON'T LIKE HOW SEARCH_DOCUMENTS IS BEING USED FOR THIS AS IT RETURNS A LIST
+    def get_selected_documents_by_name(self, documents: List[str]) -> Optional[Dict[str, Any]]:
+        """Get document details by ID."""
+        if not self.registry:
+            return None
+        document_ids = []
+        for name in documents:
+            try:
+                doc = self.registry.search_documents(query=name, fields = ['display_name'])
+                document_ids.append(doc[0].document_id)
+
+            except Exception as e:
+                print(f"Error getting document by name {name}: {e}")
+        return document_ids
+    
+    
     def get_thumbnails(self, obj: Any) -> List[str]:
         """Return thumbnail image paths for an Artifact or Chunk."""
         thumbnails = []

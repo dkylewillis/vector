@@ -195,7 +195,7 @@ def create_search_tab():
                     )
                     components['ask_search_type'] = gr.Radio(
                         choices=["chunks", "artifacts", "both"],
-                        value="both",
+                        value="chunks",
                         label="Search Type",
                         info="chunks: text content, artifacts: images/tables, both: combined",
                         scale=1

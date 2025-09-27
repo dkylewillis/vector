@@ -11,16 +11,14 @@ def perform_search(web_service: VectorWebService, query, top_k, collection, sele
         return "Please enter a search query", []
     
     try:
-        # Build metadata filter if documents are selected
-        metadata_filter = build_metadata_filter(selected_documents)
         
         # Perform search
         result_text, thumbnails = web_service.search_with_thumbnails(
             query=query,
             collection=collection,
             top_k=top_k,
-            metadata_filter=metadata_filter,
-            search_type=search_type
+            search_type=search_type,
+            documents=selected_documents
         )
         
         return result_text, thumbnails
@@ -35,32 +33,20 @@ def ask_ai(web_service: VectorWebService, question, length, collection, selected
         return "Please enter a question", []
     
     try:
-        # Build metadata filter if documents are selected
-        metadata_filter = build_metadata_filter(selected_documents)
-        
+
         # Ask AI
         response, thumbnails = web_service.ask_ai_with_thumbnails(
             question=question,
             collection=collection,
             length=length,
-            metadata_filter=metadata_filter,
-            search_type=search_type
+            search_type=search_type,
+            documents=selected_documents
         )
         
         return response, thumbnails
         
     except Exception as e:
         return f"AI error: {str(e)}", []
-
-
-def build_metadata_filter(selected_documents):
-    """Build metadata filter from selected documents."""
-    if not selected_documents:
-        return None
-    
-    # For now, return None as the filter implementation depends on how documents are stored
-    # This can be enhanced later when document filtering is needed
-    return None
 
 
 def get_info(web_service: VectorWebService, collection):
@@ -135,7 +121,7 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
                 search_components['num_results'],
                 search_components['search_search_type'],
                 documents_checkboxgroup,
-                search_components['search_search_type']
+                search_components['search_search_type'],
             ],
             outputs=[
                 search_components['search_results'],

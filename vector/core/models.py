@@ -161,10 +161,6 @@ class Chunk(BaseModel):
 
 
 
- 
-    
-
-
 class ConvertedDocument(BaseModel):
     doc: DoclingDocument
     
