@@ -92,14 +92,14 @@ class ResearchAgent:
                 # Now validate with Pydantic
                 chunk = Chunk.model_validate(chunk_data)
 
-               
+                print(f"Debug: Validated chunk: {chunk.artifacts}")
             except Exception as e:
                 print(f"Warning: Could not validate chunk: {e}")
 
             search_results.append(SearchResult(
                 id=str(result.id),
                 score=result.score,
-                text=result.payload.get("text", ""),
+                text=chunk.text,
                 filename=result.payload.get("document_id", "Unknown"),
                 type="chunk",
                 chunk=chunk
@@ -145,10 +145,6 @@ class ResearchAgent:
             except Exception as e:
                 print(f"Warning: Could not validate artifact: {e}")
 
-        
-        # Convert to SearchResult objects
-        search_results = []
-        for result in results:
             # Build text from artifact fields
             text_parts = []
             if result.payload.get("caption"):

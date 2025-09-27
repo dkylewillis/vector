@@ -127,6 +127,30 @@ class Artifact(BaseModel):
             caption=caption,
         )
 
+    def build_thumbnail_path(self, base_path: Union[str, Path]) -> str:
+        """Build thumbnail path string from base path and self_ref.
+        
+        Args:
+            base_path: Base directory path for thumbnails
+            
+        Returns:
+            Full path string to the thumbnail file
+            
+        Example:
+            For self_ref="#/table/0", returns "{base_path}/table_0_thumb.png"
+        """
+        base_path = Path(base_path)
+        
+        # Clean self_ref: remove '#/' and replace '/' with '_'
+        # "#/table/0" -> "table_0"
+        clean_ref = self.self_ref.lstrip('#/').replace('/', '_')
+        
+        # Build thumbnail filename
+        thumbnail_filename = f"{clean_ref}_thumb.png"
+        
+        return str(base_path / thumbnail_filename)
+
+
 class Chunk(BaseModel):
     chunk_id: str
     text: str
@@ -135,12 +159,9 @@ class Chunk(BaseModel):
     doc_items: List[str] = Field(default_factory=list)  # links to artifacts
     artifacts: List[Artifact] = Field(default_factory=list)  # auto-filtered from doc_items
 
-    # @model_validator(mode="after")
-    # def _derive_picture_and_table_items(self):
-    #     lowered = [s.lower() for s in self.doc_items]
-    #     self.picture_items = [s for s, l in zip(self.doc_items, lowered) if "pictures" in l]
-    #     self.table_items = [s for s, l in zip(self.doc_items, lowered) if "table" in l]
-    #     return self
+
+
+ 
     
 
 

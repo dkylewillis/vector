@@ -252,7 +252,24 @@ class VectorPipeline:
         artifact_collection = "artifacts"
 
         converted_doc = self.convert(str(file_path))
-        chunks, artifacts = self.chunk(converted_doc)
+
+        # Next 3 steps are needed to ensure chunk.artifacts point to the same objects as in converted_doc.artifacts
+        # So that when we save chunks, they have correct image_file_path etc.
+        
+        # Get artifacts first
+        artifacts = converted_doc.get_artifacts()
+        
+        # Create a mapping of self_ref to artifact objects
+        artifact_map = {artifact.self_ref: artifact for artifact in artifacts}
+        
+        # Get chunks and update their artifact references
+        chunks = converted_doc.get_chunks()
+        
+        # Update chunk artifacts to reference the same objects
+        for chunk in chunks:
+            # Replace chunk.artifacts with references to the main artifact objects
+            chunk.artifacts = [artifact_map[ref] for ref in chunk.doc_items if ref in artifact_map]
+
 
         # Save converted document
         self.save_converted_document(
