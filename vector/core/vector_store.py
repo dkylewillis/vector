@@ -3,8 +3,6 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchAny, MatchValue
 from typing import Dict, List, Any, Optional, Generator, Union
 from pydantic import BaseModel, Field
-from pathlib import Path
-import json
 
 
 class VectorStore(BaseModel):

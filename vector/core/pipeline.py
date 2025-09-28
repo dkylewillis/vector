@@ -1,12 +1,7 @@
 from pathlib import Path
 from typing import List
 import uuid
-import hashlib
-import time
-import os
-from datetime import datetime, timezone
 from PIL import Image
-from sklearn import pipeline
 from .converter import DocumentConverter
 from .chunker import DocumentChunker
 from .embedder import Embedder
@@ -138,6 +133,26 @@ class VectorPipeline:
             
             self.store.insert(collection_name, str(uuid.uuid4()), embedding, payload)
 
+    def _get_unique_document_name(self, base_name: str, base_path: str) -> str:
+        """Generate unique document name by adding counter suffix if needed.
+        
+        Args:
+            base_name: Base name for the document
+            base_path: Base directory to check for existing documents
+            
+        Returns:
+            Unique document name with counter suffix if needed
+        """
+        base_dir = Path(base_path)
+        original_name = base_name
+        counter = 1
+        
+        while (base_dir / base_name).exists():
+            base_name = f"{original_name}_{counter:02d}"
+            counter += 1
+        
+        return base_name
+
     def create_thumbnail(self, image: Image.Image, thumbnail_size: tuple = (200, 200)) -> Image.Image:
         """Create a thumbnail from a PIL image.
         
@@ -243,11 +258,14 @@ class VectorPipeline:
             file_path: Path to the file to process.
 
         Returns:
-            Document ID (derived from file stem).
+            Document ID (unique document name).
         """
         file_path = Path(file_path)
-        document_name = file_path.stem
         base_path = "data/converted_documents"
+        
+        # Generate unique document name to prevent conflicts
+        document_name = self._get_unique_document_name(file_path.stem, base_path)
+        
         chunk_collection = "chunks"
         artifact_collection = "artifacts"
 
@@ -308,7 +326,7 @@ class VectorPipeline:
 
 
         print(f"✅ Pipeline completed for {file_path.name}")
-        return file_path.stem
+        return document_name
     
 
     def delete_document(self, document_id: str, cleanup_files: bool = True) -> bool:

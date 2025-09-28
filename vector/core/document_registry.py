@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import List, Dict, Optional, Union
 from datetime import datetime, timezone
 import uuid
-from .models import Chunk, Artifact, DocumentRecord
+from .models import DocumentRecord
+from typing import Dict, List, Set
+
 
 class VectorRegistry:
     """Registry for managing processed documents and their lifecycle."""
@@ -17,7 +19,6 @@ class VectorRegistry:
         """
         self.registry_path = Path(registry_path)
         self.registry_path.mkdir(parents=True, exist_ok=True)
-
 
     def register_document(self, file_path: Path, document_name: str) -> DocumentRecord:
         """Register a new document with unique display name handling."""
@@ -119,6 +120,20 @@ class VectorRegistry:
             documents.sort(key=lambda x: x.registered_date, reverse=True)
         
         return documents
+    
+    def get_id_by_display_name(self, display_name: str) -> Optional[str]:
+        """Get document ID by display name.
+        
+        Args:
+            display_name: Display name of the document
+            
+        Returns:
+            Document ID or None if not found
+        """
+        for doc in self.list_documents():
+            if doc.display_name == display_name:
+                return doc.document_id
+        return None
         
     def search_documents(self, query: str, fields: List[str] = None) -> List[DocumentRecord]:
         """Search registered documents.
@@ -153,7 +168,7 @@ class VectorRegistry:
         
         Args:
             document_id: Document identifier
-            tags: List of tags to add
+            tags: List of tags to add (will be normalized to lowercase)
             
         Returns:
             True if successful, False otherwise
@@ -162,7 +177,9 @@ class VectorRegistry:
         if document_record is None:
             return False
         
-        document_record.add_tags(tags)
+        # Normalize tags to lowercase at registry level for consistency
+        normalized_tags = [tag.strip().lower() for tag in tags if tag.strip()]
+        document_record.add_tags(normalized_tags)
         return self.update_document(document_record)
     
     def remove_tags(self, document_id: str, tags: List[str]) -> bool:
@@ -170,7 +187,7 @@ class VectorRegistry:
         
         Args:
             document_id: Document identifier
-            tags: List of tags to remove
+            tags: List of tags to remove (will be normalized to lowercase)
             
         Returns:
             True if successful, False otherwise
@@ -179,7 +196,9 @@ class VectorRegistry:
         if document_record is None:
             return False
         
-        document_record.remove_tags(tags)
+        # Normalize tags to lowercase at registry level for consistency
+        normalized_tags = [tag.strip().lower() for tag in tags if tag.strip()]
+        document_record.remove_tags(normalized_tags)
         return self.update_document(document_record)
     
     def delete_document_record(self, document_id: str) -> bool:
@@ -276,3 +295,4 @@ class VectorRegistry:
             if candidate_name not in existing_names:
                 return candidate_name
             counter += 1
+

@@ -91,8 +91,7 @@ class ResearchAgent:
                 
                 # Now validate with Pydantic
                 chunk = Chunk.model_validate(chunk_data)
-
-                print(f"Debug: Validated chunk: {chunk.artifacts}")
+                
             except Exception as e:
                 print(f"Warning: Could not validate chunk: {e}")
 

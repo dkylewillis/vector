@@ -68,3 +68,7 @@ test/
 archive/
 
 .pytest_cache/
+
+vector_registry/
+
+tests/

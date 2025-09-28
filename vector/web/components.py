@@ -37,109 +37,18 @@ def create_collection_selector(collections: List[str], default_collection: str, 
     return collection_dropdown, refresh_btn, documents_checkboxgroup
 
 
-def create_upload_tab():
-    """Create upload tab components."""
-    with gr.TabItem("📤 Upload", elem_id="upload_tab"):
-        gr.Markdown("### File Upload (Not Yet Implemented)")
-        
-        file_upload = gr.File(
-            label="Select Files",
-            file_count="multiple",
-            interactive=False
-        )
-        
-        source_textbox = gr.Textbox(
-            label="Source",
-            placeholder="File upload not yet implemented in refactored version",
-            interactive=False
-        )
-        
-        force_checkbox = gr.Checkbox(
-            label="Force Reprocess",
-            interactive=False
-        )
-        
-        upload_btn = gr.Button("Upload (Not Implemented)", interactive=False)
-        upload_output = gr.Textbox(
-            label="Upload Status",
-            value="Upload functionality not yet implemented in refactored version",
-            interactive=False
-        )
-    
-    return {
-        'file_upload': file_upload,
-        'source_textbox': source_textbox,
-        'force_checkbox': force_checkbox,
-        'upload_btn': upload_btn,
-        'upload_output': upload_output
-    }
-
-
-def create_info_tab():
-    """Create info tab components."""
-    with gr.TabItem("ℹ️ Info", elem_id="info_tab"):
-        gr.Markdown("### Collection Information")
-        
-        info_btn = gr.Button("Get Info", interactive=True)
-        info_output = gr.Textbox(
-            label="Collection Info",
-            value="",
-            interactive=False
-        )
-        
-        metadata_btn = gr.Button("Get Metadata", interactive=False)
-        metadata_output = gr.Textbox(
-            label="Metadata Summary",
-            value="Metadata functionality not yet implemented in refactored version",
-            interactive=False
-        )
-    
-    return {
-        'info_btn': info_btn,
-        'info_output': info_output,
-        'metadata_btn': metadata_btn,
-        'metadata_output': metadata_output
-    }
-
-
-def create_collection_documents_tab():
-    """Create collection documents tab components."""
-    with gr.TabItem("📋 Collection Docs", elem_id="collection_documents_tab"):
-        gr.Markdown("### Collection Documents")
-        
-        available_docs_list = gr.CheckboxGroup(
-            label="Available Documents",
-            choices=[],
-            interactive=False
-        )
-        
-        add_to_collection_btn = gr.Button("Add to Collection (Disabled)", interactive=False)
-        remove_from_collection_btn = gr.Button("Remove from Collection (Disabled)", interactive=False)
-        
-        collection_docs_output = gr.Textbox(
-            label="Collection Documents Status",
-            value="Collection document management not yet implemented in refactored version",
-            interactive=False
-        )
-    
-    return {
-        'available_docs_list': available_docs_list,
-        'add_to_collection_btn': add_to_collection_btn,
-        'remove_from_collection_btn': remove_from_collection_btn,
-        'collection_docs_output': collection_docs_output
-    }
-
-
 def create_delete_tab():
     """Create delete tab components."""
     with gr.TabItem("🗑️ Delete", elem_id="delete_tab"):
-        gr.Markdown("### Delete Operations")
+        gr.Markdown("### Delete Documents")
+        gr.Markdown("""
+        **⚠️ Warning:** This will permanently delete documents from the system and all collections.
         
-        delete_collection_dropdown = gr.Dropdown(
-            label="Collection",
-            choices=["placeholder"],
-            interactive=False
-        )
+        **Instructions:**
+        1. Select documents from the main document list on the left
+        2. Check the confirmation box below
+        3. Click 'Delete Selected Documents'
+        """)
         
         delete_documents_list = gr.CheckboxGroup(
             label="Documents to Delete",
@@ -148,19 +57,19 @@ def create_delete_tab():
         )
         
         confirm_delete_checkbox = gr.Checkbox(
-            label="Confirm Deletion",
-            interactive=False
+            label="I understand this action cannot be undone",
+            value=False,
+            interactive=True
         )
         
-        delete_selected_btn = gr.Button("Delete Selected (Disabled)", interactive=False)
+        delete_selected_btn = gr.Button("Delete Selected Documents", interactive=True)
         delete_output = gr.Textbox(
             label="Delete Status",
-            value="Delete functionality not yet implemented in refactored version",
+            value="",
             interactive=False
         )
     
     return {
-        'delete_collection_dropdown': delete_collection_dropdown,
         'delete_documents_list': delete_documents_list,
         'confirm_delete_checkbox': confirm_delete_checkbox,
         'delete_selected_btn': delete_selected_btn,
@@ -265,6 +174,7 @@ def create_search_tab():
     
     return components
 
+
 def create_upload_tab():
     """Create the Upload Documents tab."""
     components = {}
@@ -278,17 +188,11 @@ def create_upload_tab():
         
         gr.Markdown("### ⚙️ Processing Options")
         with gr.Row():
-            components['source_dropdown'] = gr.Dropdown(
-                choices=["auto", "ordinances", "manuals", "checklists", "other"],
-                value="auto",
-                label="Source Category",
-                info="Choose source or 'auto' to detect from folder name",
+            components['upload_tags_input'] = gr.Textbox(
+                label="Add Tags",
+                placeholder="Enter tags separated by commas (e.g., important, manual, checklist)",
+                info="Tags will be added to uploaded documents",
                 scale=2
-            )
-            components['force_reprocess'] = gr.Checkbox(
-                label="Force Reprocess",
-                value=False,
-                scale=1
             )
         
         with gr.Row():
@@ -327,105 +231,6 @@ def create_info_tab():
     return components
 
 
-def create_management_tab():
-    """Create the Collection Management tab."""
-    components = {}
-    
-    with gr.TabItem("📚 Collection Management"):
-        with gr.Tabs():
-            # Sub-tab: List Collections
-            with gr.TabItem("📋 List Collections"):
-                with gr.Row():
-                    components['list_collections_btn'] = gr.Button("📋 List All Collections", variant="primary")
-                
-                components['collections_list'] = gr.Textbox(
-                    label="Collections",
-                    lines=12,
-                    interactive=False,
-                    placeholder="Click 'List All Collections' to see available collections..."
-                )
-            
-            # Sub-tab: Create Collection
-            with gr.TabItem("➕ Create Collection"):
-                gr.Markdown("### Create New Collection")
-                
-                components['new_name_input'] = gr.Textbox(
-                    label="Display Name",
-                    placeholder="Enter a friendly name for the collection...",
-                )
-                
-                components['new_desc_input'] = gr.Textbox(
-                    label="Description (Optional)",
-                    placeholder="Enter a description for the collection...",
-                    lines=2
-                )
-                
-                with gr.Row():
-                    components['create_btn'] = gr.Button("➕ Create Collection", variant="primary")
-                
-                components['management_output'] = gr.Textbox(
-                    label="Creation Result",
-                    lines=4,
-                    interactive=False,
-                    placeholder="Collection creation results will appear here..."
-                )
-            
-            # Sub-tab: Rename Collection
-            with gr.TabItem("✏️ Rename Collection"):
-                gr.Markdown("### Rename Collection Display Name")
-                
-                with gr.Row():
-                    components['rename_old_name'] = gr.Textbox(
-                        label="Current Display Name",
-                        placeholder="Enter current display name...",
-                        scale=1
-                    )
-                    components['rename_new_name'] = gr.Textbox(
-                        label="New Display Name",
-                        placeholder="Enter new display name...",
-                        scale=1
-                    )
-                
-                with gr.Row():
-                    components['rename_collection_btn'] = gr.Button("✏️ Rename Collection", variant="primary")
-                
-                components['rename_output'] = gr.Textbox(
-                    label="Rename Result",
-                    lines=4,
-                    interactive=False,
-                    placeholder="Collection rename results will appear here..."
-                )
-            
-            # Sub-tab: Delete Collection
-            with gr.TabItem("🗑️ Delete Collection"):
-                gr.Markdown("### ⚠️ Delete Collection")
-                gr.Markdown("**Warning:** This will permanently delete the collection and all its data!")
-                
-                components['delete_collection_name'] = gr.Textbox(
-                    label="Collection Display Name",
-                    placeholder="Enter display name of collection to delete...",
-                    info="Type the exact display name of the collection you want to delete"
-                )
-                
-                components['delete_force_checkbox'] = gr.Checkbox(
-                    label="I understand this action cannot be undone",
-                    value=False,
-                    info="Check this box to confirm deletion"
-                )
-                
-                with gr.Row():
-                    components['delete_collection_btn'] = gr.Button("🗑️ Delete Collection", variant="stop")
-                
-                components['delete_collection_output'] = gr.Textbox(
-                    label="Deletion Result",
-                    lines=4,
-                    interactive=False,
-                    placeholder="Collection deletion results will appear here..."
-                )
-    
-    return components
-
-
 def create_document_management_tab():
     """Create the Document Management tab."""
     components = {}
@@ -452,107 +257,50 @@ def create_document_management_tab():
                     placeholder="Select documents and click 'View Details' to see information..."
                 )
             
-            # Sub-tab: Delete Documents
-            with gr.TabItem("🗑️ Delete Documents"):
-                gr.Markdown("### ⚠️ Permanently Delete Documents")
-                gr.Markdown("**Warning:** This will delete the converted documents from disk and remove them from ALL collections!")
-                
-                components['documents_to_delete'] = gr.CheckboxGroup(
-                    label="Select Documents to Delete",
-                    choices=[],
-                    interactive=True,
-                    info="These documents will be permanently removed from the system"
-                )
-                
-                components['confirm_delete_checkbox'] = gr.Checkbox(
-                    label="I understand this action cannot be undone",
-                    value=False,
-                    info="Check this box to confirm deletion"
-                )
+            # Sub-tab: Manage Tags
+            with gr.TabItem("🏷️ Manage Tags"):
+                gr.Markdown("### Document Tag Management")
+                gr.Markdown("Select documents from the left panel, then add or remove tags below.")
                 
                 with gr.Row():
-                    components['delete_documents_btn'] = gr.Button("🗑️ Delete Selected Documents", variant="stop")
+                    with gr.Column(scale=2):
+                        components['add_tags_input'] = gr.Textbox(
+                            label="Add Tags",
+                            placeholder="Enter tags separated by commas (e.g., important, manual, checklist)",
+                            info="Tags will be added to all selected documents"
+                        )
+                    with gr.Column(scale=1):
+                        components['add_tags_btn'] = gr.Button("➕ Add Tags", variant="primary")
                 
-                components['delete_documents_output'] = gr.Textbox(
-                    label="Deletion Log",
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        components['remove_tags_input'] = gr.Textbox(
+                            label="Remove Tags",
+                            placeholder="Enter tags to remove, separated by commas",
+                            info="Tags will be removed from all selected documents"
+                        )
+                    with gr.Column(scale=1):
+                        components['remove_tags_btn'] = gr.Button("➖ Remove Tags", variant="secondary")
+                
+                components['tag_management_output'] = gr.Textbox(
+                    label="Tag Management Log",
                     lines=8,
                     interactive=False,
-                    placeholder="Select documents and confirm to delete..."
-                )
-    
-    return components
-
-
-def create_collection_documents_tab():
-    """Create the Collection Documents tab (replaces current Delete Documents tab)."""
-    components = {}
-    
-    with gr.TabItem("📚 Collection Documents"):
-        with gr.Tabs():
-            # Sub-tab: Add Documents
-            with gr.TabItem("➕ Add to Collection"):
-                gr.Markdown("### Add Documents to Current Collection")
-                
-                components['available_documents'] = gr.CheckboxGroup(
-                    label="Available Documents (not in current collection)",
-                    choices=[],
-                    interactive=True,
-                    info="Select documents to add to the current collection"
+                    placeholder="Select documents and add/remove tags above to see results..."
                 )
                 
-                with gr.Row():
-                    components['add_to_collection_btn'] = gr.Button("➕ Add to Collection", variant="primary")
-                
-                components['add_to_collection_output'] = gr.Textbox(
-                    label="Add Documents Log",
-                    lines=6,
+                # Show current tags for selected documents
+                components['current_tags_display'] = gr.Textbox(
+                    label="Current Tags for Selected Documents",
+                    lines=3,
                     interactive=False,
-                    placeholder="Select documents and click 'Add to Collection'..."
+                    placeholder="Select documents to view their current tags..."
                 )
-            
-            # Sub-tab: Remove from Collection
-            with gr.TabItem("➖ Remove from Collection"):
-                gr.Markdown("### Remove Documents from Current Collection")
-                gr.Markdown("**Note:** This only removes documents from the collection, not from the system.")
-                
-                with gr.Row():
-                    components['remove_from_collection_btn'] = gr.Button("➖ Remove Selected Documents", variant="secondary", scale=1)
-                
-                components['remove_from_collection_output'] = gr.Textbox(
-                    label="Remove Documents Log",
-                    lines=6,
-                    interactive=False,
-                    placeholder="Select documents from the left panel, then click 'Remove Selected Documents'..."
-                )
+
     
     return components
 
 
-def create_delete_tab():
-    """Create the Delete Documents tab (DEPRECATED - Use create_collection_documents_tab instead)."""
-    components = {}
-    
-    with gr.TabItem("🗑️ Delete Documents"):
-        gr.Markdown("### ⚠️ Delete Documents")
-        gr.Markdown("**Warning:** This action cannot be undone. Please select files carefully.")
-        
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("""
-                **Instructions:**
-                1. Select documents from the **"Documents in Collection"** section on the left
-                2. Click the delete button below
-                3. The selected documents will be permanently removed from the collection
-                """)
-                
-                with gr.Row():
-                    components['delete_btn'] = gr.Button("🗑️ Delete Selected Documents", variant="stop", scale=1)
-        
-        components['delete_output'] = gr.Textbox(
-            label="Deletion Log",
-            lines=8,
-            interactive=False,
-            placeholder="Select documents from the left panel, then click 'Delete Selected Documents'..."
-        )
-    
-    return components
+
+
+

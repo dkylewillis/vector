@@ -57,17 +57,6 @@ def get_info(web_service: VectorWebService, collection):
         return f"Error getting collection info: {e}"
 
 
-def create_new_collection(web_service: VectorWebService, display_name, description):
-    """Create new collection."""
-    if not display_name or not display_name.strip():
-        return "Please enter a collection name"
-    
-    try:
-        result = web_service.create_collection(display_name, description)
-        return result
-    except Exception as e:
-        return f"Error creating collection: {e}"
-
 
 def refresh_registry_documents(web_service: VectorWebService):
     """Refresh documents list from registry."""
@@ -90,16 +79,139 @@ def view_document_details(web_service: VectorWebService, selected_documents):
         return f"Error getting document details: {e}"
 
 
+def delete_selected_documents(web_service: VectorWebService, selected_documents, confirm_delete):
+    """Handle document deletion request."""
+    if not selected_documents:
+        return "Please select one or more documents to delete"
+    
+    if not confirm_delete:
+        return "Please check the confirmation box to proceed with deletion"
+    
+    try:
+        # Call the service method to delete documents
+        result = web_service.delete_documents(selected_documents, "chunks")  # Default collection
+        
+        # Provide more detailed feedback
+        deleted_count = len(selected_documents)
+        success_message = f"Deletion request processed for {deleted_count} document(s):\n"
+        for doc in selected_documents:
+            success_message += f"• {doc}\n"
+        
+        return f"{success_message}\n{result}"
+        
+    except Exception as e:
+        return f"Error during document deletion: {str(e)}"
+
+
+def handle_add_tags(web_service: VectorWebService, document_list: List[str], tags_input: str):
+    """Handle adding tags to selected documents."""
+    try:
+        result = web_service.add_document_tags(document_list, tags_input)
+        return result["message"]
+    except Exception as e:
+        return f"Error adding tags: {str(e)}"
+
+
+def handle_remove_tags(web_service: VectorWebService, document_list: List[str], tags_input: str):
+    """Handle removing tags from selected documents."""
+    try:
+        result = web_service.remove_document_tags(document_list, tags_input)
+        return result["message"]
+    except Exception as e:
+        return f"Error removing tags: {str(e)}"
+
+
+def handle_show_current_tags(web_service: VectorWebService, document_list: List[str]):
+    """Handle showing current tags for selected documents."""
+    try:
+        return web_service.get_document_tags(document_list)
+    except Exception as e:
+        return f"Error retrieving tags: {str(e)}"
+
+
+def refresh_tags_and_documents(web_service: VectorWebService, selected_tags: Optional[List[str]] = None):
+    """Refresh both tags dropdown and document list based on tag filter."""
+    try:
+        # Get all available tags
+        all_tags = web_service.get_all_tags()
+        
+        # Get filtered documents based on selected tags
+        if selected_tags:
+            filtered_documents = web_service.get_documents_by_tags(selected_tags)
+        else:
+            filtered_documents = web_service.get_registry_documents()
+        
+        # Return updates for both components
+        return (
+            gr.update(choices=all_tags),  # Update tag dropdown choices
+            gr.update(choices=filtered_documents, value=[])  # Update documents and clear selection
+        )
+    except Exception as e:
+        print(f"Error refreshing tags and documents: {e}")
+        return (
+            gr.update(choices=[]),
+            gr.update(choices=[], value=[])
+        )
+
+
+def filter_documents_by_tags(web_service: VectorWebService, selected_tags: Optional[List[str]] = None):
+    """Filter documents based on selected tags."""
+    try:
+        if selected_tags:
+            filtered_documents = web_service.get_documents_by_tags(selected_tags)
+        else:
+            filtered_documents = web_service.get_registry_documents()
+        
+        return gr.update(choices=filtered_documents, value=[])
+    except Exception as e:
+        print(f"Error filtering documents by tags: {e}")
+        return gr.update(choices=[], value=[])
+
+
+def process_uploaded_documents(web_service: VectorWebService, files, tags):
+    """Handle document processing request."""
+    if not files:
+        return "Please select one or more documents to process"
+    
+    try:
+        # Call the service method to process documents
+        result = web_service.process_documents(
+            files=files,
+            collection="chunks",  # Default collection
+            tags=tags
+        )
+        
+        return result
+        
+    except Exception as e:
+        return f"Error during document processing: {str(e)}"
+
+
 def connect_events(web_service, collection_dropdown, refresh_btn, search_components, 
-                  upload_components, info_components, management_components, 
-                  document_management_components, collection_documents_components, 
-                  delete_components, documents_checkboxgroup):
+                  upload_components, info_components, 
+                  document_management_components, 
+                  delete_components, documents_checkboxgroup, tag_filter_dropdown=None):
     """Connect all event handlers."""
     
     # Documents refresh (collection_dropdown is now None, refresh_btn is now refresh_docs_btn)
     if refresh_btn:
-        refresh_btn.click(
-            fn=lambda: refresh_registry_documents(web_service),
+        if tag_filter_dropdown:
+            refresh_btn.click(
+                fn=lambda selected_tags: refresh_tags_and_documents(web_service, selected_tags),
+                inputs=tag_filter_dropdown,
+                outputs=[tag_filter_dropdown, documents_checkboxgroup]
+            )
+        else:
+            refresh_btn.click(
+                fn=lambda: refresh_registry_documents(web_service),
+                outputs=documents_checkboxgroup
+            )
+    
+    # Tag filter functionality
+    if tag_filter_dropdown:
+        tag_filter_dropdown.change(
+            fn=lambda selected_tags: filter_documents_by_tags(web_service, selected_tags),
+            inputs=tag_filter_dropdown,
             outputs=documents_checkboxgroup
         )
     
@@ -155,6 +267,24 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
             ]
         )
     
+    # Upload/Process functionality - only connect if components exist
+    if (upload_components and 
+        'process_btn' in upload_components and 
+        'file_upload' in upload_components and
+        'upload_tags_input' in upload_components and
+        'processing_output' in upload_components):
+        
+        upload_components['process_btn'].click(
+            fn=lambda files, tags: process_uploaded_documents(
+                web_service, files, tags
+            ),
+            inputs=[
+                upload_components['file_upload'],
+                upload_components['upload_tags_input']
+            ],
+            outputs=upload_components['processing_output']
+        )
+    
     # Info functionality - only connect if components exist
     if (info_components and 
         'info_btn' in info_components and 
@@ -163,22 +293,6 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
         info_components['info_btn'].click(
             fn=lambda: get_info(web_service, "chunks"),  # Default to chunks collection
             outputs=info_components['info_output']
-        )
-    
-    # Management functionality - only connect if components exist
-    if (management_components and 
-        'create_btn' in management_components and 
-        'new_name_input' in management_components and
-        'new_desc_input' in management_components and
-        'management_output' in management_components):
-        
-        management_components['create_btn'].click(
-            fn=lambda name, desc: create_new_collection(web_service, name, desc),
-            inputs=[
-                management_components['new_name_input'],
-                management_components['new_desc_input']
-            ],
-            outputs=management_components['management_output']
         )
     
     # Document management - only connect if components exist
@@ -200,4 +314,60 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
             fn=lambda docs: view_document_details(web_service, docs),
             inputs=document_management_components['all_documents_list'],
             outputs=document_management_components['document_details_output']
+        )
+    
+    # Tag management functionality - only connect if components exist
+    if (document_management_components and 
+        'add_tags_btn' in document_management_components and
+        'add_tags_input' in document_management_components and
+        'tag_management_output' in document_management_components):
+        
+        document_management_components['add_tags_btn'].click(
+            fn=lambda tags_input, document_list: handle_add_tags(web_service, document_list, tags_input),
+            inputs=[
+                document_management_components['add_tags_input'],
+                documents_checkboxgroup
+            ],
+            outputs=document_management_components['tag_management_output']
+        )
+    
+    if (document_management_components and 
+        'remove_tags_btn' in document_management_components and
+        'remove_tags_input' in document_management_components and
+        'tag_management_output' in document_management_components):
+        
+        document_management_components['remove_tags_btn'].click(
+            fn=lambda tags_input, document_list: handle_remove_tags(web_service, document_list, tags_input),
+            inputs=[
+                document_management_components['remove_tags_input'],
+                documents_checkboxgroup
+            ],
+            outputs=document_management_components['tag_management_output']
+        )
+    
+    # Show current tags when documents are selected
+    if (document_management_components and 
+        'current_tags_display' in document_management_components):
+        
+        documents_checkboxgroup.change(
+            fn=lambda document_list: handle_show_current_tags(web_service, document_list),
+            inputs=documents_checkboxgroup,
+            outputs=document_management_components['current_tags_display']
+        )
+    
+    # Delete functionality - only connect if components exist
+    if (delete_components and 
+        'delete_selected_btn' in delete_components and
+        'confirm_delete_checkbox' in delete_components and
+        'delete_output' in delete_components):
+        
+        delete_components['delete_selected_btn'].click(
+            fn=lambda selected_docs, confirm: delete_selected_documents(
+                web_service, selected_docs, confirm
+            ),
+            inputs=[
+                documents_checkboxgroup,  # Selected documents from main panel
+                delete_components['confirm_delete_checkbox']
+            ],
+            outputs=delete_components['delete_output']
         )

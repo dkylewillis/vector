@@ -52,10 +52,15 @@ class DocumentRecord(BaseModel):
         """Add tags to the document.
         
         Args:
-            tags: List of tags to add
+            tags: List of tags to add (will be normalized to lowercase)
         """
+        if not tags:
+            return
+        
+        # Normalize to lowercase and remove duplicates
+        normalized_tags = [tag.strip().lower() for tag in tags if tag.strip()]
         current_tags = set(self.tags)
-        current_tags.update(tags)
+        current_tags.update(normalized_tags)
         self.tags = list(current_tags)
         self.last_updated = datetime.now(timezone.utc)
     
@@ -63,10 +68,15 @@ class DocumentRecord(BaseModel):
         """Remove tags from the document.
         
         Args:
-            tags: List of tags to remove
+            tags: List of tags to remove (will be normalized to lowercase)
         """
+        if not tags:
+            return
+        
+        # Normalize to lowercase for consistent removal
+        normalized_tags = [tag.strip().lower() for tag in tags if tag.strip()]
         current_tags = set(self.tags)
-        current_tags.difference_update(tags)
+        current_tags.difference_update(normalized_tags)
         self.tags = list(current_tags)
         self.last_updated = datetime.now(timezone.utc)
 
