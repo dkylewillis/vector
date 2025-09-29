@@ -251,15 +251,18 @@ class VectorPipeline:
         except Exception as e:
             print(f"❌ Failed to save converted document: {e}")
 
-    def run(self, file_path: str) -> str:
+    def run(self, file_path: str, tags: List[str] = None) -> str:
         """Process a file through the complete pipeline.
 
         Args:
             file_path: Path to the file to process.
+            tags: Optional list of tags to add to the document.
 
         Returns:
             Document ID (unique document name).
         """
+        if tags is None:
+            tags = []
         file_path = Path(file_path)
         base_path = "data/converted_documents"
         
@@ -314,7 +317,7 @@ class VectorPipeline:
         document_record.chunk_count = len(chunks)
         document_record.chunk_collection = chunk_collection
         document_record.artifact_collection = artifact_collection
-        document_record.tags = []
+        document_record.tags = tags  # Use provided tags instead of empty list
         self.registry.update_document(document_record)
 
         chunk_embeddings = self.embed_chunks(chunks)
@@ -340,7 +343,7 @@ class VectorPipeline:
             True if deletion was successful, False otherwise
         """
         # Get document info before deletion
-        document_record = self.registry.get_document_info(document_id)
+        document_record = self.registry.get_document(document_id)
         if not document_record:
             print(f"❌ Document {document_id} not found in registry")
             return False

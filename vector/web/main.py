@@ -13,10 +13,7 @@ logging.getLogger('docling.backend').setLevel(logging.WARNING)
 from ..config import Config
 from .service import VectorWebService
 from .components import (
-    create_header, create_collection_selector,
-    create_search_tab, create_upload_tab, create_info_tab,
-    create_delete_tab,
-    create_document_management_tab
+    create_header, create_search_tab, create_document_management_tab, create_upload_tab, create_info_tab,
 )
 from .handlers import connect_events
 
@@ -68,17 +65,15 @@ def create_vector_app() -> gr.Blocks:
                 with gr.Tabs():
                     # Create all tabs
                     search_components = create_search_tab()
+                    document_management_components = create_document_management_tab()
                     upload_components = create_upload_tab()
                     info_components = create_info_tab()
-                    document_management_components = create_document_management_tab()
-                    delete_components = create_delete_tab()
                 
                 # Connect event handlers
                 connect_events(
-                    web_service, None, refresh_docs_btn,
+                    web_service,refresh_docs_btn,
                     search_components, upload_components, info_components,
-                    document_management_components, 
-                    delete_components,
+                    document_management_components,
                     documents_checkboxgroup, tag_filter_dropdown
                 )
     

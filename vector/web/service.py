@@ -212,8 +212,13 @@ class VectorWebService:
                 results.append(f"\n📄 Processing file {i}/{len(files)}: {file_name}")
                 results.append("-" * 40)
 
+                # Parse tags if provided
+                parsed_tags = []
+                if tags and tags.strip():
+                    parsed_tags = [tag.strip().lower() for tag in tags.split(",") if tag.strip()]
+                
                 # Use pipeline to process the document
-                document_id = self.pipeline.run(file_path)
+                document_id = self.pipeline.run(file_path, tags=parsed_tags)
 
                 results.append(f"✅ Successfully processed: {file_name}")
                 results.append(f"   Document ID: {document_id}")
@@ -228,26 +233,10 @@ class VectorWebService:
                 print(error_msg)  # Also log to console
                 error_count += 1
 
-        # Add tags to successfully processed documents
+        # Add tags to successfully processed documents if any were processed
+        # but tags were not provided during initial processing
         if tags and tags.strip() and processed_document_ids:
-            results.append(f"\n🏷️  Adding tags to {len(processed_document_ids)} processed documents...")
-            
-            # Get document display names for the processed documents
-            processed_display_names = []
-            for doc_id in processed_document_ids:
-                try:
-                    doc_record = self.registry.get_document(doc_id)
-                    if doc_record:
-                        processed_display_names.append(doc_record.display_name)
-                except Exception as e:
-                    print(f"Error getting display name for {doc_id}: {e}")
-            
-            if processed_display_names:
-                try:
-                    tag_result = self.add_document_tags(processed_display_names, tags)
-                    results.append(f"📋 Tag Result: {tag_result.get('message', 'Tags added')}")
-                except Exception as e:
-                    results.append(f"⚠️  Error adding tags: {str(e)}")
+            results.append(f"\n🏷️  Note: Tags were added during document processing.")
 
         # Summary
         results.append("\n" + "=" * 50)
@@ -474,7 +463,7 @@ class VectorWebService:
                 results.append(f"❌ {display_name}: Document not found")
                 continue
             
-            doc_record = self.registry.get_document_info(document_id)
+            doc_record = self.registry.get_document(document_id)
             if doc_record and doc_record.tags:
                 tags_str = ", ".join(doc_record.tags)
                 results.append(f"📄 {display_name}: {tags_str}")

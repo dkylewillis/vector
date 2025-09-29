@@ -83,7 +83,7 @@ class DocumentChunker:
                 chunk_id=f"chunk_{len(processed_chunks)}",  # Generate sequential IDs
                 text=contextualized_text,
                 page_number=None,  # Not available in this version
-                headings=getattr(doc_chunk.meta, 'headings', []),  # Use safe attribute access
+                headings=getattr(doc_chunk.meta, 'headings', None) or [],  # Use safe attribute access
                 doc_items=doc_items,
                 artifacts=artifacts,
             )

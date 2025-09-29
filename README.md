@@ -1,13 +1,14 @@
-# Vector CLI System
+# Vector System
 
-A comprehensive command-line interface system for managing vector databases and AI-powered document operations. The system provides two complementary CLIs:
+A comprehensive AI-powered document processing and search system with multiple interfaces for different use cases. The system provides three main components:
 
 - **Vector Core CLI** (`vector-core`): Low-level vector database operations
-- **Vector Agent CLI** (`vector-agent`): High-level AI-powered search and document management
+- **Vector Agent CLI** (`vector-agent`): High-level AI-powered search and document management  
+- **Vector Web Interface** (`vector-web`): Gradio-based web UI for document upload, search, and management
 
 ## Overview
 
-The Vector CLI System provides two specialized interfaces:
+The Vector System provides three specialized interfaces:
 
 ### Vector Core CLI
 For **low-level vector database operations**:
@@ -23,6 +24,98 @@ For **high-level AI-powered operations**:
 - **Document Management**: Complete document lifecycle with cleanup
 - **Multi-Collection Operations**: Search across chunks and artifacts simultaneously
 
+### Vector Web Interface
+For **user-friendly web-based operations**:
+- **Document Upload**: Drag-and-drop file upload with automatic processing
+- **Interactive Search**: Real-time search with filtering by documents and tags
+- **AI Chat Interface**: Natural language questions with context-aware responses
+- **Document Management**: View, tag, and delete documents through the web UI
+- **Collection Monitoring**: Real-time collection statistics and system information
+
+## Vector Web Interface
+
+The Vector Web Interface provides a user-friendly Gradio-based web application for document processing, search, and management.
+
+### Starting the Web Interface
+
+The web interface is available after installing the package:
+
+```bash
+# Install the package in development mode
+pip install -e .
+
+# Start the web interface (Method 1 - using entry point)
+vector-web
+
+# Start the web interface (Method 2 - using module)
+python -m vector.web
+
+# Start the web interface (Method 3 - using standalone script)
+python vector_web.py
+```
+
+### Web Interface Features
+
+#### Document Upload & Processing
+- **Drag & Drop Upload**: Upload PDF, DOCX, and other document formats
+- **Automatic Processing**: Documents are automatically converted and embedded
+- **Real-time Feedback**: Progress indicators and status updates
+- **Batch Processing**: Upload multiple files simultaneously
+
+#### Interactive Search
+- **Semantic Search**: Find relevant content using natural language queries
+- **Document Filtering**: Select specific documents to search within
+- **Tag-based Filtering**: Filter by document tags for focused searches
+- **Result Ranking**: Results sorted by relevance with confidence scores
+
+#### AI-Powered Q&A
+- **Natural Language Questions**: Ask questions in plain English
+- **Context-Aware Responses**: AI provides detailed answers with source citations
+- **Response Length Control**: Choose short, medium, or long responses
+- **Source Tracking**: See which documents provided the context
+
+#### Document Management
+- **Document Library**: View all processed documents with metadata
+- **Tagging System**: Add and manage tags for better organization
+- **Document Deletion**: Remove documents and associated data
+- **Collection Statistics**: Monitor vector database usage and performance
+
+### Web Interface Usage
+
+#### Getting Started
+1. **Start the Interface**: Run `vector-web` to launch at http://127.0.0.1:7860
+2. **Upload Documents**: Use the "Upload Documents" tab to add your files
+3. **Wait for Processing**: Documents are automatically processed and indexed
+4. **Search or Ask**: Use the "Search" tab for finding content or "AI Chat" for questions
+
+#### Document Upload Workflow
+```bash
+# 1. Start the web interface
+vector-web
+
+# 2. Navigate to http://127.0.0.1:7860
+# 3. Go to "Upload Documents" tab
+# 4. Drag and drop your documents
+# 5. Add tags if desired
+# 6. Click "Process Documents"
+# 7. Wait for processing to complete
+```
+
+#### Search and Q&A Workflow
+```bash
+# 1. Use "Search" tab for finding relevant documents
+#    - Enter your search query
+#    - Select documents to search (optional)
+#    - Filter by tags (optional)
+#    - Review search results
+
+# 2. Use "AI Chat" tab for questions
+#    - Ask questions in natural language
+#    - Select response length
+#    - Choose document scope
+#    - Get detailed answers with sources
+```
+
 ## Vector Agent CLI
 
 The Vector Agent CLI provides high-level, AI-powered operations for document management and intelligent search.
@@ -36,6 +129,8 @@ The agent CLI is available after installing the package:
 pip install -e .
 
 # Use the agent CLI
+vector-agent [command] [options]
+# OR
 python -m vector.agent [command] [options]
 ```
 
@@ -227,31 +322,19 @@ The Vector Core CLI handles low-level vector database operations and direct coll
 
 ### Installation
 
-### Option 1: Package Installation
 ```bash
 # Install the package in development mode
 pip install -e .
 
 # Use the installed command
 vector-core [command] [options]
+# OR
+python -m vector.core [command] [options]
 ```
-
-### Option 2: Direct Script Execution
-```bash
-# Use the standalone runner script
-python vector_cli.py [command] [options]
-```
-
-### Dependencies
-The CLI uses only Python standard library modules:
-- `argparse` - Command-line argument parsing
-- `json` - JSON data handling
-- `sys` - System interface
-- Plus the existing vector core modules
 
 ### Configuration
 
-### Global Options
+#### Global Options
 
 Available for all commands:
 
@@ -263,12 +346,12 @@ Available for all commands:
 
 **Local Database:**
 ```bash
-python vector_cli.py [command] --db-path ./my_qdrant_db
+vector-core [command] --db-path ./my_qdrant_db
 ```
 
 **Remote Database:**
 ```bash
-python vector_cli.py [command] --url https://my-qdrant.example.com --api-key your_api_key
+vector-core [command] --url https://my-qdrant.example.com --api-key your_api_key
 ```
 
 ## Commands Reference
@@ -279,7 +362,7 @@ python vector_cli.py [command] --url https://my-qdrant.example.com --api-key you
 Create a new vector collection with specified parameters.
 
 ```bash
-python vector_cli.py create-collection <name> [options]
+vector-core create-collection <name> [options]
 ```
 
 **Options:**
@@ -289,23 +372,23 @@ python vector_cli.py create-collection <name> [options]
 **Examples:**
 ```bash
 # Basic collection with default settings
-python vector_cli.py create-collection my_documents
+vector-core create-collection my_documents
 
 # Custom vector size and distance metric
-python vector_cli.py create-collection embeddings_768 --vector-size 768 --distance cosine
+vector-core create-collection embeddings_768 --vector-size 768 --distance cosine
 
 # Collection for sentence transformers
-python vector_cli.py create-collection sentence_embeddings --vector-size 384 --distance cosine
+vector-core create-collection sentence_embeddings --vector-size 384 --distance cosine
 
 # Collection for OpenAI embeddings
-python vector_cli.py create-collection openai_embeddings --vector-size 1536 --distance cosine
+vector-core create-collection openai_embeddings --vector-size 1536 --distance cosine
 ```
 
 #### Delete Collection
 Remove a collection and all its data.
 
 ```bash
-python vector_cli.py delete-collection <name> [--force]
+vector-core delete-collection <name> [--force]
 ```
 
 **Options:**
@@ -314,17 +397,17 @@ python vector_cli.py delete-collection <name> [--force]
 **Examples:**
 ```bash
 # Interactive deletion with confirmation
-python vector_cli.py delete-collection old_collection
+vector-core delete-collection old_collection
 
 # Force deletion without confirmation
-python vector_cli.py delete-collection temp_collection --force
+vector-core delete-collection temp_collection --force
 ```
 
 #### List Collections
 Display all available collections in the database.
 
 ```bash
-python vector_cli.py list-collections
+vector-core list-collections
 ```
 
 **Example Output:**
@@ -340,12 +423,12 @@ Collections:
 Get detailed information about a specific collection.
 
 ```bash
-python vector_cli.py collection-info <collection_name>
+vector-core collection-info <collection_name>
 ```
 
 **Example:**
 ```bash
-python vector_cli.py collection-info document_chunks
+vector-core collection-info document_chunks
 ```
 
 **Example Output:**
@@ -363,7 +446,7 @@ Collection 'document_chunks' information:
 Add a vector point to a collection with optional payload data.
 
 ```bash
-python vector_cli.py insert-point <collection> <point_id> <vector> [--payload JSON]
+vector-core insert-point <collection> <point_id> <vector> [--payload JSON]
 ```
 
 **Parameters:**
@@ -375,23 +458,23 @@ python vector_cli.py insert-point <collection> <point_id> <vector> [--payload JS
 **Examples:**
 ```bash
 # Basic point insertion
-python vector_cli.py insert-point my_collection point_1 '[0.1, 0.2, 0.3, 0.4]'
+vector-core insert-point my_collection point_1 '[0.1, 0.2, 0.3, 0.4]'
 
 # Point with metadata payload
-python vector_cli.py insert-point documents doc_123 '[0.15, 0.25, 0.35, 0.45]' --payload '{"title": "Sample Document", "type": "article", "author": "John Doe"}'
+vector-core insert-point documents doc_123 '[0.15, 0.25, 0.35, 0.45]' --payload '{"title": "Sample Document", "type": "article", "author": "John Doe"}'
 
 # Document chunk with rich metadata
-python vector_cli.py insert-point chunks chunk_456 '[0.2, 0.3, 0.4, 0.5]' --payload '{"document_id": "doc_123", "chunk_number": 1, "text": "This is a sample text chunk", "page": 1}'
+vector-core insert-point chunks chunk_456 '[0.2, 0.3, 0.4, 0.5]' --payload '{"document_id": "doc_123", "chunk_number": 1, "text": "This is a sample text chunk", "page": 1}'
 
 # Image embedding with visual metadata
-python vector_cli.py insert-point images img_789 '[0.1, 0.4, 0.2, 0.6]' --payload '{"document_id": "doc_123", "type": "diagram", "caption": "System Architecture", "page": 5}'
+vector-core insert-point images img_789 '[0.1, 0.4, 0.2, 0.6]' --payload '{"document_id": "doc_123", "type": "diagram", "caption": "System Architecture", "page": 5}'
 ```
 
 #### Search Vectors
 Find similar vectors in a collection using cosine similarity or other distance metrics.
 
 ```bash
-python vector_cli.py search <collection> <query_vector> [options]
+vector-core search <collection> <query_vector> [options]
 ```
 
 **Options:**
@@ -401,16 +484,16 @@ python vector_cli.py search <collection> <query_vector> [options]
 **Examples:**
 ```bash
 # Basic similarity search
-python vector_cli.py search documents '[0.1, 0.2, 0.3, 0.4]'
+vector-core search documents '[0.1, 0.2, 0.3, 0.4]'
 
 # Search with more results
-python vector_cli.py search documents '[0.1, 0.2, 0.3, 0.4]' --top-k 10
+vector-core search documents '[0.1, 0.2, 0.3, 0.4]' --top-k 10
 
 # Search within specific documents
-python vector_cli.py search chunks '[0.15, 0.25, 0.35, 0.45]' --document-ids '["doc_123", "doc_456", "doc_789"]'
+vector-core search chunks '[0.15, 0.25, 0.35, 0.45]' --document-ids '["doc_123", "doc_456", "doc_789"]'
 
 # Find similar chunks with detailed results
-python vector_cli.py search document_chunks '[0.2, 0.3, 0.4, 0.5]' --top-k 3
+vector-core search document_chunks '[0.2, 0.3, 0.4, 0.5]' --top-k 3
 ```
 
 **Example Output:**
@@ -435,16 +518,16 @@ Search results for collection 'documents':
 Show all unique documents in a collection.
 
 ```bash
-python vector_cli.py list-documents <collection>
+vector-core list-documents <collection>
 ```
 
 **Examples:**
 ```bash
 # List all documents in a collection
-python vector_cli.py list-documents document_chunks
+vector-core list-documents document_chunks
 
 # Check documents in artifacts collection
-python vector_cli.py list-documents document_artifacts
+vector-core list-documents document_artifacts
 ```
 
 **Example Output:**
@@ -463,7 +546,7 @@ Total: 5 documents
 Remove all points associated with a specific document ID.
 
 ```bash
-python vector_cli.py delete-document <collection> <document_id> [--force]
+vector-core delete-document <collection> <document_id> [--force]
 ```
 
 **Options:**
@@ -472,10 +555,10 @@ python vector_cli.py delete-document <collection> <document_id> [--force]
 **Examples:**
 ```bash
 # Interactive document deletion
-python vector_cli.py delete-document chunks doc_123
+vector-core delete-document chunks doc_123
 
 # Force deletion without confirmation
-python vector_cli.py delete-document artifacts old_doc_456 --force
+vector-core delete-document artifacts old_doc_456 --force
 ```
 
 ## Complete Workflow Examples
@@ -484,59 +567,59 @@ python vector_cli.py delete-document artifacts old_doc_456 --force
 
 ```bash
 # 1. Create collections for a new document set
-python vector_cli.py create-collection legal_docs_chunks --vector-size 384
-python vector_cli.py create-collection legal_docs_artifacts --vector-size 384
+vector-core create-collection legal_docs_chunks --vector-size 384
+vector-core create-collection legal_docs_artifacts --vector-size 384
 
 # 2. Verify collections were created
-python vector_cli.py list-collections
+vector-core list-collections
 
 # 3. Check collection details
-python vector_cli.py collection-info legal_docs_chunks
+vector-core collection-info legal_docs_chunks
 
 # 4. Process and insert document chunks (example with sample data)
-python vector_cli.py insert-point legal_docs_chunks chunk_001 '[0.1, 0.2, ...]' --payload '{"document_id": "ordinance_123", "page": 1, "section": "Zoning Requirements"}'
+vector-core insert-point legal_docs_chunks chunk_001 '[0.1, 0.2, ...]' --payload '{"document_id": "ordinance_123", "page": 1, "section": "Zoning Requirements"}'
 
 # 5. Insert document artifacts (tables, images)
-python vector_cli.py insert-point legal_docs_artifacts artifact_001 '[0.3, 0.4, ...]' --payload '{"document_id": "ordinance_123", "type": "table", "caption": "Setback Requirements"}'
+vector-core insert-point legal_docs_artifacts artifact_001 '[0.3, 0.4, ...]' --payload '{"document_id": "ordinance_123", "type": "table", "caption": "Setback Requirements"}'
 
 # 6. Search for relevant content
-python vector_cli.py search legal_docs_chunks '[0.15, 0.25, ...]' --top-k 5
+vector-core search legal_docs_chunks '[0.15, 0.25, ...]' --top-k 5
 
 # 7. List all processed documents
-python vector_cli.py list-documents legal_docs_chunks
+vector-core list-documents legal_docs_chunks
 
 # 8. Clean up if needed
-python vector_cli.py delete-document legal_docs_chunks old_ordinance_456 --force
+vector-core delete-document legal_docs_chunks old_ordinance_456 --force
 ```
 
 ### Multi-Collection Search Workflow
 
 ```bash
 # Search across different collection types
-python vector_cli.py search document_chunks '[0.1, 0.2, 0.3, 0.4]' --top-k 3
-python vector_cli.py search document_artifacts '[0.1, 0.2, 0.3, 0.4]' --top-k 3
+vector-core search document_chunks '[0.1, 0.2, 0.3, 0.4]' --top-k 3
+vector-core search document_artifacts '[0.1, 0.2, 0.3, 0.4]' --top-k 3
 
 # Filter search by specific documents
-python vector_cli.py search all_documents '[0.2, 0.3, 0.4, 0.5]' --document-ids '["important_doc", "reference_manual"]'
+vector-core search all_documents '[0.2, 0.3, 0.4, 0.5]' --document-ids '["important_doc", "reference_manual"]'
 ```
 
 ### Database Maintenance
 
 ```bash
 # 1. List all collections to see current state
-python vector_cli.py list-collections
+vector-core list-collections
 
 # 2. Get information about each collection
-python vector_cli.py collection-info collection_name
+vector-core collection-info collection_name
 
 # 3. Check document counts
-python vector_cli.py list-documents collection_name
+vector-core list-documents collection_name
 
 # 4. Clean up old collections
-python vector_cli.py delete-collection temp_collection --force
+vector-core delete-collection temp_collection --force
 
 # 5. Verify cleanup
-python vector_cli.py list-collections
+vector-core list-collections
 ```
 
 ## Advanced Usage Patterns
@@ -550,7 +633,7 @@ For batch operations, you can create shell scripts:
 # create_test_collections.ps1
 $collections = @("docs_v1", "docs_v2", "docs_v3")
 foreach ($collection in $collections) {
-    python vector_cli.py create-collection $collection --vector-size 768
+    vector-core create-collection $collection --vector-size 768
 }
 ```
 
@@ -560,7 +643,7 @@ foreach ($collection in $collections) {
 # create_test_collections.sh
 collections=("docs_v1" "docs_v2" "docs_v3")
 for collection in "${collections[@]}"; do
-    python vector_cli.py create-collection "$collection" --vector-size 768
+    vector-core create-collection "$collection" --vector-size 768
 done
 ```
 
@@ -573,7 +656,7 @@ import json
 
 def run_cli_command(args):
     """Execute a CLI command and return results."""
-    cmd = ["python", "vector_cli.py"] + args
+    cmd = ["vector-core"] + args
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0, result.stdout, result.stderr
 
@@ -601,26 +684,26 @@ The CLI provides comprehensive error handling with clear messages:
 
 **Invalid JSON:**
 ```bash
-python vector_cli.py insert-point test invalid_id '[0.1, 0.2, invalid]'
+vector-core insert-point test invalid_id '[0.1, 0.2, invalid]'
 # Output: [ERROR] JSON parsing error: Expecting value: line 1 column 15 (char 14)
 ```
 
 **Collection Not Found:**
 ```bash
-python vector_cli.py search nonexistent_collection '[0.1, 0.2]'
+vector-core search nonexistent_collection '[0.1, 0.2]'
 # Output: [ERROR] Collection 'nonexistent_collection' does not exist
 ```
 
 **Vector Dimension Mismatch:**
 ```bash
 # Collection expects 384 dimensions, but vector has 3
-python vector_cli.py insert-point my_collection point1 '[0.1, 0.2, 0.3]'
+vector-core insert-point my_collection point1 '[0.1, 0.2, 0.3]'
 # Output: [ERROR] Error inserting point: Vector dimension mismatch
 ```
 
 **Database Connection Issues:**
 ```bash
-python vector_cli.py list-collections --url http://invalid-url
+vector-core list-collections --url http://invalid-url
 # Output: [ERROR] Connection failed: Unable to connect to database
 ```
 
@@ -657,9 +740,9 @@ python vector_cli.py list-collections --url http://invalid-url
 
 **Command not recognized:**
 ```bash
-# Ensure you're in the correct directory
-cd /path/to/vector/project
-python vector_cli.py --help
+# Ensure the package is installed correctly
+pip install -e .
+vector-core --help
 ```
 
 **Import errors:**
@@ -683,74 +766,94 @@ ls -la ./qdrant_db/
 # Consider using remote Qdrant instance
 ```
 
-## CLI Integration and Workflows
+## System Integration and Workflows
 
-The Vector Core CLI and Vector Agent CLI work together to provide a complete document management solution:
+The Vector System's three components work together to provide a complete document management solution:
 
 ### Complete Document Lifecycle
 
 ```bash
 # 1. Set up collections (Core CLI)
-python vector_cli.py create-collection documents_chunks --vector-size 384
-python vector_cli.py create-collection documents_artifacts --vector-size 384
+vector-core create-collection documents_chunks --vector-size 384
+vector-core create-collection documents_artifacts --vector-size 384
 
 # 2. Verify setup (Core CLI)
-python vector_cli.py list-collections
-python vector_cli.py collection-info documents_chunks
+vector-core list-collections
+vector-core collection-info documents_chunks
 
-# 3. Process documents (Pipeline - not CLI, but part of workflow)
-# Documents get processed and stored in collections
+# 3. Process documents (Web Interface - preferred) 
+# OR use Pipeline programmatically
+vector-web  # Upload documents via web interface
 
 # 4. Search and analyze (Agent CLI)
-python -m vector.agent search "building codes" --type both --verbose
-python -m vector.agent ask "What are the parking requirements?" --length medium
+vector-agent search "building codes" --type both --verbose
+vector-agent ask "What are the parking requirements?" --length medium
 
-# 5. Document cleanup (Agent CLI) - NEW DELETE FUNCTIONALITY
-python -m vector.agent delete --name "outdated document" --force
+# 5. Document cleanup (Agent CLI)
+vector-agent delete --name "outdated document" --force
 
 # 6. Verify cleanup (Agent CLI)
-python -m vector.agent collection-info
+vector-agent collection-info
 ```
 
 ### Mixed Operations Example
 
 ```bash
 # Use Core CLI for collection management
-python vector_cli.py create-collection legal_docs --vector-size 1536
+vector-core create-collection legal_docs --vector-size 1536
+
+# Use Web Interface for document upload and processing
+vector-web  # Upload documents via web interface
 
 # Use Agent CLI for intelligent operations  
-python -m vector.agent ask "zoning requirements" --chunks-collection legal_docs
+vector-agent ask "zoning requirements" --chunks-collection legal_docs
 
 # Use Core CLI for low-level inspection
-python vector_cli.py list-documents legal_docs
-python vector_cli.py collection-info legal_docs
+vector-core list-documents legal_docs
+vector-core collection-info legal_docs
 
-# Use Agent CLI for complete document removal (NEW)
-python -m vector.agent delete --document-id doc123 --no-cleanup
+# Use Agent CLI for complete document removal
+vector-agent delete --document-id doc123 --no-cleanup
 ```
 
-### When to Use Each CLI
+### When to Use Each Interface
 
-**Use Vector Core CLI (`vector-core` or `vector_cli.py`) for:**
+**Use Vector Web Interface (`vector-web`) for:**
+- Document upload and processing
+- Interactive search and exploration
+- Natural language questions with immediate feedback
+- Document management and organization
+- Users who prefer GUI over command line
+- Demonstrations and presentations
+
+**Use Vector Core CLI (`vector-core`) for:**
 - Creating and configuring collections
 - Low-level vector operations
 - Direct point insertion and search
 - Database administration
 - Debugging vector operations
+- Automation and scripting
 
-**Use Vector Agent CLI (`python -m vector.agent`) for:**
-- Intelligent document search
-- Natural language questions
-- Complete document management (including NEW delete functionality)
-- AI-powered analysis
-- High-level document operations
+**Use Vector Agent CLI (`vector-agent`) for:**
+- Intelligent document search from command line
+- Natural language questions in scripts
+- Complete document management including deletion
+- AI-powered analysis in batch processes
+- Integration with other command-line tools
 
 ## Contributing
 
-When extending the CLI system:
+When extending the Vector System:
+
+**For Vector Web Interface:**
+1. Add new components to `vector/web/components.py`
+2. Update handlers in `vector/web/handlers.py`
+3. Modify the main app in `vector/web/main.py`
+4. Update web service in `vector/web/service.py`
+5. Update this README with new functionality
 
 **For Vector Core CLI:**
-1. Add new commands to `vector/cli/commands.py`
+1. Add new commands to `vector/core/cli.py`
 2. Update argument parser in `setup_parser()`
 3. Add command handlers to the `VectorStoreCLI` class
 4. Update this README with new command documentation
@@ -766,7 +869,8 @@ When extending the CLI system:
 - Add tests to verify functionality
 - Follow existing error handling patterns
 - Use consistent help text formatting
-- Consider both interactive and scripted usage
+- Consider all three interfaces for feature parity where appropriate
+- Update entry points in `pyproject.toml` if adding new CLI commands
 
 ## Support
 
@@ -778,18 +882,33 @@ For issues and questions:
 
 ## Recent Updates
 
-### Document Delete Functionality (NEW)
-The Vector Agent CLI now includes comprehensive document deletion capabilities:
+### Vector System Refactor (v2.0.0)
+Major refactor with new architecture and features:
 
-- **Delete by ID**: `python -m vector.agent delete --document-id abc123`
-- **Delete by Name**: `python -m vector.agent delete --name "Document Name"`
+- **Three-Interface Architecture**: Web UI, Agent CLI, and Core CLI for different use cases
+- **Web Interface**: New Gradio-based web application for document management
+- **Improved CLI Structure**: Separate entry points for core and agent operations
+- **Enhanced Document Processing**: Better pipeline with automatic processing
+- **Tag Management**: Document tagging and filtering capabilities
+- **Real-time Updates**: Live collection statistics and document management
+
+### Document Delete Functionality
+The Vector Agent CLI includes comprehensive document deletion capabilities:
+
+- **Delete by ID**: `vector-agent delete --document-id abc123`
+- **Delete by Name**: `vector-agent delete --name "Document Name"`
 - **Safety Features**: Confirmation prompts and `--force` option
 - **Flexible Cleanup**: `--no-cleanup` to preserve files while removing vectors
 - **Complete Removal**: Deletes vectors, registry entries, and saved files
 - **Error Handling**: Clear messages for missing or ambiguous documents
 
-This feature provides a complete document lifecycle management solution when combined with the existing pipeline processing capabilities.
+## Examples and Testing
 
-## Examples Repository
+The `tests/` directory contains comprehensive examples of all functionality:
 
-The `test_cli.py` script provides comprehensive examples of all CLI functionality and can serve as a reference for integration patterns.
+- **CLI Tests**: `test_cli.py` - Examples of both Core and Agent CLI usage
+- **Pipeline Tests**: `test_pipeline_run.py` - Document processing workflows
+- **Search Tests**: `test_search_handler.py` - Search functionality examples
+- **Deletion Tests**: `test_delete_command.py` - Document cleanup examples
+
+These test files serve as reference implementations for integration patterns and can help understand the complete system capabilities.

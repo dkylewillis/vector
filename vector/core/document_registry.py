@@ -44,7 +44,7 @@ class VectorRegistry:
         print(f"✅ Registered document: {unique_display_name}")
         return document_record
         
-    def get_document_info(self, document_id: str) -> Optional[DocumentRecord]:
+    def get_document(self, document_id: str) -> Optional[DocumentRecord]:
         """Get information about a registered document.
         
         Args:
@@ -173,10 +173,10 @@ class VectorRegistry:
         Returns:
             True if successful, False otherwise
         """
-        document_record = self.get_document_info(document_id)
+        document_record = self.get_document(document_id)
         if document_record is None:
             return False
-        
+
         # Normalize tags to lowercase at registry level for consistency
         normalized_tags = [tag.strip().lower() for tag in tags if tag.strip()]
         document_record.add_tags(normalized_tags)
@@ -192,7 +192,7 @@ class VectorRegistry:
         Returns:
             True if successful, False otherwise
         """
-        document_record = self.get_document_info(document_id)
+        document_record = self.get_document(document_id)
         if document_record is None:
             return False
         
@@ -258,7 +258,7 @@ class VectorRegistry:
         Returns:
             True if successful, False otherwise
         """
-        document_record = self.get_document_info(document_id)
+        document_record = self.get_document(document_id)
         if not document_record:
             return False
         

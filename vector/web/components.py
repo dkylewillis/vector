@@ -14,69 +14,6 @@ def create_header():
         """)
 
 
-def create_collection_selector(collections: List[str], default_collection: str, initial_documents: List[str] = None):
-    """Create collection selector with document list."""
-    if initial_documents is None:
-        initial_documents = []
-        
-    with gr.Column():
-        gr.Markdown("**Collection Selector**")
-        collection_dropdown = gr.Dropdown(
-            choices=collections,
-            value=default_collection,
-            label="Collection",
-            interactive=True
-        )
-        refresh_btn = gr.Button("Refresh Collections", interactive=True)
-        documents_checkboxgroup = gr.CheckboxGroup(
-            choices=[],
-            label="Documents",
-            interactive=False
-        )
-    
-    return collection_dropdown, refresh_btn, documents_checkboxgroup
-
-
-def create_delete_tab():
-    """Create delete tab components."""
-    with gr.TabItem("🗑️ Delete", elem_id="delete_tab"):
-        gr.Markdown("### Delete Documents")
-        gr.Markdown("""
-        **⚠️ Warning:** This will permanently delete documents from the system and all collections.
-        
-        **Instructions:**
-        1. Select documents from the main document list on the left
-        2. Check the confirmation box below
-        3. Click 'Delete Selected Documents'
-        """)
-        
-        delete_documents_list = gr.CheckboxGroup(
-            label="Documents to Delete",
-            choices=[],
-            interactive=False
-        )
-        
-        confirm_delete_checkbox = gr.Checkbox(
-            label="I understand this action cannot be undone",
-            value=False,
-            interactive=True
-        )
-        
-        delete_selected_btn = gr.Button("Delete Selected Documents", interactive=True)
-        delete_output = gr.Textbox(
-            label="Delete Status",
-            value="",
-            interactive=False
-        )
-    
-    return {
-        'delete_documents_list': delete_documents_list,
-        'confirm_delete_checkbox': confirm_delete_checkbox,
-        'delete_selected_btn': delete_selected_btn,
-        'delete_output': delete_output
-    }
-
-
 def create_search_tab():
     """Create the Search & Ask tab."""
     components = {}
@@ -214,7 +151,6 @@ def create_info_tab():
     with gr.TabItem("📊 Collection Info"):
         with gr.Row():
             components['info_btn'] = gr.Button("📊 Get Collection Info", variant="primary")
-            components['metadata_btn'] = gr.Button("📋 Get Metadata Summary", variant="secondary")
         
         components['info_output'] = gr.Textbox(
             label="Collection Information",
@@ -222,11 +158,6 @@ def create_info_tab():
             interactive=False
         )
         
-        components['metadata_summary'] = gr.Textbox(
-            label="Metadata Summary",
-            lines=20,
-            interactive=False
-        )
     
     return components
 
@@ -237,24 +168,18 @@ def create_document_management_tab():
     
     with gr.TabItem("📄 Document Management"):
         with gr.Tabs():
-            # Sub-tab: All Documents
-            with gr.TabItem("📋 All Documents"):
-                with gr.Row():
-                    components['refresh_docs_btn'] = gr.Button("🔄 Refresh Documents", variant="secondary")
-                    components['view_details_btn'] = gr.Button("🔍 View Details", variant="primary")
+            # Sub-tab: Document Details
+            with gr.TabItem("📋 Document Details"):
+                gr.Markdown("### Document Details")
+                gr.Markdown("Select documents from the main document list on the left, then click 'View Details' to see information.")
                 
-                components['all_documents_list'] = gr.CheckboxGroup(
-                    label="Available Documents",
-                    choices=[],
-                    interactive=True,
-                    elem_classes="document-checkbox-group"
-                )
+                components['view_details_btn'] = gr.Button("🔍 View Details", variant="primary")
                 
                 components['document_details_output'] = gr.Textbox(
                     label="Document Details",
                     lines=10,
                     interactive=False,
-                    placeholder="Select documents and click 'View Details' to see information..."
+                    placeholder="Select documents from the left panel and click 'View Details' to see information..."
                 )
             
             # Sub-tab: Manage Tags
@@ -295,6 +220,32 @@ def create_document_management_tab():
                     lines=3,
                     interactive=False,
                     placeholder="Select documents to view their current tags..."
+                )
+            
+            # Sub-tab: Delete Documents
+            with gr.TabItem("🗑️ Delete Documents"):
+                gr.Markdown("### Delete Documents")
+                gr.Markdown("""
+                **⚠️ Warning:** This will permanently delete documents from the system and all collections.
+                
+                **Instructions:**
+                1. Select documents from the main document list on the left
+                2. Check the confirmation box below
+                3. Click 'Delete Selected Documents'
+                """)
+                
+                components['confirm_delete_checkbox'] = gr.Checkbox(
+                    label="I understand this action cannot be undone",
+                    value=False,
+                    interactive=True
+                )
+                
+                components['delete_selected_btn'] = gr.Button("Delete Selected Documents", variant="primary")
+                components['delete_output'] = gr.Textbox(
+                    label="Delete Status",
+                    lines=6,
+                    interactive=False,
+                    placeholder="Select documents from the left panel, confirm deletion, and click the delete button..."
                 )
 
     

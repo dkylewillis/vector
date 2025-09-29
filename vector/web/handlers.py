@@ -187,10 +187,10 @@ def process_uploaded_documents(web_service: VectorWebService, files, tags):
         return f"Error during document processing: {str(e)}"
 
 
-def connect_events(web_service, collection_dropdown, refresh_btn, search_components, 
+def connect_events(web_service, refresh_btn, search_components, 
                   upload_components, info_components, 
                   document_management_components, 
-                  delete_components, documents_checkboxgroup, tag_filter_dropdown=None):
+                  documents_checkboxgroup, tag_filter_dropdown=None):
     """Connect all event handlers."""
     
     # Documents refresh (collection_dropdown is now None, refresh_btn is now refresh_docs_btn)
@@ -297,22 +297,12 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
     
     # Document management - only connect if components exist
     if (document_management_components and 
-        'refresh_docs_btn' in document_management_components and
-        'all_documents_list' in document_management_components):
-        
-        document_management_components['refresh_docs_btn'].click(
-            fn=lambda: refresh_registry_documents(web_service),
-            outputs=document_management_components['all_documents_list']
-        )
-    
-    if (document_management_components and 
         'view_details_btn' in document_management_components and
-        'all_documents_list' in document_management_components and
         'document_details_output' in document_management_components):
         
         document_management_components['view_details_btn'].click(
             fn=lambda docs: view_document_details(web_service, docs),
-            inputs=document_management_components['all_documents_list'],
+            inputs=documents_checkboxgroup,  # Use main selected documents from left panel
             outputs=document_management_components['document_details_output']
         )
     
@@ -355,19 +345,19 @@ def connect_events(web_service, collection_dropdown, refresh_btn, search_compone
             outputs=document_management_components['current_tags_display']
         )
     
-    # Delete functionality - only connect if components exist
-    if (delete_components and 
-        'delete_selected_btn' in delete_components and
-        'confirm_delete_checkbox' in delete_components and
-        'delete_output' in delete_components):
+    # Delete functionality - now part of document management
+    if (document_management_components and 
+        'delete_selected_btn' in document_management_components and
+        'confirm_delete_checkbox' in document_management_components and
+        'delete_output' in document_management_components):
         
-        delete_components['delete_selected_btn'].click(
+        document_management_components['delete_selected_btn'].click(
             fn=lambda selected_docs, confirm: delete_selected_documents(
                 web_service, selected_docs, confirm
             ),
             inputs=[
                 documents_checkboxgroup,  # Selected documents from main panel
-                delete_components['confirm_delete_checkbox']
+                document_management_components['confirm_delete_checkbox']
             ],
-            outputs=delete_components['delete_output']
+            outputs=document_management_components['delete_output']
         )
