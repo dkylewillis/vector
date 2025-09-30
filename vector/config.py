@@ -130,3 +130,14 @@ class Config:
         
         # Fall back to config file
         return self._config_data.get('openai', {}).get('api_key')
+    
+    # Storage configuration
+    @property
+    def storage_converted_documents_dir(self) -> str:
+        """Get converted documents directory from config."""
+        return self._config_data.get('storage', {}).get('converted_documents_dir', './data/converted_documents')
+    
+    @property 
+    def storage_registry_dir(self) -> str:
+        """Get registry directory from config."""
+        return self._config_data.get('storage', {}).get('registry_dir', './vector_registry')

@@ -912,3 +912,21 @@ The `tests/` directory contains comprehensive examples of all functionality:
 - **Deletion Tests**: `test_delete_command.py` - Document cleanup examples
 
 These test files serve as reference implementations for integration patterns and can help understand the complete system capabilities.
+
+## License
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this project except in compliance with the License. You may obtain a copy of the License in the `LICENSE` file or at:
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+Copyright (c) 2025 Vector Team
+
+### Third-Party Licenses
+
+This project includes third-party software:
+
+- Docling (MIT License, Copyright © IBM and contributors) — see `LICENSES/Docling.txt`.
+
+Additional third-party license texts (if any are added later) will reside in the `LICENSES/` directory and be referenced in the `NOTICE` file.

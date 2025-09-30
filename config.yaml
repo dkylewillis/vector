@@ -33,9 +33,6 @@ vector_database:
   api_key: null                     # Set QDRANT_API_KEY environment variable
   collection_name: "default"  # Default collection name
   
-  # Collection metadata storage
-  collections_metadata_file: "./collection_metadata.json"  # Path to collection metadata storage
-  
   # Legacy local storage (deprecated)
   local_path: "./qdrant_db"         # Path for local file storage
 
@@ -43,8 +40,9 @@ vector_database:
 
 # Storage Configuration
 storage:
-  backend: "filesystem"               # Options: 'filesystem', 'postgresql' (future)
-  artifacts_dir: "./data"             # Base directory for processed data storage
+  converted_documents_dir: "./data/converted_documents"               
+  registry_dir: "./vector_registry"            
+
   
   # PostgreSQL configuration (when using postgresql backend - future)
   # postgres_connection_string: "postgresql://user:password@localhost/vectordb"

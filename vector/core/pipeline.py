@@ -8,6 +8,7 @@ from .embedder import Embedder
 from .vector_store import VectorStore
 from .models import ConvertedDocument, Chunk, Artifact, get_item_by_ref
 from .document_registry import VectorRegistry, DocumentRecord
+from ..config import Config
 
 from docling_core.types.doc.document import ImageRefMode, DoclingDocument
 
@@ -16,13 +17,14 @@ from docling_core.types.doc.document import ImageRefMode, DoclingDocument
 class VectorPipeline:
     """Simple pipeline for document processing and vector storage."""
     
-    def __init__(self):
+    def __init__(self, config=None):
         """Initialize pipeline with default components."""
+        self.config = config or Config()
         self.converter = DocumentConverter()
         self.chunker = DocumentChunker()
         self.embedder = Embedder()
         self.store = VectorStore()
-        self.registry = VectorRegistry()
+        self.registry = VectorRegistry(config=self.config)
 
     def convert(self, file_path: str) -> ConvertedDocument:
         """Convert a document file to ConvertedDocument.
@@ -168,7 +170,7 @@ class VectorPipeline:
         return thumbnail
 
     def save_artifacts(self, doc: DoclingDocument, artifacts: List[Artifact], document_name: str, 
-                      base_path: str = "data/converted_documents", 
+                      base_path: str = None, 
                       create_thumbnails: bool = False, 
                       thumbnail_size: tuple = (200, 200)) -> None:
         """Save artifact images to filesystem in document-specific folder structure.
@@ -183,6 +185,10 @@ class VectorPipeline:
         if not artifacts:
             print("No artifacts to save")
             return
+        
+        # Use config value if base_path not provided
+        if base_path is None:
+            base_path = self.config.storage_converted_documents_dir
             
         # Create document-specific directory with artifacts subfolder
         doc_dir = Path(base_path) / document_name
@@ -228,7 +234,7 @@ class VectorPipeline:
         if create_thumbnails:
             print(f"✅ Created {thumbnail_count} thumbnails")
 
-    def save_converted_document(self, converted_doc: ConvertedDocument, document_name: str, base_path: str = "data/converted_documents") -> None:
+    def save_converted_document(self, converted_doc: ConvertedDocument, document_name: str, base_path: str = None) -> None:
         """Save the entire converted document as JSON in a document-specific folder.
         
         Args:
@@ -236,6 +242,10 @@ class VectorPipeline:
             document_name: Name of the document (used for folder structure)
             base_path: Base directory to save the document
         """
+        
+        # Use config value if base_path not provided
+        if base_path is None:
+            base_path = self.config.storage_converted_documents_dir
 
         # Create document-specific directory
         doc_dir = Path(base_path) / document_name
@@ -264,7 +274,7 @@ class VectorPipeline:
         if tags is None:
             tags = []
         file_path = Path(file_path)
-        base_path = "data/converted_documents"
+        base_path = self.config.storage_converted_documents_dir
         
         # Generate unique document name to prevent conflicts
         document_name = self._get_unique_document_name(file_path.stem, base_path)
@@ -377,7 +387,7 @@ class VectorPipeline:
         # Delete files if requested
         if cleanup_files:
             try:
-                base_path = Path("data/converted_documents")
+                base_path = Path(self.config.storage_converted_documents_dir)
                 # Extract document name from display_name (remove counter suffix if present)
                 doc_name = document_record.display_name
                 if " (" in doc_name and doc_name.endswith(")"):

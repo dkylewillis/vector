@@ -6,17 +6,25 @@ from datetime import datetime, timezone
 import uuid
 from .models import DocumentRecord
 from typing import Dict, List, Set
+from ..config import Config
 
 
 class VectorRegistry:
     """Registry for managing processed documents and their lifecycle."""
     
-    def __init__(self, registry_path: str = "vector_registry"):
+    def __init__(self, registry_path: str = None, config=None):
         """Initialize the registry with a storage location.
         
         Args:
             registry_path: Path to directory where registry files are stored
+            config: Config object to get registry_dir from
         """
+        self.config = config or Config()
+        
+        # Use config registry_dir if registry_path not provided
+        if registry_path is None:
+            registry_path = self.config.storage_registry_dir
+            
         self.registry_path = Path(registry_path)
         self.registry_path.mkdir(parents=True, exist_ok=True)
 

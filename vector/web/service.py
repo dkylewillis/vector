@@ -22,13 +22,13 @@ class VectorWebService:
         try:
             # Initialize components
             self.store = VectorStore(db_path=self.config.vector_db_path)
-            self.registry = VectorRegistry()
+            self.registry = VectorRegistry(config=self.config)
             self.agent = ResearchAgent(
                 config=self.config,
                 chunks_collection="chunks",
                 artifacts_collection="artifacts"
             )
-            self.pipeline = VectorPipeline()
+            self.pipeline = VectorPipeline(config=self.config)
             print("✅ VectorWebService initialized successfully")
         except Exception as e:
             print(f"⚠️  Error initializing VectorWebService: {e}")
@@ -501,7 +501,7 @@ class VectorWebService:
             selected_tags: List of tags to filter by. If None or empty, returns all documents.
             
         Returns:
-            List of document display names that have any of the selected tags
+            List of document display names that have all of the selected tags
         """
         if not self.registry:
             return []
@@ -515,8 +515,8 @@ class VectorWebService:
             filtered_documents = []
             for doc in documents:
                 if doc.tags:
-                    # Check if document has any of the selected tags
-                    if any(tag in doc.tags for tag in selected_tags):
+                    # Check if document has all of the selected tags (AND operation)
+                    if all(tag in doc.tags for tag in selected_tags):
                         filtered_documents.append(doc.display_name)
                 
             return filtered_documents
