@@ -446,7 +446,7 @@ class ResearchAgent:
             )
         
         session = self._sessions[session_id]
-        session.messages.append(ChatMessage(role='user', content=user_message))
+        session.messages.append(z(role='user', content=user_message))
         
         # Build retrieval query from conversation context
         retrieval_query = self._build_retrieval_query(session, user_message)
