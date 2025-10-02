@@ -61,6 +61,41 @@ python -m vector.agent ask "What do regulations say?" --collection "Legal" --typ
 python -m vector.agent ask "What are fire codes?" --collection "Legal" --filter source=ordinances
 ```
 
+### Chat Sessions (Multi-turn Conversations)
+
+Chat mode enables multi-turn conversations with context awareness:
+
+```bash
+# Start a new chat session
+python -m vector.agent chat --start
+# Returns: Started chat session: abc123-def456-...
+
+# Send messages in the session
+python -m vector.agent chat --session abc123-def456 --message "What are R-1 setback requirements?"
+python -m vector.agent chat --session abc123-def456 --message "How about for corner lots?"
+python -m vector.agent chat --session abc123-def456 --message "What about parking requirements?"
+
+# Control search and response settings
+python -m vector.agent chat --session abc123-def456 --message "Tell me more" --length long --type chunks
+
+# Get session information
+python -m vector.agent chat --session abc123-def456 --info
+
+# End the session
+python -m vector.agent chat --session abc123-def456 --end
+```
+
+#### Chat Features
+- **Multi-turn context**: Agent remembers prior messages in the conversation
+- **Automatic summarization**: Long conversations are automatically summarized to stay within token limits
+- **Context-aware retrieval**: Search queries are enhanced based on conversation history
+- **Session persistence**: Sessions persist for the lifetime of the agent process
+
+#### Chat vs Ask
+- **Use `ask`** for single, independent questions
+- **Use `chat`** when you need to ask follow-up questions or have a conversation
+- Chat maintains conversational context, while ask treats each query independently
+
 ### System Information
 
 ```bash
@@ -195,7 +230,42 @@ response_lengths:
 
 # Search settings
 ai_search_max_tokens: 150
+
+# Chat settings
+chat:
+  max_history_messages: 40          # Maximum messages to keep in session
+  summary_trigger_messages: 14      # Trigger summarization after this many messages
+  max_context_results: 40           # Maximum search results to use for context
+  default_top_k: 12                 # Default number of search results per chat turn
 ```
+
+## Chat Session Management
+
+### Session Lifecycle
+
+1. **Start Session**: Creates new session with unique ID
+2. **Send Messages**: Add user messages and receive AI responses
+3. **Context Maintenance**: Agent maintains message history
+4. **Automatic Summarization**: Long conversations are compressed
+5. **End Session**: Clean up when conversation is complete
+
+### Memory Management
+
+The agent automatically manages conversation memory:
+
+- **Rolling Context**: Recent messages are kept in full
+- **Summarization**: Older messages are compressed into summaries
+- **Token Limits**: Ensures conversations stay within model limits
+- **Context Pruning**: Removes oldest messages when needed
+
+### Session Persistence
+
+- Sessions exist in-memory during agent runtime
+- Sessions are lost when agent process terminates
+- For persistent sessions, consider:
+  - Saving session state to database
+  - Implementing session recovery on restart
+  - Using external session store (Redis, etc.)
 
 ## Error Handling
 

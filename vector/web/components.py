@@ -19,9 +19,91 @@ def create_search_tab():
     components = {}
     
     with gr.TabItem("🔍 Search & Ask"):
-        # Sub-tabs for Ask AI and Search
+        # Sub-tabs for Ask AI, Chat, and Search
         with gr.Tabs():
-            # Ask AI Tab
+            # Chat Tab (Multi-turn conversation)
+            with gr.TabItem("💬 Chat"):
+                gr.Markdown("""
+                ### Multi-turn Conversation
+                Have a back-and-forth conversation with AI about your documents. The AI remembers context from previous messages.
+                """)
+                
+                # Session management
+                with gr.Row():
+                    components['chat_session_id'] = gr.Textbox(
+                        label="Session ID",
+                        placeholder="Click 'Start New Chat' to begin...",
+                        interactive=False,
+                        scale=3
+                    )
+                    with gr.Column(scale=1):
+                        components['start_chat_btn'] = gr.Button("🆕 Start New Chat", variant="primary")
+                        components['end_chat_btn'] = gr.Button("🛑 End Chat", variant="secondary")
+                
+                # Chat interface
+                components['chat_history'] = gr.Chatbot(
+                    label="Conversation",
+                    height=400,
+                    show_label=True,
+                    bubble_full_width=False
+                )
+                
+                with gr.Row():
+                    components['chat_message'] = gr.Textbox(
+                        label="Your Message",
+                        placeholder="Ask a question or continue the conversation...",
+                        scale=4,
+                        lines=2
+                    )
+                    components['send_chat_btn'] = gr.Button("📤 Send", variant="primary", scale=1)
+                
+                with gr.Accordion("⚙️ Chat Settings", open=False):
+                    with gr.Row():
+                        components['chat_response_length'] = gr.Radio(
+                            choices=["short", "medium", "long"],
+                            value="medium",
+                            label="Response Length",
+                            scale=1
+                        )
+                        components['chat_search_type'] = gr.Radio(
+                            choices=["chunks", "artifacts", "both"],
+                            value="both",
+                            label="Search Type",
+                            info="chunks: text content, artifacts: images/tables, both: combined",
+                            scale=1
+                        )
+                        components['chat_top_k'] = gr.Slider(
+                            minimum=5,
+                            maximum=30,
+                            value=12,
+                            step=1,
+                            label="Search Results per Turn",
+                            scale=1
+                        )
+                
+                # Chat thumbnails
+                components['chat_thumbnails'] = gr.Gallery(
+                    label="Related Document Pages (Last Response)",
+                    show_label=True,
+                    elem_id="chat_thumbnails",
+                    columns=4,
+                    rows=2,
+                    height="auto",
+                    allow_preview=True,
+                    show_share_button=False,
+                    interactive=False
+                )
+                
+                # Session info
+                with gr.Accordion("📊 Session Info", open=False):
+                    components['chat_session_info'] = gr.Textbox(
+                        label="Session Details",
+                        lines=3,
+                        interactive=False,
+                        placeholder="Start a chat session to see details..."
+                    )
+            
+            # Ask AI Tab (Single-turn Q&A)
             with gr.TabItem("🤖 Ask AI"):
                 with gr.Row():
                     components['ask_query'] = gr.Textbox(

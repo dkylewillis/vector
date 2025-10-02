@@ -114,6 +114,23 @@ class Config:
             'long': 2000
         })
     
+    # Chat configuration
+    @property
+    def chat_max_history_messages(self) -> int:
+        return self._config_data.get('chat', {}).get('max_history_messages', 40)
+    
+    @property
+    def chat_summary_trigger_messages(self) -> int:
+        return self._config_data.get('chat', {}).get('summary_trigger_messages', 14)
+    
+    @property
+    def chat_max_context_results(self) -> int:
+        return self._config_data.get('chat', {}).get('max_context_results', 40)
+    
+    @property
+    def chat_default_top_k(self) -> int:
+        return self._config_data.get('chat', {}).get('default_top_k', 12)
+    
     # Vector database
     @property
     def vector_db_path(self) -> str:

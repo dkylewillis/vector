@@ -49,6 +49,81 @@ def ask_ai(web_service: VectorWebService, question, length, collection, selected
         return f"AI error: {str(e)}", []
 
 
+# Chat handlers
+def start_chat_session(web_service: VectorWebService):
+    """Start a new chat session."""
+    try:
+        result = web_service.start_chat_session()
+        if result.get('success'):
+            session_id = result['session_id']
+            info = f"Session active - {result['message']}"
+            return session_id, [], [], info
+        else:
+            error_msg = f"Error: {result.get('error', 'Unknown error')}"
+            return "", [], [], error_msg
+    except Exception as e:
+        return "", [], [], f"Error starting chat: {str(e)}"
+
+
+def send_chat_message(
+    web_service: VectorWebService,
+    session_id: str,
+    message: str,
+    chat_history: List,
+    response_length: str,
+    search_type: str,
+    top_k: int,
+    selected_documents: List[str]
+):
+    """Send a message in chat session."""
+    if not session_id or not session_id.strip():
+        return chat_history, [], "Please start a new chat session first"
+    
+    if not message or not message.strip():
+        return chat_history, [], "Please enter a message"
+    
+    try:
+        result = web_service.send_chat_message(
+            session_id=session_id,
+            message=message,
+            response_length=response_length,
+            search_type=search_type,
+            top_k=top_k,
+            documents=selected_documents
+        )
+        
+        if result.get('success'):
+            # Add user message and assistant response to chat history
+            chat_history.append((message, result['assistant']))
+            thumbnails = result.get('thumbnails', [])
+            
+            # Update session info
+            info = f"Messages: {result['message_count']} | Results used: {result['results_count']}"
+            
+            return chat_history, thumbnails, info
+        else:
+            error_msg = f"Error: {result.get('error', 'Unknown error')}"
+            return chat_history, [], error_msg
+            
+    except Exception as e:
+        return chat_history, [], f"Chat error: {str(e)}"
+
+
+def end_chat_session(web_service: VectorWebService, session_id: str):
+    """End a chat session."""
+    if not session_id or not session_id.strip():
+        return "", [], [], "No active session to end"
+    
+    try:
+        result = web_service.end_chat_session(session_id)
+        if result.get('success'):
+            return "", [], [], "Session ended successfully"
+        else:
+            return "", [], [], f"Error: {result.get('error', 'Session not found')}"
+    except Exception as e:
+        return "", [], [], f"Error ending chat: {str(e)}"
+
+
 def get_info(web_service: VectorWebService, collection):
     """Get collection info."""
     try:
@@ -264,6 +339,85 @@ def connect_events(web_service, refresh_btn, search_components,
             outputs=[
                 search_components['ai_response'],
                 search_components['ai_thumbnails']
+            ]
+        )
+    
+    # Chat functionality - only connect if components exist
+    if (search_components and 
+        'start_chat_btn' in search_components and
+        'send_chat_btn' in search_components and
+        'end_chat_btn' in search_components):
+        
+        # Start chat session
+        search_components['start_chat_btn'].click(
+            fn=lambda: start_chat_session(web_service),
+            outputs=[
+                search_components['chat_session_id'],
+                search_components['chat_history'],
+                search_components['chat_thumbnails'],
+                search_components['chat_session_info']
+            ]
+        )
+        
+        # Send chat message
+        search_components['send_chat_btn'].click(
+            fn=lambda sid, msg, hist, rlen, stype, topk, docs: send_chat_message(
+                web_service, sid, msg, hist, rlen, stype, topk, docs
+            ),
+            inputs=[
+                search_components['chat_session_id'],
+                search_components['chat_message'],
+                search_components['chat_history'],
+                search_components['chat_response_length'],
+                search_components['chat_search_type'],
+                search_components['chat_top_k'],
+                documents_checkboxgroup
+            ],
+            outputs=[
+                search_components['chat_history'],
+                search_components['chat_thumbnails'],
+                search_components['chat_session_info']
+            ]
+        ).then(
+            # Clear the message input after sending
+            lambda: "",
+            outputs=search_components['chat_message']
+        )
+        
+        # Also allow Enter key to send message
+        search_components['chat_message'].submit(
+            fn=lambda sid, msg, hist, rlen, stype, topk, docs: send_chat_message(
+                web_service, sid, msg, hist, rlen, stype, topk, docs
+            ),
+            inputs=[
+                search_components['chat_session_id'],
+                search_components['chat_message'],
+                search_components['chat_history'],
+                search_components['chat_response_length'],
+                search_components['chat_search_type'],
+                search_components['chat_top_k'],
+                documents_checkboxgroup
+            ],
+            outputs=[
+                search_components['chat_history'],
+                search_components['chat_thumbnails'],
+                search_components['chat_session_info']
+            ]
+        ).then(
+            # Clear the message input after sending
+            lambda: "",
+            outputs=search_components['chat_message']
+        )
+        
+        # End chat session
+        search_components['end_chat_btn'].click(
+            fn=lambda sid: end_chat_session(web_service, sid),
+            inputs=search_components['chat_session_id'],
+            outputs=[
+                search_components['chat_session_id'],
+                search_components['chat_history'],
+                search_components['chat_thumbnails'],
+                search_components['chat_session_info']
             ]
         )
     

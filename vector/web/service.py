@@ -523,3 +523,154 @@ class VectorWebService:
         except Exception as e:
             print(f"Error filtering documents by tags: {e}")
             return []
+
+    # Chat Methods
+
+    def start_chat_session(self, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+        """Start a new chat session.
+        
+        Args:
+            system_prompt: Optional custom system prompt
+            
+        Returns:
+            Dict with session_id and status
+        """
+        if not self.agent:
+            return {"success": False, "error": "Agent not available"}
+        
+        try:
+            session_id = self.agent.start_chat(system_prompt)
+            return {
+                "success": True,
+                "session_id": session_id,
+                "message": "Chat session started successfully"
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def send_chat_message(
+        self,
+        session_id: str,
+        message: str,
+        response_length: str = 'medium',
+        search_type: str = 'both',
+        top_k: Optional[int] = None,
+        documents: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Send a message in a chat session.
+        
+        Args:
+            session_id: Chat session identifier
+            message: User message
+            response_length: Response length (short/medium/long)
+            search_type: 'chunks', 'artifacts', or 'both'
+            top_k: Number of results to retrieve (uses config default if None)
+            documents: Optional list of document names to filter
+            
+        Returns:
+            Dict with assistant response, results, and metadata
+        """
+        if not self.agent:
+            return {"success": False, "error": "Agent not available"}
+        
+        try:
+            # Get document IDs if document names provided
+            document_ids = None
+            if documents:
+                document_ids = self.get_selected_documents_by_name(documents)
+            
+            # Use config default if top_k not specified
+            if top_k is None:
+                top_k = self.config.chat_default_top_k
+            
+            result = self.agent.chat(
+                session_id=session_id,
+                user_message=message,
+                response_length=response_length,
+                search_type=search_type,
+                top_k=top_k,
+                document_ids=document_ids
+            )
+            
+            # Get thumbnails from results
+            thumbnails = []
+            for search_result in result.get('results', []):
+                if search_result.chunk:
+                    chunk_thumbnails = self.get_thumbnails(search_result.chunk)
+                    thumbnails.extend(chunk_thumbnails)
+                if search_result.artifact:
+                    artifact_thumbnails = self.get_thumbnails(search_result.artifact)
+                    thumbnails.extend(artifact_thumbnails)
+            
+            return {
+                "success": True,
+                "session_id": result["session_id"],
+                "assistant": result["assistant"],
+                "message_count": result["message_count"],
+                "results_count": len(result["results"]),
+                "thumbnails": thumbnails
+            }
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": f"Chat error: {str(e)}"}
+
+    def get_chat_session(self, session_id: str) -> Dict[str, Any]:
+        """Get chat session information.
+        
+        Args:
+            session_id: Chat session identifier
+            
+        Returns:
+            Dict with session information
+        """
+        if not self.agent:
+            return {"success": False, "error": "Agent not available"}
+        
+        try:
+            session = self.agent.get_session(session_id)
+            if not session:
+                return {"success": False, "error": "Session not found"}
+            
+            # Return sanitized session info
+            return {
+                "success": True,
+                "session_id": session.id,
+                "message_count": len(session.messages),
+                "created_at": session.created_at,
+                "last_updated": session.last_updated,
+                "has_summary": session.summary is not None,
+                "messages": [
+                    {"role": msg.role, "content": msg.content}
+                    for msg in session.messages
+                ]
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def end_chat_session(self, session_id: str) -> Dict[str, Any]:
+        """End a chat session.
+        
+        Args:
+            session_id: Chat session identifier
+            
+        Returns:
+            Dict with success status
+        """
+        if not self.agent:
+            return {"success": False, "error": "Agent not available"}
+        
+        try:
+            success = self.agent.end_chat(session_id)
+            if success:
+                return {
+                    "success": True,
+                    "message": "Chat session ended successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Session not found"
+                }
+        except Exception as e:
+            return {"success": False, "error": str(e)}

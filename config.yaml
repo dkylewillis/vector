@@ -26,6 +26,13 @@ response_lengths:
   medium: 8000     # Balanced detail level
   long: 15000      # Comprehensive answers
 
+# Chat Configuration
+chat:
+  max_history_messages: 40          # Maximum messages to keep in session
+  summary_trigger_messages: 14      # Trigger summarization after this many messages
+  max_context_results: 40           # Maximum search results to use for context
+  default_top_k: 12                 # Default number of search results per chat turn
+
 # Vector Database Settings
 vector_database:
   # Use cloud Qdrant instance
