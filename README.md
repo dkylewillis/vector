@@ -54,6 +54,40 @@ python -m vector.web
 python vector_web.py
 ```
 
+#### Quick Start with Standalone Script
+
+For the fastest way to start the web interface without worrying about package installation:
+
+```bash
+# Navigate to the project directory
+cd /path/to/your/vector/project
+
+# Activate your virtual environment (Windows)
+.venv\Scripts\activate
+
+# Start the web interface directly
+python vector_web.py
+```
+
+The web interface will start and be available at: **http://127.0.0.1:7860**
+
+#### Troubleshooting Web Interface Startup
+
+If you encounter issues starting the web interface:
+
+1. **Verify Python Environment**: Ensure you're using the correct Python environment with all dependencies installed
+2. **Check Dependencies**: Run `pip install -e .` to ensure all required packages are installed
+3. **Port Conflicts**: If port 7860 is in use, the application will show an error. Close other applications using that port
+4. **Configuration Issues**: Check that your `config.yaml` is properly configured with AI provider settings
+
+**Expected Startup Output:**
+```
+🚀 Starting Vector Web Interface...
+📍 Navigate to: http://127.0.0.1:7860
+✅ VectorWebService initialized successfully
+Running on local URL:  http://127.0.0.1:7860
+```
+
 ### Web Interface Features
 
 #### Document Upload & Processing
@@ -83,15 +117,20 @@ python vector_web.py
 ### Web Interface Usage
 
 #### Getting Started
-1. **Start the Interface**: Run `vector-web` to launch at http://127.0.0.1:7860
-2. **Upload Documents**: Use the "Upload Documents" tab to add your files
-3. **Wait for Processing**: Documents are automatically processed and indexed
-4. **Search or Ask**: Use the "Search" tab for finding content or "AI Chat" for questions
+1. **Start the Interface**: 
+   - **Recommended**: Run `python vector_web.py` in the project directory
+   - **Alternative**: Run `vector-web` (if package is installed) 
+   - **Alternative**: Run `python -m vector.web` (if package is installed)
+2. **Access the Interface**: Navigate to http://127.0.0.1:7860 in your web browser
+3. **Upload Documents**: Use the "Upload Documents" tab to add your files
+4. **Wait for Processing**: Documents are automatically processed and indexed
+5. **Search or Ask**: Use the "Search" tab for finding content or "AI Chat" for questions
 
 #### Document Upload Workflow
 ```bash
 # 1. Start the web interface
-vector-web
+python vector_web.py
+# OR: vector-web (if package installed)
 
 # 2. Navigate to http://127.0.0.1:7860
 # 3. Go to "Upload Documents" tab
@@ -782,8 +821,9 @@ vector-core list-collections
 vector-core collection-info documents_chunks
 
 # 3. Process documents (Web Interface - preferred) 
-# OR use Pipeline programmatically
-vector-web  # Upload documents via web interface
+# Start web interface with standalone script:
+python vector_web.py
+# OR use entry point: vector-web
 
 # 4. Search and analyze (Agent CLI)
 vector-agent search "building codes" --type both --verbose
@@ -803,7 +843,8 @@ vector-agent collection-info
 vector-core create-collection legal_docs --vector-size 1536
 
 # Use Web Interface for document upload and processing
-vector-web  # Upload documents via web interface
+python vector_web.py  # Start web interface and upload documents
+# OR: vector-web  # If package is installed
 
 # Use Agent CLI for intelligent operations  
 vector-agent ask "zoning requirements" --chunks-collection legal_docs

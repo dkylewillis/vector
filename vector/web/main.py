@@ -58,7 +58,6 @@ def create_vector_app() -> gr.Blocks:
                     value=[],
                     interactive=True
                 )
-                refresh_docs_btn = gr.Button("Refresh Documents", interactive=True)
                 
             with gr.Column(scale=3):
                 # Main tabs
@@ -71,7 +70,7 @@ def create_vector_app() -> gr.Blocks:
                 
                 # Connect event handlers
                 connect_events(
-                    web_service,refresh_docs_btn,
+                    web_service,
                     search_components, upload_components, info_components,
                     document_management_components,
                     documents_checkboxgroup, tag_filter_dropdown

@@ -560,7 +560,7 @@ class VectorWebService:
         """Send a message in a chat session.
         
         Args:
-            session_id: Chat session identifier
+            session_id: Chat session identifier (empty string will create new session)
             message: User message
             response_length: Response length (short/medium/long)
             search_type: 'chunks', 'artifacts', or 'both'
@@ -574,6 +574,15 @@ class VectorWebService:
             return {"success": False, "error": "Agent not available"}
         
         try:
+            # Auto-create session if none exists
+            auto_created = False
+            if not session_id or not session_id.strip():
+                session_result = self.start_chat_session()
+                if not session_result.get('success'):
+                    return {"success": False, "error": "Failed to create session"}
+                session_id = session_result['session_id']
+                auto_created = True
+            
             # Get document IDs if document names provided
             document_ids = None
             if documents:
@@ -608,7 +617,8 @@ class VectorWebService:
                 "assistant": result["assistant"],
                 "message_count": result["message_count"],
                 "results_count": len(result["results"]),
-                "thumbnails": thumbnails
+                "thumbnails": thumbnails,
+                "auto_created": auto_created
             }
         except ValueError as e:
             return {"success": False, "error": str(e)}
@@ -645,32 +655,5 @@ class VectorWebService:
                     for msg in session.messages
                 ]
             }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def end_chat_session(self, session_id: str) -> Dict[str, Any]:
-        """End a chat session.
-        
-        Args:
-            session_id: Chat session identifier
-            
-        Returns:
-            Dict with success status
-        """
-        if not self.agent:
-            return {"success": False, "error": "Agent not available"}
-        
-        try:
-            success = self.agent.end_chat(session_id)
-            if success:
-                return {
-                    "success": True,
-                    "message": "Chat session ended successfully"
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": "Session not found"
-                }
         except Exception as e:
             return {"success": False, "error": str(e)}

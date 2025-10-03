@@ -23,39 +23,24 @@ def create_search_tab():
         with gr.Tabs():
             # Chat Tab (Multi-turn conversation)
             with gr.TabItem("💬 Chat"):
-                gr.Markdown("""
-                ### Multi-turn Conversation
-                Have a back-and-forth conversation with AI about your documents. The AI remembers context from previous messages.
-                """)
-                
-                # Session management
-                with gr.Row():
-                    components['chat_session_id'] = gr.Textbox(
-                        label="Session ID",
-                        placeholder="Click 'Start New Chat' to begin...",
-                        interactive=False,
-                        scale=3
-                    )
-                    with gr.Column(scale=1):
-                        components['start_chat_btn'] = gr.Button("🆕 Start New Chat", variant="primary")
-                        components['end_chat_btn'] = gr.Button("🛑 End Chat", variant="secondary")
                 
                 # Chat interface
                 components['chat_history'] = gr.Chatbot(
-                    label="Conversation",
-                    height=400,
+                    label="Chatbot",
+                    height=450,
                     show_label=True,
-                    bubble_full_width=False
+                    bubble_full_width=False,
+                    type='messages'
                 )
                 
-                with gr.Row():
-                    components['chat_message'] = gr.Textbox(
-                        label="Your Message",
-                        placeholder="Ask a question or continue the conversation...",
-                        scale=4,
-                        lines=2
-                    )
-                    components['send_chat_btn'] = gr.Button("📤 Send", variant="primary", scale=1)
+                components['chat_message'] = gr.Textbox(
+                    label="Your Message",
+                    placeholder="Ask me anything about your documents...",
+                    lines=1,
+                    show_label=False,
+                    submit_btn=True,
+                    stop_btn=True
+                )
                 
                 with gr.Accordion("⚙️ Chat Settings", open=False):
                     with gr.Row():
@@ -67,7 +52,7 @@ def create_search_tab():
                         )
                         components['chat_search_type'] = gr.Radio(
                             choices=["chunks", "artifacts", "both"],
-                            value="both",
+                            value="chunks",
                             label="Search Type",
                             info="chunks: text content, artifacts: images/tables, both: combined",
                             scale=1
@@ -100,7 +85,7 @@ def create_search_tab():
                         label="Session Details",
                         lines=3,
                         interactive=False,
-                        placeholder="Start a chat session to see details..."
+                        placeholder="Start a chat session to see session ID and details..."
                     )
             
             # Ask AI Tab (Single-turn Q&A)
@@ -332,8 +317,3 @@ def create_document_management_tab():
 
     
     return components
-
-
-
-
-

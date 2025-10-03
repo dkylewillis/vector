@@ -50,21 +50,6 @@ def ask_ai(web_service: VectorWebService, question, length, collection, selected
 
 
 # Chat handlers
-def start_chat_session(web_service: VectorWebService):
-    """Start a new chat session."""
-    try:
-        result = web_service.start_chat_session()
-        if result.get('success'):
-            session_id = result['session_id']
-            info = f"Session active - {result['message']}"
-            return session_id, [], [], info
-        else:
-            error_msg = f"Error: {result.get('error', 'Unknown error')}"
-            return "", [], [], error_msg
-    except Exception as e:
-        return "", [], [], f"Error starting chat: {str(e)}"
-
-
 def send_chat_message(
     web_service: VectorWebService,
     session_id: str,
@@ -76,16 +61,20 @@ def send_chat_message(
     selected_documents: List[str]
 ):
     """Send a message in chat session."""
-    if not session_id or not session_id.strip():
-        return chat_history, [], "Please start a new chat session first"
+    # Handle MultimodalTextbox input - extract text from dict if needed
+    if isinstance(message, dict):
+        message_text = message.get('text', '')
+    else:
+        message_text = message if message else ''
     
-    if not message or not message.strip():
+    if not message_text or not message_text.strip():
         return chat_history, [], "Please enter a message"
     
     try:
+        # Use empty session_id to let service auto-create or manage sessions
         result = web_service.send_chat_message(
-            session_id=session_id,
-            message=message,
+            session_id=session_id or "",
+            message=message_text,
             response_length=response_length,
             search_type=search_type,
             top_k=top_k,
@@ -93,12 +82,18 @@ def send_chat_message(
         )
         
         if result.get('success'):
-            # Add user message and assistant response to chat history
-            chat_history.append((message, result['assistant']))
+            # Add user message and assistant response to chat history in messages format
+            chat_history.append({"role": "user", "content": message_text})
+            chat_history.append({"role": "assistant", "content": result['assistant']})
             thumbnails = result.get('thumbnails', [])
             
-            # Update session info
-            info = f"Messages: {result['message_count']} | Results used: {result['results_count']}"
+            # Get the session ID (may be newly created)
+            new_session_id = result['session_id']
+            
+            # Update session info with session ID
+            info = f"Session ID: {new_session_id}\nMessages: {result['message_count']} | Results used: {result['results_count']}"
+            if result.get('auto_created'):
+                info = f"✨ New session started\n{info}"
             
             return chat_history, thumbnails, info
         else:
@@ -106,22 +101,7 @@ def send_chat_message(
             return chat_history, [], error_msg
             
     except Exception as e:
-        return chat_history, [], f"Chat error: {str(e)}"
-
-
-def end_chat_session(web_service: VectorWebService, session_id: str):
-    """End a chat session."""
-    if not session_id or not session_id.strip():
-        return "", [], [], "No active session to end"
-    
-    try:
-        result = web_service.end_chat_session(session_id)
-        if result.get('success'):
-            return "", [], [], "Session ended successfully"
-        else:
-            return "", [], [], f"Error: {result.get('error', 'Session not found')}"
-    except Exception as e:
-        return "", [], [], f"Error ending chat: {str(e)}"
+        return chat_history, [], session_id, f"Chat error: {str(e)}"
 
 
 def get_info(web_service: VectorWebService, collection):
@@ -131,16 +111,6 @@ def get_info(web_service: VectorWebService, collection):
     except Exception as e:
         return f"Error getting collection info: {e}"
 
-
-
-def refresh_registry_documents(web_service: VectorWebService):
-    """Refresh documents list from registry."""
-    try:
-        documents = web_service.get_registry_documents()
-        return gr.update(choices=documents, value=[])
-    except Exception as e:
-        print(f"Error refreshing registry documents: {e}")
-        return gr.update(choices=[], value=[])
 
 
 def view_document_details(web_service: VectorWebService, selected_documents):
@@ -243,10 +213,10 @@ def filter_documents_by_tags(web_service: VectorWebService, selected_tags: Optio
         return gr.update(choices=[], value=[])
 
 
-def process_uploaded_documents(web_service: VectorWebService, files, tags):
-    """Handle document processing request."""
+def process_uploaded_documents_with_refresh(web_service: VectorWebService, files, tags):
+    """Handle document processing request and return refreshed document/tag lists."""
     if not files:
-        return "Please select one or more documents to process"
+        return "Please select one or more documents to process", gr.update(), gr.update()
     
     try:
         # Call the service method to process documents
@@ -256,31 +226,25 @@ def process_uploaded_documents(web_service: VectorWebService, files, tags):
             tags=tags
         )
         
-        return result
+        # Get updated documents and tags for refresh
+        updated_documents = web_service.get_registry_documents()
+        updated_tags = web_service.get_all_tags()
+        
+        return (
+            result,
+            gr.update(choices=updated_documents, value=[]),  # Refresh documents list
+            gr.update(choices=updated_tags)  # Refresh tags dropdown
+        )
         
     except Exception as e:
-        return f"Error during document processing: {str(e)}"
+        return f"Error during document processing: {str(e)}", gr.update(), gr.update()
 
 
-def connect_events(web_service, refresh_btn, search_components, 
+def connect_events(web_service, search_components, 
                   upload_components, info_components, 
                   document_management_components, 
                   documents_checkboxgroup, tag_filter_dropdown=None):
     """Connect all event handlers."""
-    
-    # Documents refresh (collection_dropdown is now None, refresh_btn is now refresh_docs_btn)
-    if refresh_btn:
-        if tag_filter_dropdown:
-            refresh_btn.click(
-                fn=lambda selected_tags: refresh_tags_and_documents(web_service, selected_tags),
-                inputs=tag_filter_dropdown,
-                outputs=[tag_filter_dropdown, documents_checkboxgroup]
-            )
-        else:
-            refresh_btn.click(
-                fn=lambda: refresh_registry_documents(web_service),
-                outputs=documents_checkboxgroup
-            )
     
     # Tag filter functionality
     if tag_filter_dropdown:
@@ -300,15 +264,14 @@ def connect_events(web_service, refresh_btn, search_components,
         'search_thumbnails' in search_components):
         
         search_components['search_btn'].click(
-            fn=lambda query, top_k, collection, selected_docs, search_type: perform_search(
-                web_service, query, top_k, collection, selected_docs, search_type
+            fn=lambda query, top_k, search_type, selected_docs: perform_search(
+                web_service, query, top_k, "chunks", selected_docs, search_type
             ),
             inputs=[
                 search_components['search_query'],
                 search_components['num_results'],
                 search_components['search_search_type'],
-                documents_checkboxgroup,
-                search_components['search_search_type'],
+                documents_checkboxgroup
             ],
             outputs=[
                 search_components['search_results'],
@@ -344,53 +307,14 @@ def connect_events(web_service, refresh_btn, search_components,
     
     # Chat functionality - only connect if components exist
     if (search_components and 
-        'start_chat_btn' in search_components and
-        'send_chat_btn' in search_components and
-        'end_chat_btn' in search_components):
+        'chat_message' in search_components):
         
-        # Start chat session
-        search_components['start_chat_btn'].click(
-            fn=lambda: start_chat_session(web_service),
-            outputs=[
-                search_components['chat_session_id'],
-                search_components['chat_history'],
-                search_components['chat_thumbnails'],
-                search_components['chat_session_info']
-            ]
-        )
-        
-        # Send chat message
-        search_components['send_chat_btn'].click(
-            fn=lambda sid, msg, hist, rlen, stype, topk, docs: send_chat_message(
-                web_service, sid, msg, hist, rlen, stype, topk, docs
-            ),
-            inputs=[
-                search_components['chat_session_id'],
-                search_components['chat_message'],
-                search_components['chat_history'],
-                search_components['chat_response_length'],
-                search_components['chat_search_type'],
-                search_components['chat_top_k'],
-                documents_checkboxgroup
-            ],
-            outputs=[
-                search_components['chat_history'],
-                search_components['chat_thumbnails'],
-                search_components['chat_session_info']
-            ]
-        ).then(
-            # Clear the message input after sending
-            lambda: "",
-            outputs=search_components['chat_message']
-        )
-        
-        # Also allow Enter key to send message
+        # Allow Enter key to send message (session will be auto-created)
         search_components['chat_message'].submit(
-            fn=lambda sid, msg, hist, rlen, stype, topk, docs: send_chat_message(
-                web_service, sid, msg, hist, rlen, stype, topk, docs
+            fn=lambda msg, hist, rlen, stype, topk, docs: send_chat_message(
+                web_service, "", msg, hist, rlen, stype, topk, docs
             ),
             inputs=[
-                search_components['chat_session_id'],
                 search_components['chat_message'],
                 search_components['chat_history'],
                 search_components['chat_response_length'],
@@ -409,12 +333,10 @@ def connect_events(web_service, refresh_btn, search_components,
             outputs=search_components['chat_message']
         )
         
-        # End chat session
-        search_components['end_chat_btn'].click(
-            fn=lambda sid: end_chat_session(web_service, sid),
-            inputs=search_components['chat_session_id'],
+        # Connect Chatbot clear button to end session
+        search_components['chat_history'].clear(
+            fn=lambda: ([], [], "Chat session ended - start typing to begin a new conversation"),
             outputs=[
-                search_components['chat_session_id'],
                 search_components['chat_history'],
                 search_components['chat_thumbnails'],
                 search_components['chat_session_info']
@@ -429,14 +351,18 @@ def connect_events(web_service, refresh_btn, search_components,
         'processing_output' in upload_components):
         
         upload_components['process_btn'].click(
-            fn=lambda files, tags: process_uploaded_documents(
+            fn=lambda files, tags: process_uploaded_documents_with_refresh(
                 web_service, files, tags
             ),
             inputs=[
                 upload_components['file_upload'],
                 upload_components['upload_tags_input']
             ],
-            outputs=upload_components['processing_output']
+            outputs=[
+                upload_components['processing_output'],
+                documents_checkboxgroup,
+                tag_filter_dropdown
+            ]
         )
     
     # Info functionality - only connect if components exist
