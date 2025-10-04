@@ -49,13 +49,7 @@ class VectorWebService:
             return "Search functionality not available", []
 
         try:
-            # Map collection name to search type if needed
-            if collection == "artifacts":
-                agent_search_type = "artifacts"
-            elif collection == "chunks":
-                agent_search_type = "chunks"
-            else:
-                agent_search_type = search_type or "both"
+            agent_search_type = search_type or "both"
 
             results = self.agent.search(
                 query=query,

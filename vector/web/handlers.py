@@ -256,14 +256,13 @@ def connect_events(web_service, search_components,
     
     # Search functionality - only connect if components exist
     if (search_components and 
-        'search_btn' in search_components and 
         'search_query' in search_components and
         'num_results' in search_components and
         'search_search_type' in search_components and
         'search_results' in search_components and
         'search_thumbnails' in search_components):
         
-        search_components['search_btn'].click(
+        search_components['search_query'].submit(
             fn=lambda query, top_k, search_type, selected_docs: perform_search(
                 web_service, query, top_k, "chunks", selected_docs, search_type
             ),
@@ -308,6 +307,19 @@ def connect_events(web_service, search_components,
     # Chat functionality - only connect if components exist
     if (search_components and 
         'chat_message' in search_components):
+        
+        # Chat settings dialog toggle
+        if 'chat_settings_btn' in search_components and 'chat_settings_dialog' in search_components:
+            search_components['chat_settings_btn'].click(
+                fn=lambda: gr.update(visible=True),
+                outputs=search_components['chat_settings_dialog']
+            )
+        
+        if 'chat_settings_close_btn' in search_components and 'chat_settings_dialog' in search_components:
+            search_components['chat_settings_close_btn'].click(
+                fn=lambda: gr.update(visible=False),
+                outputs=search_components['chat_settings_dialog']
+            )
         
         # Allow Enter key to send message (session will be auto-created)
         search_components['chat_message'].submit(

@@ -23,7 +23,7 @@ class Embedder:
         Returns:
             List of float values representing the embedding
         """
-        embedding = self.model.encode([text])[0]
+        embedding = self.model.encode([text], show_progress_bar=False)[0]
         return embedding.tolist()
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
@@ -38,7 +38,7 @@ class Embedder:
         if not texts:
             return []
         
-        embeddings = self.model.encode(texts)
+        embeddings = self.model.encode(texts, show_progress_bar=False)
         return [embedding.tolist() for embedding in embeddings]
 
     def get_embedding_dimension(self) -> int:

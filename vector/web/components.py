@@ -33,16 +33,28 @@ def create_search_tab():
                     type='messages'
                 )
                 
-                components['chat_message'] = gr.Textbox(
-                    label="Your Message",
-                    placeholder="Ask me anything about your documents...",
-                    lines=1,
-                    show_label=False,
-                    submit_btn=True,
-                    stop_btn=True
-                )
+                # Message input and settings button row
+                with gr.Row():
+                    components['chat_message'] = gr.Textbox(
+                        label="Your Message",
+                        placeholder="Ask me anything about your documents...",
+                        lines=1,
+                        show_label=False,
+                        submit_btn=True,
+                        stop_btn=True,
+                        scale=20
+                    )
+                    components['chat_settings_btn'] = gr.Button(
+                        value="⚙️",
+                        variant="secondary",
+                        scale=1,
+                        min_width=50,
+                        elem_classes="settings-button"
+                    )
                 
-                with gr.Accordion("⚙️ Chat Settings", open=False):
+                # Chat Settings Dialog (hidden by default)
+                with gr.Group(visible=False) as components['chat_settings_dialog']:
+                    gr.Markdown("### ⚙️ Chat Settings")
                     with gr.Row():
                         components['chat_response_length'] = gr.Radio(
                             choices=["short", "medium", "long"],
@@ -65,6 +77,8 @@ def create_search_tab():
                             label="Search Results per Turn",
                             scale=1
                         )
+                    with gr.Row():
+                        components['chat_settings_close_btn'] = gr.Button("Close", variant="primary")
                 
                 # Chat thumbnails
                 components['chat_thumbnails'] = gr.Gallery(
@@ -135,14 +149,11 @@ def create_search_tab():
             
             # Search Documents Tab
             with gr.TabItem("🔍 Search Documents"):
-                with gr.Row():
-                    components['search_query'] = gr.Textbox(
-                        label="Search Query",
-                        placeholder="Enter search terms...",
-                        scale=3
-                    )
-                    components['search_btn'] = gr.Button("Search", variant="primary", scale=1, 
-                                         elem_classes="vector-button-1")
+                components['search_query'] = gr.Textbox(
+                    label="Search Query",
+                    placeholder="Enter search terms...",
+                    submit_btn=True
+                )
                 
                 with gr.Row():
                     components['num_results'] = gr.Slider(

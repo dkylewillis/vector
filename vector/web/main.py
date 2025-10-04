@@ -31,7 +31,16 @@ def create_vector_app() -> gr.Blocks:
     # Get all available tags
     initial_tags = web_service.get_all_tags()
     
-    with gr.Blocks(title="Vector - Document Search & AI") as app:
+    # Custom CSS for the interface
+    custom_css = """
+    .settings-button {
+        min-width: 50px !important;
+        padding: 8px !important;
+        font-size: 18px !important;
+    }
+    """
+    
+    with gr.Blocks(title="Vector - Document Search & AI", css=custom_css) as app:
         
         # Header
         create_header()

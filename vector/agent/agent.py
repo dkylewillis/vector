@@ -536,7 +536,7 @@ class ResearchAgent:
         
         recent = self._render_recent_messages(session, limit=6)
         expand_prompt = (
-            "Given the ongoing municipal regulations conversation and NEW user message, "
+            "Given the ongoing conversation and NEW user message, "
             "produce a comma-separated list of focused retrieval keyphrases. "
             "Avoid generic fluff. Prior conversation:\n"
             f"{recent}\n\nUser message:\n{user_message}"
