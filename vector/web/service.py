@@ -1,5 +1,6 @@
 """Web service layer for Vector application."""
 
+import os
 from typing import List, Tuple, Optional, Dict, Any
 from pathlib import Path
 
@@ -436,6 +437,67 @@ class VectorWebService:
             "success": successful_count > 0,
             "message": message
         }
+
+    def rename_document(self, display_name: str, new_name: str) -> Dict[str, Any]:
+        """Rename a document.
+        
+        Args:
+            display_name: Current display name of the document
+            new_name: New display name for the document
+            
+        Returns:
+            Dictionary with success status and message
+        """
+        try:
+            # Get document ID
+            document_id = self.registry.get_id_by_display_name(display_name)
+            if not document_id:
+                return {
+                    "success": False,
+                    "message": f"❌ Document '{display_name}' not found"
+                }
+            
+            # Get document record
+            doc_record = self.registry.get_document(document_id)
+            if not doc_record:
+                return {
+                    "success": False,
+                    "message": "❌ Document record not found"
+                }
+            
+            # Strip any extension from the new name (we don't show extensions)
+            if '.' in new_name:
+                new_name = os.path.splitext(new_name)[0]
+            
+            # Attempt to rename
+            success = self.registry.update_display_name(document_id, new_name)
+            
+            if success:
+                # Get the actual name that was set (might have counter added)
+                updated_doc = self.registry.get_document(document_id)
+                actual_name = updated_doc.display_name
+                
+                if actual_name != new_name:
+                    return {
+                        "success": True,
+                        "message": f"✅ Document renamed to: '{actual_name}'\n(Note: Name was modified to ensure uniqueness)"
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "message": f"✅ Document renamed successfully to: '{actual_name}'"
+                    }
+            else:
+                return {
+                    "success": False,
+                    "message": "❌ Failed to rename document"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"❌ Error renaming document: {str(e)}"
+            }
 
     def get_document_tags(self, document_display_names: List[str]) -> str:
         """Get current tags for selected documents.

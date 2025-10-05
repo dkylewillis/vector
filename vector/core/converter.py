@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Optional, Union
+import json
 
 from docling.document_converter import DocumentConverter as DoclingConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, VlmPipelineOptions
@@ -10,6 +11,7 @@ from docling.pipeline.vlm_pipeline import VlmPipeline
 from docling.datamodel.pipeline_options_vlm_model import ApiVlmOptions, ResponseFormat
 from docling_core.types.doc.page import SegmentedPage
 from docling_core.types.doc import ImageRefMode
+from pydantic import ValidationError
 
 from .models import ConvertedDocument
 
@@ -87,6 +89,73 @@ class DocumentConverter:
 
         return doc
     
+    @staticmethod
+    def is_valid_docling_json(json_path: Path) -> bool:
+        """Check if a JSON file contains a valid DoclingDocument.
+
+        Args:
+            json_path: Path to the JSON file to validate
+
+        Returns:
+            True if the JSON is a valid DoclingDocument, False otherwise
+        """
+        try:
+            if not json_path.exists():
+                return False
+            
+            with open(json_path, 'r', encoding='utf-8') as f:
+                json_content = f.read()
+            
+            # Try to validate the JSON against DoclingDocument schema
+            DoclingDocument.model_validate_json(json_content)
+            return True
+        except (json.JSONDecodeError, ValidationError, Exception):
+            return False
+    
+    def load_from_json(self, json_path: Path) -> DoclingDocument:
+        """Load a DoclingDocument from a JSON file.
+
+        Args:
+            json_path: Path to the JSON file containing the DoclingDocument
+
+        Returns:
+            DoclingDocument object
+
+        Raises:
+            FileNotFoundError: If the JSON file doesn't exist
+            ValueError: If the JSON is invalid or not a DoclingDocument
+        """
+        if not json_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {json_path}")
+        
+        print(f"Loading DoclingDocument from: {json_path}")
+        
+        with open(json_path, 'r', encoding='utf-8') as f:
+            json_content = f.read()
+        
+        try:
+            doc = DoclingDocument.model_validate_json(json_content)
+            return doc
+        except ValidationError as e:
+            raise ValueError(f"Invalid DoclingDocument JSON: {e}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON format: {e}")
+    
+    @staticmethod
+    def save_to_json(doc: DoclingDocument, json_path: Path, image_mode: ImageRefMode = ImageRefMode.EMBEDDED) -> None:
+        """Save a DoclingDocument to a JSON file.
+
+        Args:
+            doc: The DoclingDocument to save
+            json_path: Path where to save the JSON file
+            image_mode: How to handle images in the export
+        """
+        print(f"Saving DoclingDocument to: {json_path}")
+        
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        doc.save_as_json(json_path, image_mode=image_mode)
+    
     def _get_file_type(self, file_path: Path) -> str:
         """Get file type for logging purposes."""
         suffix = file_path.suffix.lower()
@@ -95,7 +164,7 @@ class DocumentConverter:
             '.docx': 'DOCX', '.doc': 'DOC',
             '.png': 'IMAGE', '.jpg': 'IMAGE', '.jpeg': 'IMAGE', '.gif': 'IMAGE',
             '.html': 'HTML', '.htm': 'HTML',
-            '.txt': 'TEXT', '.md': 'TEXT'
+            '.txt': 'TEXT', '.md': 'TEXT',
+            '.json': 'JSON_DOCLING'
         }
         return type_mapping.get(suffix, 'PDF')
-    

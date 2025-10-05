@@ -174,6 +174,43 @@ def handle_show_current_tags(web_service: VectorWebService, document_list: List[
         return f"Error retrieving tags: {str(e)}"
 
 
+def handle_rename_document(web_service: VectorWebService, selected_docs: List[str], new_name: str):
+    """Handle renaming a single document.
+    
+    Args:
+        web_service: VectorWebService instance
+        selected_docs: List of selected document names
+        new_name: New name for the document
+        
+    Returns:
+        Tuple of (status_message, updated_document_list, updated_tags_list)
+    """
+    if not selected_docs:
+        return "❌ Please select a document to rename", gr.update(), gr.update()
+    
+    if len(selected_docs) > 1:
+        return "❌ Please select only ONE document to rename", gr.update(), gr.update()
+    
+    if not new_name or not new_name.strip():
+        return "❌ Please enter a new name", gr.update(), gr.update()
+    
+    try:
+        result = web_service.rename_document(selected_docs[0], new_name.strip())
+        
+        # Get updated documents and tags for refresh
+        updated_documents = web_service.get_registry_documents()
+        updated_tags = web_service.get_all_tags()
+        
+        return (
+            result["message"],
+            gr.update(choices=updated_documents, value=[]),  # Refresh documents list
+            gr.update(choices=updated_tags)  # Refresh tags dropdown
+        )
+        
+    except Exception as e:
+        return f"❌ Error renaming document: {str(e)}", gr.update(), gr.update()
+
+
 def refresh_tags_and_documents(web_service: VectorWebService, selected_tags: Optional[List[str]] = None):
     """Refresh both tags dropdown and document list based on tag filter."""
     try:
@@ -435,6 +472,25 @@ def connect_events(web_service, search_components,
             fn=lambda document_list: handle_show_current_tags(web_service, document_list),
             inputs=documents_checkboxgroup,
             outputs=document_management_components['current_tags_display']
+        )
+    
+    # Rename document functionality
+    if (document_management_components and 
+        'rename_btn' in document_management_components and
+        'rename_new_name' in document_management_components and
+        'rename_output' in document_management_components):
+        
+        document_management_components['rename_btn'].click(
+            fn=lambda docs, name: handle_rename_document(web_service, docs, name),
+            inputs=[
+                documents_checkboxgroup,
+                document_management_components['rename_new_name']
+            ],
+            outputs=[
+                document_management_components['rename_output'],
+                documents_checkboxgroup,
+                tag_filter_dropdown
+            ]
         )
     
     # Delete functionality - now part of document management

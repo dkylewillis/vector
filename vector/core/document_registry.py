@@ -30,8 +30,10 @@ class VectorRegistry:
 
     def register_document(self, file_path: Path, document_name: str) -> DocumentRecord:
         """Register a new document with unique display name handling."""
+        # Strip extension from display name for cleaner UI
+        base_name = file_path.stem  # Get filename without extension
         # Generate unique display name
-        unique_display_name = self._generate_unique_display_name(file_path.name, document_name)
+        unique_display_name = self._generate_unique_display_name(base_name, document_name)
         document_id = uuid.uuid4().hex
         
         document_record = DocumentRecord(

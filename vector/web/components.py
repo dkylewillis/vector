@@ -196,8 +196,8 @@ def create_upload_tab():
     
     with gr.TabItem("📁 Upload Documents"):
         components['file_upload'] = gr.Files(
-            label="Select Documents (.pdf, .docx)",
-            file_types=[".pdf", ".docx"],
+            label="Select Documents (.pdf, .docx, .json)",
+            file_types=[".pdf", ".docx", ".json"],
             file_count="multiple"
         )
         
@@ -258,6 +258,33 @@ def create_document_management_tab():
                     lines=10,
                     interactive=False,
                     placeholder="Select documents from the left panel and click 'View Details' to see information..."
+                )
+            
+            # Sub-tab: Rename Document
+            with gr.TabItem("✏️ Rename Document"):
+                gr.Markdown("### Rename Document")
+                gr.Markdown("""
+                **Instructions:**
+                1. Select a single document from the main document list on the left
+                2. Enter a new name below (without extension)
+                3. Click 'Rename Document'
+                
+                **Note:** The system will automatically ensure the new name is unique by adding a counter if needed.
+                """)
+                
+                with gr.Row():
+                    components['rename_new_name'] = gr.Textbox(
+                        label="New Document Name",
+                        placeholder="Enter new name (e.g., 'Updated Report')",
+                        scale=3
+                    )
+                    components['rename_btn'] = gr.Button("✏️ Rename", variant="primary", scale=1)
+                
+                components['rename_output'] = gr.Textbox(
+                    label="Rename Status",
+                    lines=4,
+                    interactive=False,
+                    placeholder="Select a single document and enter a new name above..."
                 )
             
             # Sub-tab: Manage Tags
