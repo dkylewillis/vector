@@ -16,7 +16,6 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  vector-agent ask "What are the parking requirements?" --type both --length medium
   vector-agent search "building permits" --type chunks --top-k 10
   vector-agent delete --document-id abc123 --force
   vector-agent delete --name "My Document" --no-cleanup
@@ -27,18 +26,6 @@ For low-level vector operations, use 'vector-core' instead.
         """
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands", required=True)
-
-    # Ask command
-    ask_parser = subparsers.add_parser("ask", help="Ask a question and get relevant context")
-    ask_parser.add_argument("question", help="Question to ask")
-    ask_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
-    ask_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
-    ask_parser.add_argument("--type", choices=["chunks", "artifacts", "both"], default="both", 
-                           help="Search type for context")
-    ask_parser.add_argument("--length", choices=["short", "medium", "long"], default="medium", 
-                           help="Response length")
-    ask_parser.add_argument("--top-k", "-k", type=int, default=20, help="Number of results for context")
-    ask_parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     # Search command
     search_parser = subparsers.add_parser("search", help="Search chunks or artifacts")
@@ -82,30 +69,7 @@ For low-level vector operations, use 'vector-core' instead.
             artifacts_collection=args.artifacts_collection
         )
         
-        if args.command == "ask":
-            if args.verbose:
-                print(f"🤖 Asking question about collections: {args.chunks_collection}, {args.artifacts_collection}")
-                print(f"🔧 Search type: {args.type}")
-                print(f"🔧 Top-k: {args.top_k}")
-            
-            response, search_results = agent.ask(
-                question=args.question,
-                response_length=args.length,
-                search_type=args.type,
-                top_k=args.top_k
-            )
-            
-            print(response)
-            
-            if args.verbose:
-                print(f"\n📊 Context Results: {len(search_results)} documents used")
-                print("🔍 Context Sources:")
-                for i, result in enumerate(search_results[:5], 1):  # Show first 5 sources
-                    print(f"   {i}. {result.filename} (Score: {result.score:.3f}, Type: {result.type})")
-                if len(search_results) > 5:
-                    print(f"   ... and {len(search_results) - 5} more results")
-
-        elif args.command == "search":
+        if args.command == "search":
             if args.verbose:
                 print(f"� Searching collections: {args.chunks_collection}, {args.artifacts_collection}")
                 print(f"🔧 Search type: {args.type}")

@@ -19,7 +19,7 @@ def create_search_tab():
     components = {}
     
     with gr.TabItem("🔍 Search & Ask"):
-        # Sub-tabs for Ask AI, Chat, and Search
+        # Sub-tabs for Chat and Search
         with gr.Tabs():
             # Chat Tab (Multi-turn conversation)
             with gr.TabItem("💬 Chat"):
@@ -101,51 +101,6 @@ def create_search_tab():
                         interactive=False,
                         placeholder="Start a chat session to see session ID and details..."
                     )
-            
-            # Ask AI Tab (Single-turn Q&A)
-            with gr.TabItem("🤖 Ask AI"):
-                with gr.Row():
-                    components['ask_query'] = gr.Textbox(
-                        label="Question",
-                        placeholder="Ask a question about your documents...",
-                        scale=3
-                    )
-                    components['ask_btn'] = gr.Button("Ask AI", variant="primary", scale=1, 
-                                      elem_classes="vector-button-1")
-
-                with gr.Row():
-                    components['response_length'] = gr.Radio(
-                        choices=["short", "medium", "long"],
-                        value="medium",
-                        label="Response Length",
-                        scale=1
-                    )
-                    components['ask_search_type'] = gr.Radio(
-                        choices=["chunks", "artifacts", "both"],
-                        value="chunks",
-                        label="Search Type",
-                        info="chunks: text content, artifacts: images/tables, both: combined",
-                        scale=1
-                    )
-                
-                components['ai_response'] = gr.Textbox(
-                    label="AI Response",
-                    lines=8,
-                    interactive=False
-                )
-                
-                # Add thumbnail gallery under AI response
-                components['ai_thumbnails'] = gr.Gallery(
-                    label="Related Document Pages",
-                    show_label=True,
-                    elem_id="ai_thumbnails",
-                    columns=4,
-                    rows=2,
-                    height="auto",
-                    allow_preview=True,
-                    show_share_button=False,
-                    interactive=False
-                )
             
             # Search Documents Tab
             with gr.TabItem("🔍 Search Documents"):

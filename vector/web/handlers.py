@@ -27,28 +27,6 @@ def perform_search(web_service: VectorWebService, query, top_k, collection, sele
         return f"Search error: {str(e)}", []
 
 
-def ask_ai(web_service: VectorWebService, question, length, collection, selected_documents, search_type):
-    """Handle AI question request."""
-    if not question or not question.strip():
-        return "Please enter a question", []
-    
-    try:
-
-        # Ask AI
-        response, thumbnails = web_service.ask_ai_with_thumbnails(
-            question=question,
-            collection=collection,
-            length=length,
-            search_type=search_type,
-            documents=selected_documents
-        )
-        
-        return response, thumbnails
-        
-    except Exception as e:
-        return f"AI error: {str(e)}", []
-
-
 # Chat handlers
 def send_chat_message(
     web_service: VectorWebService,
@@ -312,32 +290,6 @@ def connect_events(web_service, search_components,
             outputs=[
                 search_components['search_results'],
                 search_components['search_thumbnails']
-            ]
-        )
-    
-    # AI Q&A functionality - only connect if components exist
-    if (search_components and 
-        'ask_btn' in search_components and 
-        'ask_query' in search_components and
-        'response_length' in search_components and
-        'ask_search_type' in search_components and
-        'ai_response' in search_components and
-        'ai_thumbnails' in search_components):
-        
-        search_components['ask_btn'].click(
-            fn=lambda question, length, collection, selected_docs, search_type: ask_ai(
-                web_service, question, length, collection, selected_docs, search_type
-            ),
-            inputs=[
-                search_components['ask_query'],
-                search_components['response_length'],
-                search_components['ask_search_type'],
-                documents_checkboxgroup,
-                search_components['ask_search_type']
-            ],
-            outputs=[
-                search_components['ai_response'],
-                search_components['ai_thumbnails']
             ]
         )
     

@@ -43,24 +43,6 @@ python -m vector.agent search "standards" --collection "Legal" --filter filename
 python -m vector.agent search "requirements" --collection "Legal" --verbose
 ```
 
-### Ask Questions
-
-```bash
-# Basic question
-python -m vector.agent ask "What are the parking requirements?" --collection "Legal"
-
-# Control response length
-python -m vector.agent ask "What setbacks are required?" --collection "Legal" --length short
-python -m vector.agent ask "Explain the permit process" --collection "Legal" --length long
-
-# Search specific content types
-python -m vector.agent ask "Show me building diagrams" --collection "Technical" --type artifacts
-python -m vector.agent ask "What do regulations say?" --collection "Legal" --type chunks
-
-# Filter context sources
-python -m vector.agent ask "What are fire codes?" --collection "Legal" --filter source=ordinances
-```
-
 ### Chat Sessions (Multi-turn Conversations)
 
 Chat mode enables multi-turn conversations with context awareness:
@@ -90,11 +72,6 @@ python -m vector.agent chat --session abc123-def456 --end
 - **Automatic summarization**: Long conversations are automatically summarized to stay within token limits
 - **Context-aware retrieval**: Search queries are enhanced based on conversation history
 - **Session persistence**: Sessions persist for the lifetime of the agent process
-
-#### Chat vs Ask
-- **Use `ask`** for single, independent questions
-- **Use `chat`** when you need to ask follow-up questions or have a conversation
-- Chat maintains conversational context, while ask treats each query independently
 
 ### System Information
 
@@ -313,13 +290,13 @@ Agent handles:
 
 ```bash
 # Zoning Questions
-python -m vector.agent ask "What are R-1 setback requirements?" --collection "Zoning"
+python -m vector.agent search "R-1 setback requirements" --collection "Zoning"
 
 # Building Codes
 python -m vector.agent search "fire safety requirements" --collection "Codes" --type chunks
 
 # Permit Processes
-python -m vector.agent ask "How do I apply for a building permit?" --collection "Permits" --length long
+python -m vector.agent search "building permit application" --collection "Permits" --type both
 
 # Technical Standards
 python -m vector.agent search "drainage diagrams" --collection "Engineering" --type artifacts
@@ -332,10 +309,10 @@ python -m vector.agent search "drainage diagrams" --collection "Engineering" --t
 python -m vector.agent search "parking standards" --collection "Legal" --filter source=ordinances
 
 # Specific document analysis
-python -m vector.agent ask "What does Chapter 14 require?" --collection "Codes" --filter filename=chapter_14.docx
+python -m vector.agent search "Chapter 14 requirements" --collection "Codes" --filter filename=chapter_14.docx
 
 # Multi-source comparison
-python -m vector.agent ask "Compare zoning requirements" --collection "Legal" --type both
+python -m vector.agent search "zoning requirements" --collection "Legal" --type both
 ```
 
 ## Dependencies

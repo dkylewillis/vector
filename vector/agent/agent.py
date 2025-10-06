@@ -41,7 +41,7 @@ class ChatSession(BaseModel):
     summary: Optional[str] = Field(None, description="Compressed history summary")
     created_at: float = Field(..., description="Session creation timestamp")
     last_updated: float = Field(..., description="Last update timestamp")
-
+    system_prompt: Optional[str] = Field(None, description="System prompt for this session")
 
 class ResearchAgent:
     """
@@ -218,72 +218,6 @@ class ResearchAgent:
             results = results[:top_k * 2]  # Return up to top_k*2 results when searching both
         
         return results
-
-    def ask(self, question: str, response_length: str = 'medium', search_type: str = 'both', top_k: int = 20, document_ids: Optional[List[str]] = None) -> tuple[str, List[SearchResult]]:
-        """Ask a question about the documents and get relevant context.
-        
-        Args:
-            question: Question to ask
-            response_length: Response length (short/medium/long)
-            search_type: 'chunks', 'artifacts', or 'both' for context search
-            top_k: Number of results to return for context
-            
-        Returns:
-            Tuple of (AI response, search results used for context)
-        """
-        if not question.strip():
-            raise ValueError("Question cannot be empty")
-        
-        # Check if AI models are available
-        if not self.search_ai_model or not self.answer_ai_model:
-            raise AIServiceError("AI models are not available. Please configure API keys and ensure models are properly initialized.")
-        
-        # Use AI to enhance search
-        try:
-            # Generate context search prompt using search model
-            preprocess_prompt = (
-                "Given a user question, rephrase or expand it into a list of concise key terms, phrases, "
-                "and related concepts that are likely to appear in regulatory or ordinance text. "
-                "• Include synonyms, common legal/regulatory wording, and technical terminology. "
-                "• Focus on the underlying intent of the question, not just the exact words used. "
-                "• Avoid filler words and unrelated concepts. "
-                "• Output as a comma-separated list, in order of relevance."
-            )
-            
-            search_query = self.search_ai_model.generate_response(
-                question, preprocess_prompt, max_tokens=self.config.ai_search_max_tokens)
-        except Exception as e:
-            # Fall back to original question if search enhancement fails
-            print(f"Warning: Could not enhance search with AI: {e}")
-            search_query = question
-        
-        # Search for context based on search_type
-        results = self.search(query=search_query, top_k=top_k, search_type=search_type, document_ids=document_ids)
-        
-        if not results:
-            return ("No relevant documents found to answer your question.", [])
-        
-        # Generate AI response
-        try:
-            # Build context from search results
-            context = self._build_context(results[:40])  # Limit to top 40 results
-            
-            # Get response length settings
-            max_tokens = self.config.response_lengths.get(response_length, 1000)
-            
-            # Generate AI response using answer model
-            system_prompt = self._get_system_prompt()
-            user_prompt = f"Question: {question}\n\nContext:\n{context}"
-            
-            response = self.answer_ai_model.generate_response(
-                prompt=user_prompt,
-                system_prompt=system_prompt,
-                max_tokens=max_tokens
-            )
-        except Exception as e:
-            raise AIServiceError(f"Failed to generate AI response: {e}")
-        
-        return (response, results)
     
     def _build_context(self, search_results: List[SearchResult]) -> str:
         """Build context string from search results for AI."""
@@ -386,6 +320,8 @@ class ResearchAgent:
             created_at=time.time(),
             last_updated=time.time()
         )
+        # Store the system prompt explicitly for easier access
+        session.system_prompt = base_prompt
         self._sessions[session_id] = session
         return session_id
 
@@ -488,7 +424,7 @@ class ResearchAgent:
         try:
             assistant_response = self.answer_ai_model.generate_response(
                 prompt=user_prompt,
-                system_prompt=session.messages[0].content,
+                system_prompt=session.system_prompt or session.messages[0].content,
                 max_tokens=max_tokens
             )
         except Exception as e:
@@ -536,7 +472,7 @@ class ResearchAgent:
         
         recent = self._render_recent_messages(session, limit=6)
         expand_prompt = (
-            "Given the ongoing conversation and NEW user message, "
+            "Given the ongoing municipal regulations conversation and NEW user message, "
             "produce a comma-separated list of focused retrieval keyphrases. "
             "Avoid generic fluff. Prior conversation:\n"
             f"{recent}\n\nUser message:\n{user_message}"

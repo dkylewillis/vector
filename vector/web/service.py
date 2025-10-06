@@ -88,56 +88,6 @@ class VectorWebService:
             print(f"Error in search: {e}")
             return f"Search error: {str(e)}", []
 
-    def ask_ai_with_thumbnails(
-        self,
-        question: str,
-        collection: str,
-        length: str,
-        search_type: str,
-        documents: Optional[List[str]] = None
-    ) -> Tuple[str, List]:
-        """Ask AI with thumbnails."""
-        if not self.agent:
-            return "AI functionality not available", []
-
-        try:
-            # Map collection name to search type if needed
-            if collection == "artifacts":
-                agent_search_type = "artifacts"
-            elif collection == "chunks":
-                agent_search_type = "chunks"
-            else:
-                agent_search_type = search_type or "both"
-
-            response, results = self.agent.ask(
-                question=question,
-                response_length=length,
-                search_type=agent_search_type,
-                top_k=20,
-                document_ids=self.get_selected_documents_by_name(documents)
-            )
-
-            # Collect thumbnails from search results
-            thumbnails = []
-            for result in results:
-                # Get thumbnails from chunk if present
-                if result.chunk:
-                    chunk_thumbnails = self.get_thumbnails(result.chunk)
-                    thumbnails.extend(chunk_thumbnails)
-
-                # Get thumbnails from artifact if present
-                if result.artifact:
-                    artifact_thumbnails = self.get_thumbnails(result.artifact)
-                    thumbnails.extend(artifact_thumbnails)
-
-            # Return the AI response text
-            response_text = response.response if hasattr(response, 'response') else str(response)
-            return response_text, thumbnails
-
-        except Exception as e:
-            print(f"Error in AI ask: {e}")
-            return f"AI error: {str(e)}", []
-
     def get_selected_documents_by_name(self, documents: List[str]) -> Optional[Dict[str, Any]]:
         """Get document details by ID."""
         if not self.registry:
