@@ -15,13 +15,18 @@ qdrant-client
 # Numerical computing
 numpy
 
+# Data validation
+pydantic
+
+# Image processing
+Pillow
+
 # Configuration and environment
 PyYAML
 python-dotenv
 
 # AI services
 openai
-runpod
 
-# Additional web dependencies
+# Web dependencies
 gradio>=4.0.0

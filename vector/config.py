@@ -134,7 +134,7 @@ class Config:
     # Vector database
     @property
     def vector_db_path(self) -> str:
-        return self._config_data.get('vector_db', {}).get('path', './qdrant_db')
+        return self._config_data.get('vector_database', {}).get('local_path', './qdrant_db')
     
     # OpenAI API key
     @property

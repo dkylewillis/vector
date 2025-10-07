@@ -127,21 +127,43 @@ def delete_selected_documents(web_service: VectorWebService, selected_documents,
 
 
 def handle_add_tags(web_service: VectorWebService, document_list: List[str], tags_input: str):
-    """Handle adding tags to selected documents."""
+    """Handle adding tags to selected documents.
+    
+    Returns:
+        Tuple of (status_message, updated_tags_list)
+    """
     try:
         result = web_service.add_document_tags(document_list, tags_input)
-        return result["message"]
+        
+        # Get updated tags for refresh
+        updated_tags = web_service.get_all_tags()
+        
+        return (
+            result["message"],
+            gr.update(choices=updated_tags)  # Refresh tags dropdown
+        )
     except Exception as e:
-        return f"Error adding tags: {str(e)}"
+        return f"Error adding tags: {str(e)}", gr.update()
 
 
 def handle_remove_tags(web_service: VectorWebService, document_list: List[str], tags_input: str):
-    """Handle removing tags from selected documents."""
+    """Handle removing tags from selected documents.
+    
+    Returns:
+        Tuple of (status_message, updated_tags_list)
+    """
     try:
         result = web_service.remove_document_tags(document_list, tags_input)
-        return result["message"]
+        
+        # Get updated tags for refresh
+        updated_tags = web_service.get_all_tags()
+        
+        return (
+            result["message"],
+            gr.update(choices=updated_tags)  # Refresh tags dropdown
+        )
     except Exception as e:
-        return f"Error removing tags: {str(e)}"
+        return f"Error removing tags: {str(e)}", gr.update()
 
 
 def handle_show_current_tags(web_service: VectorWebService, document_list: List[str]):
@@ -399,7 +421,10 @@ def connect_events(web_service, search_components,
                 document_management_components['add_tags_input'],
                 documents_checkboxgroup
             ],
-            outputs=document_management_components['tag_management_output']
+            outputs=[
+                document_management_components['tag_management_output'],
+                tag_filter_dropdown  # Refresh tag dropdown
+            ]
         )
     
     if (document_management_components and 
@@ -413,7 +438,10 @@ def connect_events(web_service, search_components,
                 document_management_components['remove_tags_input'],
                 documents_checkboxgroup
             ],
-            outputs=document_management_components['tag_management_output']
+            outputs=[
+                document_management_components['tag_management_output'],
+                tag_filter_dropdown  # Refresh tag dropdown
+            ]
         )
     
     # Show current tags when documents are selected

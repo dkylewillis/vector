@@ -131,6 +131,7 @@ class OpenAIModel(BaseAIModel):
             self.temperature = config.ai_answer_temperature
             
         self.provider = "openai"
+        self.service_tier = getattr(config, "openai_service_tier", "priority")
         
         # Get model-specific configuration
         self.model_config = ModelConfig.get_config(model_name)
@@ -144,7 +145,8 @@ class OpenAIModel(BaseAIModel):
             raise AIServiceError(f"Failed to initialize OpenAI client: {e}")
 
     def _build_api_params(self, max_tokens: Optional[int] = None, 
-                         temperature: Optional[float] = None) -> Dict[str, Any]:
+                         temperature: Optional[float] = None,
+                         service_tier: Optional[str] = None) -> Dict[str, Any]:
         """Build API parameters based on model configuration.
         
         Args:
@@ -166,11 +168,18 @@ class OpenAIModel(BaseAIModel):
         # Handle temperature parameter
         if temperature is not None and self.model_config["supports_temperature"]:
             params["temperature"] = temperature
+
+        if service_tier:
+            params["service_tier"] = service_tier
+
+        return params
             
         return params
 
     def generate_response(self, prompt: str, system_prompt: str = "", 
-                         max_tokens: Optional[int] = None, **kwargs) -> str:
+                         max_tokens: Optional[int] = None,
+                         service_tier: Optional[str] = None,
+                         **kwargs) -> str:
         """Generate response using OpenAI API.
         
         Args:
@@ -187,6 +196,7 @@ class OpenAIModel(BaseAIModel):
 
         max_tokens = max_tokens or self.max_tokens
         temperature = kwargs.get('temperature', self.temperature)
+        tier = service_tier or self.service_tier
 
         try:
             # Build messages based on model capabilities
@@ -196,11 +206,11 @@ class OpenAIModel(BaseAIModel):
             elif system_prompt and not self.model_config["supports_system_prompt"]:
                 # For models that don't support system prompts, prepend to user message
                 prompt = f"{system_prompt}\n\n{prompt}"
-            
+
             messages.append({"role": "user", "content": prompt})
 
             # Build API parameters based on model configuration
-            api_params = self._build_api_params(max_tokens, temperature)
+            api_params = self._build_api_params(max_tokens, temperature, tier)
             api_params["messages"] = messages
 
             response = self.client.chat.completions.create(**api_params)

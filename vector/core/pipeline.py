@@ -408,6 +408,28 @@ class VectorPipeline:
         self.registry.update_document(document_record)
 
         chunk_embeddings = self.embed_chunks(chunks)
+        
+        # Ensure chunk collection exists
+        existing = set(self.store.list_collections())
+        if chunk_collection not in existing:
+            self.store.create_collection(
+                collection_name=chunk_collection,
+                vector_size=len(chunk_embeddings[0])
+            )
+
+        self.store_chunks(chunks, chunk_embeddings, document_record, collection_name=chunk_collection)
+
+        if artifacts:
+            artifact_embeddings = self.embed_artifacts(artifacts)
+            # Ensure artifact collection exists
+            existing = set(self.store.list_collections())
+            if artifact_collection not in existing:
+                self.store.create_collection(
+                    collection_name=artifact_collection,
+                    vector_size=len(artifact_embeddings[0])
+                )
+            self.store_artifacts(artifacts, artifact_embeddings, document_record, collection_name=artifact_collection)
+
         self.store_chunks(chunks, chunk_embeddings, document_record, collection_name=chunk_collection)
 
         if artifacts:

@@ -1,163 +1,170 @@
+// ...existing code...
 # Vector
 
-## About
+[![Status](https://img.shields.io/badge/status-alpha-orange)](#) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](#)
 
-Vector is a document research application that implements a Retrieval-Augmented Generation (RAG) pipeline to provide grounded context to large language models (LLMs). It uses IBM's open‑source Docling library to parse source files into structured Docling Document objects (Pydantic models) that preserve hierarchy (pages, sections, tables, figures) alongside clean text. After parsing, text is segmented with Docling's hybrid chunker, and both chunks and extracted artifacts (e.g., tables, figures) are embedded using Sentence Transformers and stored in a Qdrant vector database. Vector supplies both a command-line interface (CLI) and a Gradio web application for ingesting documents, performing semantic search, AI-assisted Q&A, and managing document lifecycle operations.
+## Table of Contents
+- Overview
+- Features
+- Quick Start (Minimal)
+- Installation
+  - Local Qdrant
+  - Configuring Qdrant (Local vs Remote)
+- Configuration
+- Architecture
+  - Core Pipeline
+  - Agent Pipeline
+- Data & Storage Layout
+- Limitations
+- Roadmap
+- Testing & Development
+- Contributing
+- License
 
-Vector is currently an early-stage proof of concept; I plan to refine it and continue adding features. 
+## Overview
+Vector is a research tool that ingests documents (text, tables, figures), extracts structured chunks and artifacts, and uses a Retrieval-Augmented Generation (RAG) pipeline (Docling + Qdrant) to answer questions with grounded citations—useful for any domain where traceability to original sources matters (regulatory, legal, engineering, scientific, policy, internal knowledge, and more).
 
+## Features
+- Multi-format ingestion (PDF, DOCX, PPTX, HTML, MD, CSV, images, Docling JSON)
+- Relevant figures and tables returned alongside responses
+- Search across multiple documents simultaneously
+- Tag-based document filtering
+- Provider-agnostic model configuration
+- Gradio web UI + CLI + Python API
 
-## Goals
-
-- Accelerate research by enabling users to query one or many documents and receive AI‑assisted, source‑grounded summaries.
-- Remain LLM‑agnostic so embedding and generation models can be swapped through configuration.
-- Provide transparent, tunable behavior by exposing configurable system and user prompt templates.
-
-## Vector Web Interface
-
-The Vector Web Interface provides a user-friendly Gradio-based web application for document processing, search, and management.
-
-### Starting the Web Interface
-
-The web interface is available after installing the package:
-
+## Quick Start (Minimal)
 ```bash
-# Install the package in development mode
+git clone <repo>
+cd vector
 pip install -e .
-
-# Configure environment (copy example and add your key)
-copy .env.example .env   # Windows PowerShell / CMD
-# or (PowerShell alternative)
-Copy-Item .env.example .env
-
-# Edit .env and set:
-# OPENAI_API_KEY=sk-...your key...
-
-# Start the web interface (Method 1 - using entry point)
-vector-web
-
-# Start the web interface (Method 2 - using module)
-python -m vector.web
-
-# Start the web interface (Method 3 - using standalone script)
-python vector_web.py
+copy .env.example .env
+# set OPENAI_API_KEY
+docker run -p 6333:6333 qdrant/qdrant:latest
+python -m vector.core.ingest ./samples/zoning.pdf
+python -m vector.agent search "corner lot setback"
 ```
 
-## Concepts
-
-Vector is split into two cooperating layers:
-
-1. Core (deterministic document processing & storage)
-2. Agent (AI-assisted retrieval, reasoning, and interaction)
-
-This separation keeps ingestion repeatable and transparent, while allowing flexible AI behavior on top of a stable data substrate.
-
-## Vector-Core
-The Core layer is responsible for turning raw source files into structured, queryable vector data plus a registry of document metadata.
-
-### Responsibilities
-- File conversion (multi-format) using Docling (`DocumentConverter`)
-- Hybrid structural + token-based chunking (`DocumentChunker` / Docling HybridChunker)
-- Artifact extraction (tables, figures, images) and association with referencing chunks
-- Text & artifact contextualization (adds headings and surrounding structure)
-- Embedding generation via Sentence Transformers (default: `sentence-transformers/all-MiniLM-L6-v2`)
-- Vector insertion into Qdrant collections (default collections: `chunks`, `artifacts`)
-- Persistent storage of:
-	- Converted document JSON (with embedded image refs)
-	- Artifact images & thumbnails (`artifacts/` subdirectory)
-	- Registry records (document id, display name, counts, tags, collection names)
-- Safe deletion of documents (vectors + files + registry cleanup)
-
-### Processing Pipeline (High-Level Flow)
-
-After conversion, the pipeline performs two complementary passes: (1) chunk extraction using Docling's Hybrid Chunker, which produces contextualized text segments while preserving a list of referenced document item `self_ref` identifiers (tables, pictures, etc.) so those relationships can be embedded as payload metadata; (2) an artifact extraction pass over the full Docling document that materializes each referenced figure/table as a PNG image, builds an `Artifact` object (caption, headings, before/after surrounding text), and records the image and thumbnail file paths. Each artifact's path is then linked back onto any chunk that referenced it, enabling either chunk‑centric or artifact‑centric retrieval strategies. Both representations are intentionally retained—even if partially redundant—to compare strengths and weaknesses (rich narrative context vs. focused structured visual context). The remaining steps embed chunks and artifacts, upsert vectors into their respective Qdrant collections, and register document metadata in the registry.
-
-
-![pipeline.run()](./core-pipeline.png)
-
-### Key Components
-- `DocumentConverter`: Normalizes multiple formats (PDF, DOCX, PPTX, HTML, MD, CSV, images, Docling JSON) and optionally uses a VLM pipeline for richer artifact image generation.
-- `DocumentChunker`: Applies a hybrid approach (hierarchical + token-aware) with a custom serializer to mark image placeholders, ensuring chunk text keeps structural cues.
-- `Embedder`: Wraps Sentence Transformers for batch embedding; exposes embedding dimension.
-- `VectorStore`: Thin Qdrant abstraction (create/list/insert/search/delete + document filtering).
-- `VectorPipeline`: Orchestrates end‑to‑end ingestion (`run()`), saves converted doc JSON, artifact images, thumbnails, registers the document, embeds & stores vectors, and links artifacts to their referencing chunks.
-- `VectorRegistry` (via `document_registry`): Tracks document metadata (ids, names, collections, counts, tags, artifact presence) for later retrieval and deletion.
-
-### Typical Ingestion (Programmatic)
+Programmatic:
 ```python
 from vector.core.pipeline import VectorPipeline
+from vector.agent.api import Agent
 
 pipeline = VectorPipeline()
-document_id = pipeline.run("./data/source_documents/zoning_chapter_14.pdf", tags=["zoning", "setbacks"])
-print("Ingested document id:", document_id)
+doc_id = pipeline.run("samples/zoning.pdf", tags=["zoning"])
+agent = Agent()
+print(agent.answer("Summarize R-1 height limits", top_k=6))
 ```
 
-### Deletion Semantics
-- Removes chunk & artifact vectors (if present)
-- Optionally deletes saved JSON + artifact image folder (unless `cleanup_files=False`)
-- Removes registry record (atomic intent; logs partial failures)
+## Installation
+Requirements: Python 3.10+, Qdrant (local or remote), ~2GB disk for embeddings (sample scale).
+Optional: GPU for Sentence Transformers acceleration.
 
-### Why Dual Collections?
-Separating `chunks` (narrative text) and `artifacts` (structured visuals) improves search control. The Agent can:
-- Query only text for dense semantic reasoning
-- Query only artifacts for tabular or figure-focused questions
-- Merge both result sets for comprehensive answers
-
-## Vector-Agent
-The Agent layer provides semantic search, multi-source context assembly, AI question answering, and conversational (multi‑turn) sessions over the data prepared by Core.
-
-### Responsibilities
-- Query construction & enhancement (expands or reformulates user queries)
-- Dual / unified retrieval across chunk & artifact collections
-- Relevance ranking & context window assembly
-- Prompt construction (system + user templates configurable)
-- AI answer generation (provider‑agnostic: OpenAI, Anthropic, local-compatible)
-- Multi-turn chat session management (context memory, summarization, pruning)
-- Metadata filtering (e.g., by `source`, `filename`, path) before or after vector search
-- Response length adaptation (short / medium / long policies)
-
-### Search Modes
-- Chunks: Narrative / textual context
-- Artifacts: Tables, figures, diagrams (caption + surrounding text synthesized into embedding text)
-- Both: Merged result set (often higher recall for complex regulatory queries)
-
-### Chat Session Lifecycle
-1. Start session → unique session id
-2. User messages accumulate → agent retrieves & augments context
-3. Automatic summarization triggers after configured message threshold (prevents token overflow)
-4. Rolling recent context + compressed history maintained
-5. End session → memory discarded (currently in‑memory only)
-
-## Chat Pipeline
-On each chat turn, the raw user message is passed to a query-expansion LLM, producing an optimized semantic search query. Retrieved vectors (chunks + artifacts) are ranked, distilled into context, and injected into a structured prompt (system + history + user intent + sources) sent to the answer-generation LLM.
-
-![Chat Pipeline](./agent-pipeline.png)
-
-### Example CLI Usage
+### Local Qdrant
 ```bash
-# One-off semantic search (both chunks & artifacts)
-python -m vector.agent search "setback requirements for corner lots" --type both --top-k 12
-
-# Filter by metadata (e.g., only ordinances)
-python -m vector.agent search "parking minimums" --filter source=ordinances
-
-# Start a multi-turn chat
-python -m vector.agent chat --start
-# Use returned session id in subsequent turns
-python -m vector.agent chat --session <SESSION_ID> --message "Summarize R-1 height restrictions"
-python -m vector.agent chat --session <SESSION_ID> --message "How do they differ for R-2?" --length medium
+docker run -d --name qdrant -p 6333:6333 qdrant/qdrant:latest
 ```
 
-### Response Length Profiles
-- Short: Key bullet or sentence summary
-- Medium (default): Balanced explanation with citations
-- Long: Comprehensive, sectioned answer (useful for memo drafting)
+### Configuring Qdrant (Local vs Remote)
 
-### Provider Agnosticism
-Configuration selects model providers per role (search vs answer). This allows lighter / faster models for query expansion and heavier models for answer generation while preserving cost efficiency.
+Vector prefers an explicit configuration via `config.yaml` (auto-created on first run if missing). Relevant section excerpt:
 
-### When to Use Core vs Agent
-- Use Core alone for batch ingestion pipelines, exporting structured JSON, or low‑level vector operations.
-- Use Agent when you need intent-aware search, enriched prompts, multi-turn dialogue, or automatic context blending of text + artifacts.
+```yaml
+vector_database:
+  # Cloud Storage
+  url: null          # Set to remote Qdrant base URL OR set to null if using local
+  api_key: null      # Use env var QDRANT_API_KEY instead of hard-coding
 
-## Example Usage Video
+  # Local Storage
+  local_path: "./qdrant_db"  # Used when url is null (embedded/local)
+```
+
+Usage modes:
+1. Local embedded (default): leave `url: null`; Vector will use the directory at `local_path`.
+2. Remote managed Qdrant: set `url` (e.g. `https://YOUR-INSTANCE-region.aws.cloud.qdrant.io:6333`) and export `QDRANT_API_KEY`.
+
+Set environment variable for remote:
+```powershell
+$Env:QDRANT_API_KEY = "your_cloud_qdrant_api_key"
+```
+
+Or in `.env`:
+```
+QDRANT_API_KEY=your_cloud_qdrant_api_key
+```
+
+If both `api_key` in file and `QDRANT_API_KEY` env are present, the environment variable should take precedence (recommended best practice). Remove any stale Docker Compose references; a single-container Qdrant can still be run via the earlier `docker run` command when you want a clean local instance.
+
+## Configuration
+Primary configuration lives in config.yaml at the project root. Edit that file instead of relying on many environment variables.
+
+## Architecture
+High-level:
+- Core: deterministic ingestion → Docling parse → chunk + artifact extraction → embeddings → Qdrant
+- Agent: query expansion → dual collection retrieval → ranking → prompt assembly → LLM answer
+- Web: Gradio UI wrapping Core + Agent APIs
+
+### Core Pipeline
+After conversion, the pipeline does two passes:
+
+1. Chunk pass: Docling’s hybrid chunker splits the document into readable text chunks and keeps references (self_ref ids) to any tables or figures mentioned. These references are stored as metadata.
+2. Artifact pass: It walks the full Docling document, exports each referenced table or figure as a PNG (plus a thumbnail), and builds an Artifact record (caption, headings, a little surrounding text, file paths). 
+
+Each artifact is linked back to any chunk that referenced it. This lets you search:
+- By text chunks (richer narrative context), or
+- By artifacts (focused tables/figures), or
+- Merge both for better coverage.
+
+Both forms are kept intentionally. Finally, the system:
+- Embeds chunks and artifacts
+- Writes them into their Qdrant collections
+- Registers the document (metadata, counts, tags, collection names) in the registry.
+  
+![Core Pipeline Diagram](./core-pipeline.png "Core pipeline: conversion → chunking → artifact extraction → embedding → storage")
+### Agent Pipeline
+
+
+![Agent Chat Flow](./agent-pipeline.png "Agent flow: user message → query expansion → retrieval → ranking → answer")
+
+## Data & Storage Layout
+```
+data/
+  documents/<doc_id>.json
+  artifacts/<doc_id>/<artifact_id>.png
+  artifacts/<doc_id>/thumb_<artifact_id>.png
+registry/ (metadata store, e.g., document_registry.json)
+```
+
+## Limitations
+- In-memory chat session store (not persisted)
+- Limited artifact OCR if figures contain dense text
+- No streaming answers yet
+
+## Roadmap
+- Persistent session storage (SQLite or Redis)
+
+
+## Testing & Development
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -e ".[dev]"
+pytest -q
+ruff check .
+```
+
+## Contributing
+PRs welcome. Open an issue describing enhancement before large changes.
+
+## License
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this project except in compliance with the License. A copy of the License is provided in the `LICENSE` file and is also available at:
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+Copyright (c) 2025 Vector Team
+
+This project may include third-party components; attribution notices (if any) are included in the `NOTICE` file. When creating derivative works, please preserve existing attribution and clearly mark any changes you make.
+
+

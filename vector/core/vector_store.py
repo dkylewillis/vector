@@ -3,12 +3,15 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchAny, MatchValue
 from typing import Dict, List, Any, Optional, Generator, Union
 from pydantic import BaseModel, Field
+from ..config import Config
+
+_config = Config()
 
 
 class VectorStore(BaseModel):
     """A Pydantic model for managing Qdrant vector store operations."""
     
-    db_path: Optional[str] = Field(default="./qdrant_db", description="Path to Qdrant database (for local)")
+    db_path: Optional[str] = Field(default_factory=lambda: _config.vector_db_path, description="Path to Qdrant database (for local)")
     url: Optional[str] = Field(default=None, description="URL for remote Qdrant instance")
     api_key: Optional[str] = Field(default=None, description="API key for remote Qdrant instance")
     

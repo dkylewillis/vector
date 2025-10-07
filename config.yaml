@@ -35,12 +35,12 @@ chat:
 
 # Vector Database Settings
 vector_database:
+
   # Use cloud Qdrant instance
-  url: null #"https://74f6dd7e-d502-40f1-974b-bd7898518e89.us-east4-0.gcp.cloud.qdrant.io:6333"
+  url: null                         # Set QDRANT_URL environment variable or set to null for local
   api_key: null                     # Set QDRANT_API_KEY environment variable
-  collection_name: "default"  # Default collection name
   
-  # Legacy local storage (deprecated)
+  # Local Storage
   local_path: "./qdrant_db"         # Path for local file storage
 
  # Directory to store generated artifacts
