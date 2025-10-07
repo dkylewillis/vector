@@ -22,7 +22,7 @@
 - License
 
 ## Overview
-Vector is a research tool that ingests documents (text, tables, figures), extracts structured chunks and artifacts, and uses a Retrieval-Augmented Generation (RAG) pipeline (Docling + Qdrant) to answer questions with grounded citations—useful for any domain where traceability to original sources matters (regulatory, legal, engineering, scientific, policy, internal knowledge, and more).
+Vector is a research tool that ingests documents (text, tables, figures), extracts structured chunks and artifacts, and uses a Retrieval-Augmented Generation (RAG) pipeline (Docling + Qdrant) to answer questions with grounded citations. Retrieved chunks and artifacts are assembled into a grounded context window and passed to the LLM (currently OpenAI models only) to produce an auditable answer. It is useful for any domain where traceability to original sources matters (regulatory, legal, engineering, scientific, policy, internal knowledge, and more).
 
 ## Features
 - Multi-format ingestion (PDF, DOCX, PPTX, HTML, MD, CSV, images, Docling JSON)
