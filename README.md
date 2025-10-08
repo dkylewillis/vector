@@ -1,4 +1,3 @@
-// ...existing code...
 # Vector
 
 [![Status](https://img.shields.io/badge/status-alpha-orange)](#) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](#)
