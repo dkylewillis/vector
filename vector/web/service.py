@@ -52,7 +52,8 @@ class VectorWebService:
         try:
             agent_search_type = search_type or "both"
 
-            results = self.agent.search(
+            # Use the search service directly (refactored architecture)
+            results = self.agent.retriever.search_service.search(
                 query=query,
                 top_k=top_k,
                 search_type=agent_search_type,
@@ -624,7 +625,8 @@ class VectorWebService:
                 "message_count": result["message_count"],
                 "results_count": len(result["results"]),
                 "thumbnails": thumbnails,
-                "auto_created": auto_created
+                "auto_created": auto_created,
+                "usage_metrics": result.get("usage_metrics", {})
             }
         except ValueError as e:
             return {"success": False, "error": str(e)}

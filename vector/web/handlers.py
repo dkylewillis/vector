@@ -3,6 +3,7 @@
 import gradio as gr
 from typing import Optional, Dict, List, Tuple
 from .service import VectorWebService
+from .components import format_usage_metrics
 
 
 def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents, search_type):
@@ -68,18 +69,27 @@ def send_chat_message(
             # Get the session ID (may be newly created)
             new_session_id = result['session_id']
             
-            # Update session info with session ID
-            info = f"Session ID: {new_session_id}\nMessages: {result['message_count']} | Results used: {result['results_count']}"
-            if result.get('auto_created'):
-                info = f"✨ New session started\n{info}"
+            # Build session info (without metrics)
+            info_lines = [f"Session ID: {new_session_id}"]
             
-            return chat_history, thumbnails, info
+            if result.get('auto_created'):
+                info_lines.insert(0, "✨ New session started")
+            
+            info_lines.append(f"Messages: {result['message_count']} | Results used: {result['results_count']}")
+            
+            info = "\n".join(info_lines)
+            
+            # Format usage metrics separately
+            usage_metrics = result.get('usage_metrics', {})
+            metrics_display = format_usage_metrics(usage_metrics)
+            
+            return chat_history, thumbnails, info, metrics_display
         else:
             error_msg = f"Error: {result.get('error', 'Unknown error')}"
-            return chat_history, [], error_msg
+            return chat_history, [], error_msg, "No metrics available"
             
     except Exception as e:
-        return chat_history, [], session_id, f"Chat error: {str(e)}"
+        return chat_history, [], f"Chat error: {str(e)}", "No metrics available"
 
 
 def get_info(web_service: VectorWebService, collection):
@@ -348,7 +358,8 @@ def connect_events(web_service, search_components,
             outputs=[
                 search_components['chat_history'],
                 search_components['chat_thumbnails'],
-                search_components['chat_session_info']
+                search_components['chat_session_info'],
+                search_components['chat_metrics']
             ]
         ).then(
             # Clear the message input after sending
@@ -358,11 +369,12 @@ def connect_events(web_service, search_components,
         
         # Connect Chatbot clear button to end session
         search_components['chat_history'].clear(
-            fn=lambda: ([], [], "Chat session ended - start typing to begin a new conversation"),
+            fn=lambda: ([], [], "Chat session ended - start typing to begin a new conversation", "No metrics yet. Send a message to see token usage."),
             outputs=[
                 search_components['chat_history'],
                 search_components['chat_thumbnails'],
-                search_components['chat_session_info']
+                search_components['chat_session_info'],
+                search_components['chat_metrics']
             ]
         )
     

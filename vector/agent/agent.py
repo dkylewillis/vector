@@ -1,55 +1,35 @@
 """Simplified Research Agent for Vector."""
 
 import warnings
-import time
-from typing import List, Dict, Any, Optional, Union, Literal
+from typing import List, Dict, Any, Optional
 from uuid import uuid4
-from pydantic import BaseModel, Field
-
-from vector.core.models import Chunk, Artifact
 
 from ..config import Config
-from ..exceptions import VectorError, AIServiceError
+from ..exceptions import AIServiceError
 from ..ai.factory import AIModelFactory
-from ..core.embedder import Embedder
-from ..core.vector_store import VectorStore
+from ..core.services.search import SearchService
+
+# Import new modular components
+from .models import ChatSession, RetrievalResult, UsageMetrics, AggregatedUsageMetrics
+from .prompting import build_system_prompt, build_answer_prompt
+from .memory import SummarizerPolicy
+from .retrieval import Retriever
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modules.module")
 
 
-class SearchResult(BaseModel):
-    """Search result container with validation."""
-    id: str = Field(..., description="Unique identifier")
-    score: float = Field(..., ge=0.0, le=1.0, description="Relevance score")
-    text: str = Field(..., description="Result content")
-    filename: str = Field(..., description="Source filename")
-    type: str = Field(..., description="Result type (chunk/artifact)")
-    chunk: Optional[Chunk] = None
-    artifact: Optional[Artifact] = None
-
-
-class ChatMessage(BaseModel):
-    """Chat message with role and content."""
-    role: Literal['system', 'user', 'assistant'] = Field(..., description="Message role")
-    content: str = Field(..., description="Message content")
-
-
-class ChatSession(BaseModel):
-    """Chat session with message history."""
-    id: str = Field(..., description="Session identifier")
-    messages: List[ChatMessage] = Field(default_factory=list, description="Message history")
-    summary: Optional[str] = Field(None, description="Compressed history summary")
-    created_at: float = Field(..., description="Session creation timestamp")
-    last_updated: float = Field(..., description="Last update timestamp")
-    system_prompt: Optional[str] = Field(None, description="System prompt for this session")
-
 class ResearchAgent:
     """
-    Simplified research agent that handles search operations only.
-    Document processing is handled separately.
+    Refactored research agent with modular architecture.
+    Handles search operations and conversational AI interactions.
     """
 
-    def __init__(self, config: Optional[Config] = None, chunks_collection: str = "chunks", artifacts_collection: str = "artifacts"):
+    def __init__(
+        self,
+        config: Optional[Config] = None,
+        chunks_collection: str = "chunks",
+        artifacts_collection: str = "artifacts"
+    ):
         """Initialize the research agent.
 
         Args:
@@ -61,9 +41,15 @@ class ResearchAgent:
         self.chunks_collection = chunks_collection
         self.artifacts_collection = artifacts_collection
         
-        # Initialize components
-        self.embedder = Embedder()
-        self.store = VectorStore()
+        # Initialize search service
+        from ..core.embedder import Embedder
+        from ..core.vector_store import VectorStore
+        search_service = SearchService(
+            Embedder(),
+            VectorStore(),
+            chunks_collection,
+            artifacts_collection
+        )
         
         # Initialize AI models using factory
         try:
@@ -74,176 +60,22 @@ class ResearchAgent:
             self.search_ai_model = None
             self.answer_ai_model = None
         
-        # Chat session management
-        self._sessions: Dict[str, ChatSession] = {}
-        self.max_history_messages = self.config.chat_max_history_messages
-        self.summary_trigger_messages = self.config.chat_summary_trigger_messages
-
-    def search_chunks(self, query: str, top_k: int = 5, document_ids: Optional[List[str]] = None) -> List[SearchResult]:
-        """Search for relevant document chunks.
+        # Initialize retriever with search service
+        self.retriever = Retriever(self.search_ai_model, search_service)
         
-        Args:
-            query: Search query
-            top_k: Number of results to return
-            
-        Returns:
-            List of search results
-        """
-        if not query.strip():
-            raise ValueError("Search query cannot be empty")
-        
-        # Embed the query
-        query_vector = self.embedder.embed_text(query)
-        
-        # Search the chunks database
-        results = self.store.search_documents(query_vector, self.chunks_collection, top_k, document_ids)
-        
-        # Convert to SearchResult objects
-        search_results = []
-        for result in results:
-
-            try:
-                # Convert string to dictionary first, then validate
-                import json
-                chunk_data = result.payload.get('chunk', {})
-                
-                # If chunk_data is a string, parse it as JSON
-                if isinstance(chunk_data, str):
-                    chunk_data = json.loads(chunk_data)
-                
-                # Now validate with Pydantic
-                chunk = Chunk.model_validate(chunk_data)
-                
-            except Exception as e:
-                print(f"Warning: Could not validate chunk: {e}")
-
-            search_results.append(SearchResult(
-                id=str(result.id),
-                score=result.score,
-                text=chunk.text,
-                filename=result.payload.get("document_id", "Unknown"),
-                type="chunk",
-                chunk=chunk
-            ))
-        
-        return search_results
-
-    def search_artifacts(self, query: str, top_k: int = 5, document_ids: Optional[List[str]] = None) -> List[SearchResult]:
-        """Search for relevant artifacts.
-        
-        Args:
-            query: Search query
-            top_k: Number of results to return
-            
-        Returns:
-            List of search results
-        """
-        if not query.strip():
-            raise ValueError("Search query cannot be empty")
-        
-        # Embed the query
-        query_vector = self.embedder.embed_text(query)
-        
-        # Search the artifacts database
-        results = self.store.search_documents(query_vector, self.artifacts_collection, top_k, document_ids)
-
-        # Convert to SearchResult objects
-        search_results = []
-        for result in results:
-
-            try:
-                # Convert string to dictionary first, then validate
-                import json
-                artifact_data = result.payload.get('artifact', {})
-                
-                # If artifact_data is a string, parse it as JSON
-                if isinstance(artifact_data, str):
-                    artifact_data = json.loads(artifact_data)
-                
-                # Now validate with Pydantic
-                artifact = Artifact.model_validate(artifact_data)
-               
-            except Exception as e:
-                print(f"Warning: Could not validate artifact: {e}")
-
-            # Build text from artifact fields
-            text_parts = []
-            if result.payload.get("caption"):
-                text_parts.append(f"Caption: {result.payload['caption']}")
-            if result.payload.get("before_text"):
-                text_parts.append(f"Context: {result.payload['before_text']}")
-            if result.payload.get("after_text"):
-                text_parts.append(f"Context: {result.payload['after_text']}")
-            if result.payload.get("headings"):
-                text_parts.append(f"Headings: {', '.join(result.payload['headings'])}")
-            
-            search_results.append(SearchResult(
-                id=str(result.id),
-                score=result.score,
-                text=" | ".join(text_parts) if text_parts else "Artifact",
-                filename=result.payload.get("document_id", "Unknown"),
-                type=result.payload.get("type", "artifact"),
-                artifact=artifact
-            ))
-        
-        return search_results
-
-    def search(self, query: str, top_k: int = 5, search_type: str = 'both', document_ids: Optional[List[str]] = None) -> List[SearchResult]:
-        """Search for relevant documents across chunks and/or artifacts.
-        
-        Args:
-            query: Search query
-            top_k: Number of results to return per type
-            search_type: 'chunks', 'artifacts', or 'both'
-            
-        Returns:
-            List of search results
-        """
-        if not query.strip():
-            raise ValueError("Search query cannot be empty")
-        
-        results = []
-        
-        if search_type in ['chunks', 'both']:
-            chunk_results = self.search_chunks(query, top_k, document_ids)
-            results.extend(chunk_results)
-        
-        if search_type in ['artifacts', 'both']:
-            artifact_results = self.search_artifacts(query, top_k, document_ids)
-            results.extend(artifact_results)
-        
-        # Sort combined results by score if searching both
-        if search_type == 'both':
-            results.sort(key=lambda x: x.score, reverse=True)
-            results = results[:top_k * 2]  # Return up to top_k*2 results when searching both
-        
-        return results
-    
-    def _build_context(self, search_results: List[SearchResult]) -> str:
-        """Build context string from search results for AI."""
-        context_parts = []
-        for i, result in enumerate(search_results, 1):
-            context_parts.append(
-                f"Document {i} (Score: {result.score:.3f}, Type: {result.type}):\n"
-                f"Source: {result.filename}\n"
-                f"Content: {result.text}\n"
+        # Initialize summarizer policy
+        if self.answer_ai_model:
+            self.summarizer = SummarizerPolicy(
+                ai_model=self.answer_ai_model,
+                trigger_messages=self.config.chat_summary_trigger_messages,
+                keep_recent=6
             )
-        return "\n".join(context_parts)
-    
-    def _get_system_prompt(self) -> str:
-        """Get system prompt for AI interactions."""
-        return (
-            "You are a professional assistant specialized in analyzing municipal "
-            "documents, ordinances, and regulations. Your job is to provide accurate, "
-            "relevant information based on the given context.\n\n"
-            "Instructions:\n"
-            "• Answer based only on the provided context\n"
-            "• Include specific details, requirements, and references\n"
-            "• If the context doesn't contain enough information, say so\n"
-            "• Be concise but thorough\n"
-            "• Use professional terminology appropriate for municipal regulations\n"
-            "• When referencing context, note whether it comes from document chunks or extracted artifacts"
-        )
+        else:
+            self.summarizer = None
+        
+        # Session management
+        self._sessions: Dict[str, ChatSession] = {}
+        self.max_answer_tokens = 800
 
     def get_model_info(self) -> str:
         """Get information about configured models."""
@@ -269,31 +101,9 @@ class ResearchAgent:
         except Exception as e:
             return f"⚠️  Error getting model info: {e}"
 
-    def format_results(self, results: List[SearchResult]) -> str:
-        """Format search results for display.
-        
-        Args:
-            results: List of search results
-            
-        Returns:
-            Formatted string
-        """
-        if not results:
-            return "No results found."
-        
-        formatted_parts = []
-        for i, result in enumerate(results, 1):
-            formatted_parts.append(
-                f"Result {i} (Score: {result.score:.3f}, Type: {result.type}):\n"
-                f"Source: {result.filename}\n"
-                f"Content: {result.text}\n"
-            )
-        
-        return "\n".join(formatted_parts)
-
     def get_collection_info(self) -> str:
         """Get information about the collections being searched."""
-        collections = self.store.list_collections()
+        collections = self.retriever.search_service.store.list_collections()
         info_parts = [
             f"Available collections: {', '.join(collections)}",
             f"Chunks collection: {self.chunks_collection}",
@@ -313,15 +123,17 @@ class ResearchAgent:
             Session ID for the new chat
         """
         session_id = str(uuid4())
-        base_prompt = system_prompt or self._get_system_prompt()
+        prompt = system_prompt or build_system_prompt()
+        
         session = ChatSession(
             id=session_id,
-            messages=[ChatMessage(role='system', content=base_prompt)],
-            created_at=time.time(),
-            last_updated=time.time()
+            system_prompt=prompt,
+            messages=[]
         )
-        # Store the system prompt explicitly for easier access
-        session.system_prompt = base_prompt
+        
+        # Add system message
+        session.add('system', prompt)
+        
         self._sessions[session_id] = session
         return session_id
 
@@ -376,149 +188,81 @@ class ResearchAgent:
             raise ValueError(f"Unknown chat session: {session_id}")
         
         # Check if AI models are available
-        if not self.search_ai_model or not self.answer_ai_model:
+        if not self.answer_ai_model:
             raise AIServiceError(
                 "AI models are not available. Please configure API keys and ensure models are properly initialized."
             )
         
         session = self._sessions[session_id]
-        session.messages.append(ChatMessage(role='user', content=user_message))
         
-        # Build retrieval query from conversation context
-        retrieval_query = self._build_retrieval_query(session, user_message)
+        # Add user message to session
+        session.add('user', user_message)
         
-        # Search for relevant context
-        results = self.search(
-            query=retrieval_query,
+        # Perform retrieval with query expansion
+        retrieval, expansion_metrics = self.retriever.retrieve(
+            session=session,
+            user_message=user_message,
             top_k=top_k,
             search_type=search_type,
             document_ids=document_ids
         )
         
-        if not results:
+        # Handle no results case
+        if not retrieval.results:
             assistant_response = "I couldn't find relevant information in the documents to answer your question."
-            session.messages.append(ChatMessage(role='assistant', content=assistant_response))
-            session.last_updated = time.time()
+            session.add('assistant', assistant_response)
+            
+            # Create aggregated metrics from just the expansion
+            aggregated = AggregatedUsageMetrics.from_operations([expansion_metrics])
+            
             return {
                 "session_id": session_id,
                 "assistant": assistant_response,
                 "results": [],
-                "message_count": len(session.messages)
+                "retrieval": retrieval.model_dump(),
+                "message_count": len(session.messages),
+                "usage_metrics": aggregated.model_dump()
             }
         
-        # Build context from search results
-        context_str = self._build_context(results[:40])
-        max_tokens = self.config.response_lengths.get(response_length, 1000)
+        # Build answer prompt with retrieved context
+        answer_prompt = build_answer_prompt(session, user_message, retrieval)
         
-        # Construct conversational prompt
-        conversation_snippet = self._render_recent_messages(session)
-        user_prompt = (
-            f"Conversation so far:\n{conversation_snippet}\n\n"
-            f"New user message: {user_message}\n\n"
-            f"Retrieved Context:\n{context_str}\n\n"
-            "Compose the assistant reply grounded ONLY in the retrieved context and prior turns. "
-            "If insufficient context, state that clearly."
-        )
+        # Get max tokens for response length
+        max_tokens = self.config.response_lengths.get(response_length, 1000)
         
         # Generate AI response
         try:
-            assistant_response = self.answer_ai_model.generate_response(
-                prompt=user_prompt,
-                system_prompt=session.system_prompt or session.messages[0].content,
-                max_tokens=max_tokens
+            assistant_response, answer_metrics_dict = self.answer_ai_model.generate_response(
+                prompt=answer_prompt,
+                system_prompt=session.system_prompt,
+                max_tokens=max_tokens,
+                operation="answer"  # Mark this as answer operation
             )
+            
+            # Convert to UsageMetrics
+            answer_metrics = UsageMetrics(**answer_metrics_dict)
+            
+            # Create aggregated metrics from both operations
+            aggregated = AggregatedUsageMetrics.from_operations([expansion_metrics, answer_metrics])
+            
         except Exception as e:
             raise AIServiceError(f"Failed to generate AI response: {e}")
         
         # Add assistant response to session
-        session.messages.append(ChatMessage(role='assistant', content=assistant_response))
-        session.last_updated = time.time()
+        session.add('assistant', assistant_response)
         
-        # Summarize if conversation is getting long
-        self._maybe_summarize_session(session)
+        # Apply summarization if needed
+        if self.summarizer:
+            self.summarizer.compact(session)
         
         return {
             "session_id": session_id,
             "assistant": assistant_response,
-            "results": results,
-            "message_count": len(session.messages)
+            "results": retrieval.results,
+            "retrieval": retrieval.model_dump(),
+            "message_count": len(session.messages),
+            "summary_present": session.summary is not None,
+            "usage_metrics": aggregated.model_dump()
         }
 
-    def _render_recent_messages(self, session: ChatSession, limit: int = 10) -> str:
-        """Render recent messages for context.
-        
-        Args:
-            session: Chat session
-            limit: Maximum number of messages to include
-            
-        Returns:
-            Formatted conversation snippet
-        """
-        relevant = [m for m in session.messages if m.role != 'system'][-limit:]
-        return "\n".join(f"{m.role.upper()}: {m.content}" for m in relevant)
-
-    def _build_retrieval_query(self, session: ChatSession, user_message: str) -> str:
-        """Build retrieval query from conversation context.
-        
-        Args:
-            session: Chat session
-            user_message: Current user message
-            
-        Returns:
-            Enhanced search query
-        """
-        if not self.search_ai_model:
-            return user_message
-        
-        recent = self._render_recent_messages(session, limit=6)
-        expand_prompt = (
-            "Given the ongoing municipal regulations conversation and NEW user message, "
-            "produce a comma-separated list of focused retrieval keyphrases. "
-            "Avoid generic fluff. Prior conversation:\n"
-            f"{recent}\n\nUser message:\n{user_message}"
-        )
-        
-        try:
-            return self.search_ai_model.generate_response(
-                user_message,
-                expand_prompt,
-                max_tokens=self.config.ai_search_max_tokens
-            )
-        except Exception:
-            return user_message
-
-    def _maybe_summarize_session(self, session: ChatSession) -> None:
-        """Summarize session history if it's getting too long.
-        
-        Args:
-            session: Chat session to potentially summarize
-        """
-        if len(session.messages) < self.summary_trigger_messages:
-            return
-        
-        if not self.answer_ai_model:
-            return
-        
-        # Summarize all but last few message pairs
-        core_messages = session.messages[1:-4]  # exclude system and last 4
-        if not core_messages:
-            return
-        
-        text = "\n".join(f"{m.role}: {m.content}" for m in core_messages)
-        
-        try:
-            summary = self.answer_ai_model.generate_response(
-                prompt=f"Summarize these municipal regulation Q&A turns into a compact factual session memory:\n{text}",
-                system_prompt="You compress conversation history; preserve obligations, constraints, and definitions.",
-                max_tokens=300
-            )
-            session.summary = summary
-            # Replace old messages with summary placeholder
-            session.messages = [
-                session.messages[0],
-                ChatMessage(role='system', content=f"[HISTORY SUMMARY]: {summary}")
-            ] + session.messages[-4:]
-        except Exception:
-            # If summarization fails, just continue without it
-            pass
     

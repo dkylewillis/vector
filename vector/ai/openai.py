@@ -1,8 +1,9 @@
 """OpenAI model implementation for Vector."""
 
 import os
+import time
 from openai import OpenAI
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from .base import BaseAIModel
 from ..config import Config
@@ -179,17 +180,19 @@ class OpenAIModel(BaseAIModel):
     def generate_response(self, prompt: str, system_prompt: str = "", 
                          max_tokens: Optional[int] = None,
                          service_tier: Optional[str] = None,
-                         **kwargs) -> str:
+                         operation: Optional[str] = None,
+                         **kwargs) -> Tuple[str, Dict[str, Any]]:
         """Generate response using OpenAI API.
         
         Args:
             prompt: User prompt
             system_prompt: System prompt
             max_tokens: Maximum tokens to generate
+            operation: Operation type (e.g., 'search', 'answer', 'summarization')
             **kwargs: Additional parameters
             
         Returns:
-            Generated response text
+            Tuple of (response_text, usage_metrics_dict)
         """
         if not self.is_available():
             raise AIServiceError("OpenAI API not available")
@@ -199,6 +202,8 @@ class OpenAIModel(BaseAIModel):
         tier = service_tier or self.service_tier
 
         try:
+            start_time = time.time()
+            
             # Build messages based on model capabilities
             messages = []
             if system_prompt and self.model_config["supports_system_prompt"]:
@@ -215,7 +220,21 @@ class OpenAIModel(BaseAIModel):
 
             response = self.client.chat.completions.create(**api_params)
             
-            return response.choices[0].message.content.strip()
+            latency_ms = (time.time() - start_time) * 1000
+            
+            # Extract usage data
+            usage_metrics = {
+                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "total_tokens": response.usage.total_tokens if response.usage else 0,
+                "model_name": self.model_name,
+                "latency_ms": round(latency_ms, 2),
+                "operation": operation  # Include operation type
+            }
+            
+            response_text = response.choices[0].message.content.strip()
+            
+            return response_text, usage_metrics
 
         except Exception as e:
             raise AIServiceError(f"OpenAI API error: {e}")

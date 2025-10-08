@@ -14,6 +14,74 @@ def create_header():
         """)
 
 
+def format_usage_metrics(usage_metrics: dict) -> str:
+    """Format usage metrics for display.
+    
+    Args:
+        usage_metrics: Dictionary containing token usage metrics
+        
+    Returns:
+        Formatted string with metrics
+    """
+    if not usage_metrics:
+        return "No metrics available"
+    
+    lines = ["📊 **Token Usage Metrics**", ""]
+    
+    # Overall totals
+    total_prompt = usage_metrics.get('total_prompt_tokens') or usage_metrics.get('prompt_tokens', 0)
+    total_completion = usage_metrics.get('total_completion_tokens') or usage_metrics.get('completion_tokens', 0)
+    total_tokens = usage_metrics.get('total_tokens', 0)
+    total_latency = usage_metrics.get('total_latency_ms') or usage_metrics.get('latency_ms', 0)
+    
+    lines.append("**Total Usage:**")
+    lines.append(f"• Prompt tokens: {total_prompt:,}")
+    lines.append(f"• Completion tokens: {total_completion:,}")
+    lines.append(f"• **Total tokens: {total_tokens:,}**")
+    
+    if usage_metrics.get('model_name'):
+        lines.append(f"• Models: {usage_metrics['model_name']}")
+    
+    if total_latency:
+        lines.append(f"• Total latency: {total_latency:.2f}ms ({total_latency/1000:.2f}s)")
+    
+    # Breakdown by operation from the new 'breakdown' field
+    breakdown = usage_metrics.get('breakdown', [])
+    
+    if breakdown and len(breakdown) > 0:
+        lines.append("")
+        lines.append("---")
+        lines.append("**Breakdown by Operation:**")
+        
+        for op_metrics in breakdown:
+            operation = op_metrics.get('operation', 'unknown')
+            
+            # Choose icon based on operation type
+            if operation == 'search':
+                icon = "🔍"
+                title = "Query Expansion"
+            elif operation == 'answer':
+                icon = "💬"
+                title = "Answer Generation"
+            elif operation == 'summarization':
+                icon = "📝"
+                title = "Summarization"
+            else:
+                icon = "⚙️"
+                title = operation.title()
+            
+            lines.append("")
+            lines.append(f"{icon} **{title}:**")
+            lines.append(f"• Model: {op_metrics.get('model_name', 'N/A')}")
+            lines.append(f"• Prompt tokens: {op_metrics.get('prompt_tokens', 0):,}")
+            lines.append(f"• Completion tokens: {op_metrics.get('completion_tokens', 0):,}")
+            lines.append(f"• Total: {op_metrics.get('total_tokens', 0):,}")
+            if op_metrics.get('latency_ms'):
+                lines.append(f"• Latency: {op_metrics['latency_ms']:.2f}ms")
+    
+    return "\n".join(lines)
+
+
 def create_search_tab():
     """Create the Search & Ask tab."""
     components = {}
@@ -93,14 +161,25 @@ def create_search_tab():
                     interactive=False
                 )
                 
-                # Session info
-                with gr.Accordion("📊 Session Info", open=False):
-                    components['chat_session_info'] = gr.Textbox(
-                        label="Session Details",
-                        lines=3,
-                        interactive=False,
-                        placeholder="Start a chat session to see session ID and details..."
-                    )
+                # Session info and metrics in columns
+                with gr.Row():
+                    # Session info column
+                    with gr.Column(scale=1):
+                        with gr.Accordion("📊 Session Info", open=False):
+                            components['chat_session_info'] = gr.Textbox(
+                                label="Session Details",
+                                lines=3,
+                                interactive=False,
+                                placeholder="Start a chat session to see session ID and details..."
+                            )
+                    
+                    # Usage metrics column
+                    with gr.Column(scale=1):
+                        with gr.Accordion("📈 Usage Metrics & Model Breakdown", open=True):
+                            components['chat_metrics'] = gr.Markdown(
+                                value="No metrics yet. Send a message to see token usage.",
+                                label="Token Usage"
+                            )
             
             # Search Documents Tab
             with gr.TabItem("🔍 Search Documents"):

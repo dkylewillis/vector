@@ -1,7 +1,7 @@
 """AI model implementations for RegScout."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 
 class BaseAIModel(ABC):
@@ -18,16 +18,24 @@ class BaseAIModel(ABC):
         self.config = kwargs
 
     @abstractmethod
-    def generate_response(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
+    def generate_response(self, prompt: str, system_prompt: str = "", **kwargs) -> Tuple[str, Dict[str, Any]]:
         """Generate a response from the AI model.
         
         Args:
             prompt: User prompt
             system_prompt: System prompt
+            operation: Optional operation type identifier (e.g., 'search', 'answer', 'summarization')
             **kwargs: Additional parameters
             
         Returns:
-            Generated response text
+            Tuple of (response_text, usage_metrics_dict)
+            usage_metrics_dict should contain:
+                - prompt_tokens: int
+                - completion_tokens: int
+                - total_tokens: int
+                - model_name: str
+                - latency_ms: float (optional)
+                - operation: str (optional, e.g., 'search', 'answer')
         """
         pass
 
