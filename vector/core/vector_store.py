@@ -4,6 +4,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, Fi
 from typing import Dict, List, Any, Optional, Generator, Union
 from pydantic import BaseModel, Field
 from ..config import Config
+from qdrant_client.models import Range
 
 _config = Config()
 
@@ -191,4 +192,73 @@ class VectorStore(BaseModel):
                     if point.payload and "document_id" in point.payload:
                         document_ids.add(point.payload["document_id"])
                 return list(document_ids)
-
+            
+        
+    def get_chunk_window(
+        self,
+        collection: str,
+        document_id: str,
+        chunk_id: str,
+        window: int = 2,
+    ) -> List[Any]:
+        """Return chunks around a given chunk_id within the same document.
+        
+        Args:
+            collection: Collection name
+            document_id: Document identifier
+            chunk_id: Chunk identifier (e.g., "chunk_5")
+            window: Number of chunks before and after (default: 2)
+            
+        Returns:
+            List of points sorted by extracted chunk_index from chunk_id
+        """
+        # Extract the numeric index from chunk_id (e.g., "chunk_5" -> 5)
+        try:
+            center_index = int(chunk_id.split("_")[1])
+        except (IndexError, ValueError):
+            print(f"Invalid chunk_id format: {chunk_id}. Expected format: 'chunk_N'")
+            return []
+        
+        start_index = max(0, center_index - window)
+        end_index = center_index + window
+        
+        # Create a list of target chunk_ids
+        target_chunk_ids = [f"chunk_{i}" for i in range(start_index, end_index + 1)]
+        
+        # Get all points for this document
+        filter_ = Filter(
+            must=[
+                FieldCondition(key="document_id", match=MatchValue(value=document_id))
+            ]
+        )
+        
+        with self.get_client() as client:
+            points, _ = client.scroll(
+                collection_name=collection,
+                limit=10000,
+                with_payload=True,
+                scroll_filter=filter_,
+            )
+        
+        # Filter points by parsing chunk JSON and checking chunk_id
+        import json
+        matching_points = []
+        for point in points:
+            if point.payload and "chunk" in point.payload:
+                try:
+                    chunk_data = json.loads(point.payload["chunk"])
+                    if chunk_data.get("chunk_id") in target_chunk_ids:
+                        matching_points.append((point, chunk_data.get("chunk_id")))
+                except (json.JSONDecodeError, KeyError):
+                    continue
+        
+        # Sort by chunk_id numeric index
+        def get_chunk_index(item):
+            _, chunk_id = item
+            try:
+                return int(chunk_id.split("_")[1])
+            except (IndexError, ValueError, AttributeError):
+                return float('inf')
+        
+        matching_points.sort(key=get_chunk_index)
+        return [point for point, _ in matching_points]

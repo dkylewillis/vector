@@ -146,7 +146,16 @@ def create_search_tab():
                             scale=1
                         )
                     with gr.Row():
-                        components['chat_settings_close_btn'] = gr.Button("Close", variant="primary")
+                        components['chat_window'] = gr.Slider(
+                            minimum=0,
+                            maximum=50,
+                            value=10,
+                            step=1,
+                            label="Context Window",
+                            info="Number of surrounding chunks to include (0=disabled, 2=recommended)",
+                            scale=2
+                        )
+                        components['chat_settings_close_btn'] = gr.Button("Close", variant="primary", scale=1)
                 
                 # Chat thumbnails
                 components['chat_thumbnails'] = gr.Gallery(
@@ -199,6 +208,12 @@ def create_search_tab():
                         value="both",
                         label="Search Type",
                         info="chunks: text content, artifacts: images/tables, both: combined",
+                        scale=1
+                    )
+                    components['search_window'] = gr.Slider(
+                        minimum=0, maximum=50, value=0, step=1,
+                        label="Context Window",
+                        info="Number of surrounding chunks (0=disabled, 2=recommended)",
                         scale=1
                     )
                 

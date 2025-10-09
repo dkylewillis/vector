@@ -23,7 +23,8 @@ class SearchService:
         self.artifacts_collection = artifacts_collection
 
     def search_chunks(self, query: str, top_k: int = 5,
-                      document_ids: Optional[List[str]] = None) -> List[SearchResult]:
+                      document_ids: Optional[List[str]] = None,
+                      window: int = 0) -> List[SearchResult]:
         if not query.strip():
             raise ValueError("Search query cannot be empty")
         qv = self.embedder.embed_text(query)
@@ -38,6 +39,32 @@ class SearchService:
                     data = json.loads(data)
                 chunk_obj = Chunk.model_validate(data)
                 text = chunk_obj.text
+                
+                # If window is enabled and we have a chunk_id, get surrounding chunks
+                if window > 0 and chunk_obj.chunk_id:
+                    doc_id = r.payload.get("document_id")
+                    if doc_id:
+                        context_chunks = self.store.get_chunk_window(
+                            collection=self.chunks_collection,
+                            document_id=doc_id,
+                            chunk_id=chunk_obj.chunk_id,
+                            window=window
+                        )
+                        # Combine text from all chunks in the window
+                        if context_chunks:
+                            context_texts = []
+                            for ctx_point in context_chunks:
+                                try:
+                                    ctx_data = ctx_point.payload.get("chunk", {})
+                                    if isinstance(ctx_data, str):
+                                        ctx_data = json.loads(ctx_data)
+                                    ctx_chunk = Chunk.model_validate(ctx_data)
+                                    context_texts.append(ctx_chunk.text)
+                                except Exception:
+                                    pass
+                            if context_texts:
+                                text = "\n\n".join(context_texts)
+                
             except Exception as e:
                 print(f"Warning: chunk validation failed ({r.id}): {e}")
                 text = r.payload.get("text") or ""
@@ -91,12 +118,13 @@ class SearchService:
 
     def search(self, query: str, top_k: int = 5,
                search_type: str = "both",
-               document_ids: Optional[List[str]] = None) -> List[SearchResult]:
+               document_ids: Optional[List[str]] = None,
+               window: int = 0) -> List[SearchResult]:
         if not query.strip():
             raise ValueError("Search query cannot be empty")
         results: List[SearchResult] = []
         if search_type in ("chunks", "both"):
-            results.extend(self.search_chunks(query, top_k, document_ids))
+            results.extend(self.search_chunks(query, top_k, document_ids, window))
         if search_type in ("artifacts", "both"):
             results.extend(self.search_artifacts(query, top_k, document_ids))
         if search_type == "both":

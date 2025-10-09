@@ -166,7 +166,8 @@ class ResearchAgent:
         response_length: str = 'medium',
         search_type: str = 'both',
         top_k: int = 12,
-        document_ids: Optional[List[str]] = None
+        document_ids: Optional[List[str]] = None,
+        window: int = 0
     ) -> Dict[str, Any]:
         """Process a chat message in a multi-turn conversation.
         
@@ -177,6 +178,7 @@ class ResearchAgent:
             search_type: 'chunks', 'artifacts', or 'both'
             top_k: Number of results to retrieve
             document_ids: Optional list of document IDs to filter
+            window: Number of surrounding chunks to include (0 = disabled, 2 = 2 before and after)
             
         Returns:
             Dict with assistant response, results, and metadata
@@ -204,7 +206,8 @@ class ResearchAgent:
             user_message=user_message,
             top_k=top_k,
             search_type=search_type,
-            document_ids=document_ids
+            document_ids=document_ids,
+            window=window
         )
         
         # Handle no results case

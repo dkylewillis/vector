@@ -6,7 +6,7 @@ from .service import VectorWebService
 from .components import format_usage_metrics
 
 
-def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents, search_type):
+def perform_search(web_service: VectorWebService, query, top_k, collection, selected_documents, search_type, window):
     """Handle search request."""
     if not query or not query.strip():
         return "Please enter a search query", []
@@ -19,7 +19,8 @@ def perform_search(web_service: VectorWebService, query, top_k, collection, sele
             collection=collection,
             top_k=top_k,
             search_type=search_type,
-            documents=selected_documents
+            documents=selected_documents,
+            window=window
         )
         
         return result_text, thumbnails
@@ -37,7 +38,8 @@ def send_chat_message(
     response_length: str,
     search_type: str,
     top_k: int,
-    selected_documents: List[str]
+    selected_documents: List[str],
+    window: int
 ):
     """Send a message in chat session."""
     # Handle MultimodalTextbox input - extract text from dict if needed
@@ -57,7 +59,8 @@ def send_chat_message(
             response_length=response_length,
             search_type=search_type,
             top_k=top_k,
-            documents=selected_documents
+            documents=selected_documents,
+            window=window
         )
         
         if result.get('success'):
@@ -310,14 +313,15 @@ def connect_events(web_service, search_components,
         'search_thumbnails' in search_components):
         
         search_components['search_query'].submit(
-            fn=lambda query, top_k, search_type, selected_docs: perform_search(
-                web_service, query, top_k, "chunks", selected_docs, search_type
+            fn=lambda query, top_k, search_type, selected_docs, window: perform_search(
+                web_service, query, top_k, "chunks", selected_docs, search_type, window
             ),
             inputs=[
                 search_components['search_query'],
                 search_components['num_results'],
                 search_components['search_search_type'],
-                documents_checkboxgroup
+                documents_checkboxgroup,
+                search_components['search_window']
             ],
             outputs=[
                 search_components['search_results'],
@@ -344,8 +348,8 @@ def connect_events(web_service, search_components,
         
         # Allow Enter key to send message (session will be auto-created)
         search_components['chat_message'].submit(
-            fn=lambda msg, hist, rlen, stype, topk, docs: send_chat_message(
-                web_service, "", msg, hist, rlen, stype, topk, docs
+            fn=lambda msg, hist, rlen, stype, topk, docs, window: send_chat_message(
+                web_service, "", msg, hist, rlen, stype, topk, docs, window
             ),
             inputs=[
                 search_components['chat_message'],
@@ -353,7 +357,8 @@ def connect_events(web_service, search_components,
                 search_components['chat_response_length'],
                 search_components['chat_search_type'],
                 search_components['chat_top_k'],
-                documents_checkboxgroup
+                documents_checkboxgroup,
+                search_components['chat_window']
             ],
             outputs=[
                 search_components['chat_history'],

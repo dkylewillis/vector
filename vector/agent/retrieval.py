@@ -68,7 +68,8 @@ class Retriever:
         user_message: str,
         top_k: int = 12,
         search_type: str = "both",
-        document_ids: Optional[List[str]] = None
+        document_ids: Optional[List[str]] = None,
+        window: int = 0
     ) -> Tuple[RetrievalBundle, UsageMetrics]:
         """Perform retrieval with query expansion.
         
@@ -78,6 +79,7 @@ class Retriever:
             top_k: Number of results to retrieve
             search_type: Type of search ('chunks', 'artifacts', or 'both')
             document_ids: Optional list of document IDs to filter
+            window: Number of surrounding chunks to include (0 = disabled)
             
         Returns:
             Tuple of (retrieval_bundle, expansion_usage_metrics)
@@ -94,7 +96,8 @@ class Retriever:
             query=expanded_query,
             top_k=top_k,
             search_type=search_type,
-            document_ids=document_ids
+            document_ids=document_ids,
+            window=window
         )
         
         # Convert SearchResult to RetrievalResult

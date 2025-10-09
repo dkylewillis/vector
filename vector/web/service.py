@@ -43,7 +43,8 @@ class VectorWebService:
         collection: str,
         top_k: int,
         search_type: str,
-        documents: Optional[List[str]] = None
+        documents: Optional[List[str]] = None,
+        window: int = 0
     ) -> Tuple[str, List]:
         """Search with thumbnails."""
         if not self.agent:
@@ -58,6 +59,7 @@ class VectorWebService:
                 top_k=top_k,
                 search_type=agent_search_type,
                 document_ids=self.get_selected_documents_by_name(documents),
+                window=window
             )
             # Collect thumbnails from all results
             thumbnails = []
@@ -93,6 +95,8 @@ class VectorWebService:
         """Get document details by ID."""
         if not self.registry:
             return None
+        if not documents:
+            return None
         document_ids = []
         for name in documents:
             try:
@@ -104,7 +108,7 @@ class VectorWebService:
 
             except Exception as e:
                 print(f"Error getting document by name {name}: {e}")
-        return document_ids
+        return document_ids if document_ids else None
 
     def get_thumbnails(self, obj: Any) -> List[str]:
         """Return thumbnail image paths for an Artifact or Chunk."""
@@ -562,7 +566,8 @@ class VectorWebService:
         response_length: str = 'medium',
         search_type: str = 'both',
         top_k: Optional[int] = None,
-        documents: Optional[List[str]] = None
+        documents: Optional[List[str]] = None,
+        window: int = 0
     ) -> Dict[str, Any]:
         """Send a message in a chat session.
         
@@ -573,6 +578,7 @@ class VectorWebService:
             search_type: 'chunks', 'artifacts', or 'both'
             top_k: Number of results to retrieve (uses config default if None)
             documents: Optional list of document names to filter
+            window: Number of surrounding chunks to include (0 = disabled)
             
         Returns:
             Dict with assistant response, results, and metadata
@@ -605,7 +611,8 @@ class VectorWebService:
                 response_length=response_length,
                 search_type=search_type,
                 top_k=top_k,
-                document_ids=document_ids
+                document_ids=document_ids,
+                window=window
             )
             
             # Get thumbnails from results
