@@ -9,6 +9,8 @@ from .prompting import (
 )
 from .memory import SummarizerPolicy, NoSummarizerPolicy
 from .retrieval import Retriever
+from .pipeline import Pipeline, PipelineStep, RetrievalContext
+from .steps import QueryExpansionStep, SearchStep, ScoreFilter, DiagnosticsStep
 
 __all__ = [
     'ResearchAgent',
@@ -21,6 +23,13 @@ __all__ = [
     'build_answer_prompt',
     'SummarizerPolicy',
     'NoSummarizerPolicy',
-    'Retriever'
+    'Retriever',
+    'Pipeline',
+    'PipelineStep',
+    'RetrievalContext',
+    'QueryExpansionStep',
+    'SearchStep',
+    'ScoreFilter',
+    'DiagnosticsStep'
 ]
 

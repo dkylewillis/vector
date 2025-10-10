@@ -158,10 +158,42 @@ Filter searches by document properties:
 ### Core Components
 
 - **ResearchAgent**: Main orchestration class
+- **Retriever**: Pipeline-based retrieval orchestration
+- **Pipeline**: Pluggable step execution framework
 - **VectorDatabase**: Search and retrieval
 - **Embedder**: Query vector generation
 - **AIModelFactory**: LLM provider abstraction
 - **CLIFormatter**: Result formatting
+
+### Retrieval Pipeline
+
+The agent uses a **pluggable pipeline architecture** for retrieval operations. See [PIPELINE_USAGE.md](PIPELINE_USAGE.md) for details.
+
+**Default Pipeline:**
+1. **QueryExpansionStep**: Expand query using AI and conversation context
+2. **SearchStep**: Perform vector similarity search
+3. **ScoreFilter** (optional): Filter by minimum score threshold
+4. **DiagnosticsStep**: Add metadata about results
+
+**Custom Pipeline Example:**
+```python
+from vector.agent import Pipeline, SearchStep, ScoreFilter, DiagnosticsStep
+
+# Build custom pipeline
+pipeline = Pipeline()
+pipeline.add_step(SearchStep(search_service, top_k=20))
+pipeline.add_step(ScoreFilter(min_score=0.5))
+pipeline.add_step(MyCustomStep())  # Your custom step!
+pipeline.add_step(DiagnosticsStep())
+
+# Use custom pipeline
+bundle, metrics = retriever.retrieve(
+    session, message,
+    custom_pipeline=pipeline
+)
+```
+
+See [example_pipeline.py](example_pipeline.py) for working examples.
 
 ### Search Pipeline
 

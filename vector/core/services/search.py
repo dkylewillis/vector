@@ -6,7 +6,7 @@ from ..vector_store import VectorStore
 
 class SearchResult(BaseModel):
     id: str = Field(..., description="Unique identifier")
-    score: float = Field(..., ge=0.0, le=1.0)
+    score: float  # Qdrant scores can be outside [0,1] depending on distance metric
     text: str
     filename: str
     type: str
@@ -122,6 +122,8 @@ class SearchService:
                window: int = 0) -> List[SearchResult]:
         if not query.strip():
             raise ValueError("Search query cannot be empty")
+        if search_type not in ("chunks", "artifacts", "both"):
+            raise ValueError(f"Invalid search_type: {search_type}")
         results: List[SearchResult] = []
         if search_type in ("chunks", "both"):
             results.extend(self.search_chunks(query, top_k, document_ids, window))
@@ -129,5 +131,5 @@ class SearchService:
             results.extend(self.search_artifacts(query, top_k, document_ids))
         if search_type == "both":
             results.sort(key=lambda r: r.score, reverse=True)
-            results = results[: top_k * 2]
+            results = results[:top_k]  # Return overall top_k, not 2*top_k
         return results

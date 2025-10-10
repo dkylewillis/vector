@@ -1,14 +1,14 @@
-"""Retrieval orchestration with query expansion."""
+"""Retrieval orchestration using pluggable pipeline."""
 
-import time
-from typing import Optional, List, Tuple, Dict, Any
-from ..core.services.search import SearchService, SearchResult
-from .models import ChatSession, RetrievalResult, RetrievalBundle, UsageMetrics
-from .prompting import build_expansion_prompt, render_recent_messages
+from typing import Optional, List, Tuple
+from ..core.services.search import SearchService
+from .models import ChatSession, RetrievalBundle, UsageMetrics, AggregatedUsageMetrics
+from .pipeline import Pipeline, RetrievalContext
+from .steps import QueryExpansionStep, SearchStep, ScoreFilter, DiagnosticsStep
 
 
 class Retriever:
-    """Orchestrates retrieval with optional query expansion."""
+    """Orchestrates retrieval using a pluggable pipeline."""
     
     def __init__(self, search_model, search_service: SearchService):
         """Initialize the retriever.
@@ -20,48 +20,6 @@ class Retriever:
         self.search_model = search_model
         self.search_service = search_service
     
-    def expand_query(self, history: str, user_message: str) -> Tuple[str, List[str], UsageMetrics]:
-        """Expand query using conversation context.
-        
-        Args:
-            history: Recent conversation history
-            user_message: Current user message
-            
-        Returns:
-            Tuple of (expanded_query, keyphrases_list, usage_metrics)
-        """
-        if not self.search_model:
-            return user_message, [], UsageMetrics()
-        
-        prompt = build_expansion_prompt(history, user_message)
-        
-        try:
-            response_text, metrics_dict = self.search_model.generate_response(
-                prompt=prompt,
-                system_prompt="You output only comma-separated keyphrases for document retrieval. No explanations.",
-                max_tokens=96,
-                operation="search"  # Mark this as search operation
-            )
-            
-            # Convert dict to UsageMetrics
-            usage_metrics = UsageMetrics(**metrics_dict)
-            
-            # Parse keyphrases
-            keyphrases = [kp.strip() for kp in response_text.split(",") if kp.strip()]
-            
-            # Merge keyphrases into query
-            if keyphrases:
-                expanded_query = ", ".join(keyphrases)
-            else:
-                expanded_query = user_message
-            
-            return expanded_query, keyphrases, usage_metrics
-            
-        except Exception as e:
-            # Fallback to original query on error
-            print(f"Warning: Query expansion failed: {e}")
-            return user_message, [], UsageMetrics()
-    
     def retrieve(
         self,
         session: ChatSession,
@@ -69,9 +27,11 @@ class Retriever:
         top_k: int = 12,
         search_type: str = "both",
         document_ids: Optional[List[str]] = None,
-        window: int = 0
-    ) -> Tuple[RetrievalBundle, UsageMetrics]:
-        """Perform retrieval with query expansion.
+        window: int = 0,
+        min_score: Optional[float] = None,
+        custom_pipeline: Optional[Pipeline] = None
+    ) -> Tuple[RetrievalBundle, AggregatedUsageMetrics]:
+        """Perform retrieval using pipeline.
         
         Args:
             session: Current chat session
@@ -80,73 +40,92 @@ class Retriever:
             search_type: Type of search ('chunks', 'artifacts', or 'both')
             document_ids: Optional list of document IDs to filter
             window: Number of surrounding chunks to include (0 = disabled)
+            min_score: Optional minimum score threshold for filtering
+            custom_pipeline: Optional custom pipeline (uses default if None)
             
         Returns:
-            Tuple of (retrieval_bundle, expansion_usage_metrics)
+            Tuple of (retrieval_bundle, aggregated_usage_metrics)
         """
-        # Build expansion context from recent history
-        history = render_recent_messages(session, limit=6)
+        # Use custom or build default pipeline
+        if custom_pipeline:
+            pipeline = custom_pipeline
+        else:
+            pipeline = self._build_pipeline(
+                top_k=top_k,
+                search_type=search_type,
+                document_ids=document_ids,
+                window=window,
+                min_score=min_score
+            )
         
-        # Expand query
-        expanded_query, keyphrases, expansion_metrics = self.expand_query(history, user_message)
+        # Create initial context
+        context = RetrievalContext(
+            session=session,
+            user_message=user_message,
+            query=user_message
+        )
         
-        # Perform search with timing
-        start_time = time.time()
-        search_results = self.search_service.search(
-            query=expanded_query,
+        # Execute pipeline
+        context = pipeline.run(context)
+        
+        # Build retrieval bundle
+        retrieval_bundle = RetrievalBundle(
+            original_query=user_message,
+            expanded_query=context.metadata.get("expanded_query", user_message),
+            keyphrases=context.metadata.get("keyphrases", []),
+            results=context.results,
+            diagnostics=context.metadata
+        )
+        
+        # Aggregate usage metrics and preserve for breakdown
+        if context.usage_metrics:
+            # Create aggregated metrics from pipeline operations
+            aggregated = AggregatedUsageMetrics.from_operations(context.usage_metrics)
+            # Return as aggregated to preserve breakdown
+            return retrieval_bundle, aggregated
+        else:
+            # Return empty aggregated metrics
+            return retrieval_bundle, AggregatedUsageMetrics()
+    
+    def _build_pipeline(
+        self,
+        top_k: int = 12,
+        search_type: str = "both",
+        document_ids: Optional[List[str]] = None,
+        window: int = 0,
+        min_score: Optional[float] = None
+    ) -> Pipeline:
+        """Build default retrieval pipeline.
+        
+        Args:
+            top_k: Number of results to retrieve
+            search_type: Type of search
+            document_ids: Optional document filter
+            window: Chunk window size
+            min_score: Optional score threshold
+            
+        Returns:
+            Configured pipeline
+        """
+        pipeline = Pipeline()
+        
+        # Add query expansion step
+        pipeline.add_step(QueryExpansionStep(self.search_model))
+        
+        # Add search step
+        pipeline.add_step(SearchStep(
+            self.search_service,
             top_k=top_k,
             search_type=search_type,
             document_ids=document_ids,
             window=window
-        )
+        ))
         
-        # Convert SearchResult to RetrievalResult
-        results = [self._convert_result(r) for r in search_results]
-        latency_ms = (time.time() - start_time) * 1000
+        # Add optional score filter
+        if min_score is not None:
+            pipeline.add_step(ScoreFilter(min_score))
         
-        # Build diagnostics
-        diagnostics = {
-            "latency_ms": round(latency_ms, 2),
-            "result_count": len(results),
-            "query_expanded": len(keyphrases) > 0,
-            "keyphrase_count": len(keyphrases)
-        }
+        # Add diagnostics step
+        pipeline.add_step(DiagnosticsStep())
         
-        # Add result breakdown by type
-        if results:
-            type_counts = {}
-            for r in results:
-                type_counts[r.type] = type_counts.get(r.type, 0) + 1
-            diagnostics["results_by_type"] = type_counts
-        
-        retrieval_bundle = RetrievalBundle(
-            original_query=user_message,
-            expanded_query=expanded_query,
-            keyphrases=keyphrases,
-            results=results,
-            diagnostics=diagnostics
-        )
-        
-        return retrieval_bundle, expansion_metrics
-    
-    def _convert_result(self, search_result: SearchResult) -> RetrievalResult:
-        """Convert SearchResult to RetrievalResult.
-        
-        Args:
-            search_result: Original SearchResult from SearchService
-            
-        Returns:
-            Converted RetrievalResult
-        """
-        collection = "artifacts" if search_result.type == "artifact" else "chunks"
-        
-        return RetrievalResult(
-            filename=search_result.filename,
-            doc_id=search_result.id,
-            type=search_result.type,
-            score=search_result.score,
-            text=search_result.text,
-            collection=collection,
-            chunk=search_result.chunk,
-            artifact=search_result.artifact
-        )
+        return pipeline

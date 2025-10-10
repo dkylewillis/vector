@@ -215,16 +215,14 @@ class ResearchAgent:
             assistant_response = "I couldn't find relevant information in the documents to answer your question."
             session.add('assistant', assistant_response)
             
-            # Create aggregated metrics from just the expansion
-            aggregated = AggregatedUsageMetrics.from_operations([expansion_metrics])
-            
+            # expansion_metrics is already AggregatedUsageMetrics from retriever
             return {
                 "session_id": session_id,
                 "assistant": assistant_response,
                 "results": [],
                 "retrieval": retrieval.model_dump(),
                 "message_count": len(session.messages),
-                "usage_metrics": aggregated.model_dump()
+                "usage_metrics": expansion_metrics.model_dump()
             }
         
         # Build answer prompt with retrieved context
@@ -245,8 +243,11 @@ class ResearchAgent:
             # Convert to UsageMetrics
             answer_metrics = UsageMetrics(**answer_metrics_dict)
             
-            # Create aggregated metrics from both operations
-            aggregated = AggregatedUsageMetrics.from_operations([expansion_metrics, answer_metrics])
+            # Combine expansion metrics (AggregatedUsageMetrics) with answer metrics
+            # expansion_metrics.operations already has the search operation metrics
+            # Add the answer operation metrics to the list
+            all_operations = list(expansion_metrics.operations) + [answer_metrics]
+            aggregated = AggregatedUsageMetrics.from_operations(all_operations)
             
         except Exception as e:
             raise AIServiceError(f"Failed to generate AI response: {e}")
