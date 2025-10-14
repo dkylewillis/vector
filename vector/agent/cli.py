@@ -28,24 +28,19 @@ For low-level vector operations, use 'vector-core' instead.
     subparsers = parser.add_subparsers(dest="command", help="Available commands", required=True)
 
     # Search command
-    search_parser = subparsers.add_parser("search", help="Search chunks or artifacts")
+    search_parser = subparsers.add_parser("search", help="Search chunks")
     search_parser.add_argument("query", help="Search query")
     search_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
-    search_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
     search_parser.add_argument("--top-k", "-k", type=int, default=5, help="Number of results to return")
-    search_parser.add_argument("--type", choices=["chunks", "artifacts", "both"], default="both", 
-                              help="Search type")
     search_parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     # Collection info command  
     collection_parser = subparsers.add_parser("collection-info", help="Show collection information")
     collection_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
-    collection_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
 
     # Model info command
     model_parser = subparsers.add_parser("model-info", help="Show AI model configuration")
     model_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
-    model_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
 
     # Delete document command
     delete_parser = subparsers.add_parser("delete", help="Delete a document and all its data")
@@ -55,7 +50,6 @@ For low-level vector operations, use 'vector-core' instead.
     delete_parser.add_argument("--no-cleanup", action="store_true", help="Don't delete saved files, only vector data")
     delete_parser.add_argument("--force", action="store_true", help="Skip confirmation prompt")
     delete_parser.add_argument("--chunks-collection", "-c", default="chunks", help="Chunks collection name")
-    delete_parser.add_argument("--artifacts-collection", "-a", default="artifacts", help="Artifacts collection name")
 
     args = parser.parse_args()
 
@@ -65,35 +59,28 @@ For low-level vector operations, use 'vector-core' instead.
         # Initialize agent
         agent = ResearchAgent(
             config=config,
-            chunks_collection=args.chunks_collection,
-            artifacts_collection=args.artifacts_collection
+            chunks_collection=args.chunks_collection
         )
         
         if args.command == "search":
             if args.verbose:
-                print(f"� Searching collections: {args.chunks_collection}, {args.artifacts_collection}")
-                print(f"🔧 Search type: {args.type}")
+                print(f"🔍 Searching collection: {args.chunks_collection}")
                 print(f"🔧 Top-k: {args.top_k}")
             
-            if args.type == "chunks":
-                results = agent.search_chunks(
-                    query=args.query,
-                    top_k=args.top_k
-                )
-            elif args.type == "artifacts":
-                results = agent.search_artifacts(
-                    query=args.query,
-                    top_k=args.top_k
-                )
-            else:  # both
-                results = agent.search(
-                    query=args.query,
-                    top_k=args.top_k,
-                    search_type="both"
-                )
+            # Use the retriever directly for simple searches
+            results = agent.retriever.search_service.search_chunks(
+                query=args.query,
+                top_k=args.top_k
+            )
             
-            formatted_results = agent.format_results(results)
-            print(formatted_results)
+            # Format and print results
+            if results:
+                for i, result in enumerate(results, 1):
+                    print(f"\n--- Result {i} (Score: {result.score:.4f}) ---")
+                    print(f"Document: {result.filename}")
+                    print(f"Text: {result.text[:200]}...")
+            else:
+                print("No results found")
 
         elif args.command == "collection-info":
             info = agent.get_collection_info()

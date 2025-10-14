@@ -27,19 +27,16 @@ class ResearchAgent:
     def __init__(
         self,
         config: Optional[Config] = None,
-        chunks_collection: str = "chunks",
-        artifacts_collection: str = "artifacts"
+        chunks_collection: str = "chunks"
     ):
         """Initialize the research agent.
 
         Args:
             config: Configuration object. If None, loads default config.
             chunks_collection: Name of the chunks collection
-            artifacts_collection: Name of the artifacts collection
         """
         self.config = config or Config()
         self.chunks_collection = chunks_collection
-        self.artifacts_collection = artifacts_collection
         
         # Initialize search service
         from ..core.embedder import Embedder
@@ -47,8 +44,7 @@ class ResearchAgent:
         search_service = SearchService(
             Embedder(),
             VectorStore(),
-            chunks_collection,
-            artifacts_collection
+            chunks_collection
         )
         
         # Initialize AI models using factory
@@ -106,8 +102,7 @@ class ResearchAgent:
         collections = self.retriever.search_service.store.list_collections()
         info_parts = [
             f"Available collections: {', '.join(collections)}",
-            f"Chunks collection: {self.chunks_collection}",
-            f"Artifacts collection: {self.artifacts_collection}"
+            f"Chunks collection: {self.chunks_collection}"
         ]
         return "\n".join(info_parts)
 
@@ -164,7 +159,6 @@ class ResearchAgent:
         session_id: str,
         user_message: str,
         response_length: str = 'medium',
-        search_type: str = 'both',
         top_k: int = 12,
         document_ids: Optional[List[str]] = None,
         window: int = 0
@@ -175,7 +169,6 @@ class ResearchAgent:
             session_id: Session identifier
             user_message: User's message
             response_length: Response length (short/medium/long)
-            search_type: 'chunks', 'artifacts', or 'both'
             top_k: Number of results to retrieve
             document_ids: Optional list of document IDs to filter
             window: Number of surrounding chunks to include (0 = disabled, 2 = 2 before and after)
@@ -205,7 +198,6 @@ class ResearchAgent:
             session=session,
             user_message=user_message,
             top_k=top_k,
-            search_type=search_type,
             document_ids=document_ids,
             window=window
         )

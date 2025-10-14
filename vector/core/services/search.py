@@ -15,12 +15,10 @@ class SearchResult(BaseModel):
 
 class SearchService:
     def __init__(self, embedder: Embedder, store: VectorStore,
-                 chunks_collection: str = "chunks",
-                 artifacts_collection: str = "artifacts"):
+                 chunks_collection: str = "chunks"):
         self.embedder = embedder
         self.store = store
         self.chunks_collection = chunks_collection
-        self.artifacts_collection = artifacts_collection
 
     def search_chunks(self, query: str, top_k: int = 5,
                       document_ids: Optional[List[str]] = None,
@@ -78,58 +76,20 @@ class SearchService:
             ))
         return results
 
-    def search_artifacts(self, query: str, top_k: int = 5,
-                         document_ids: Optional[List[str]] = None) -> List[SearchResult]:
-        if not query.strip():
-            raise ValueError("Search query cannot be empty")
-        qv = self.embedder.embed_text(query)
-        raw = self.store.search_documents(qv, self.artifacts_collection, top_k, document_ids)
-        results: List[SearchResult] = []
-        import json
-        for r in raw:
-            artifact_obj = None
-            try:
-                data = r.payload.get("artifact", {}) or {}
-                if isinstance(data, str):
-                    data = json.loads(data)
-                artifact_obj = Artifact.model_validate(data)
-            except Exception as e:
-                print(f"Warning: artifact validation failed ({r.id}): {e}")
-            # Build display text
-            parts = []
-            if r.payload.get("caption"):
-                parts.append(f"Caption: {r.payload['caption']}")
-            if r.payload.get("before_text"):
-                parts.append(f"Context: {r.payload['before_text']}")
-            if r.payload.get("after_text"):
-                parts.append(f"Context: {r.payload['after_text']}")
-            if r.payload.get("headings"):
-                parts.append("Headings: " + ", ".join(r.payload["headings"]))
-            display = " | ".join(parts) if parts else "Artifact"
-            results.append(SearchResult(
-                id=str(r.id),
-                score=r.score,
-                text=display,
-                filename=r.payload.get("document_id", "Unknown"),
-                type=r.payload.get("type", "artifact"),
-                artifact=artifact_obj
-            ))
-        return results
-
     def search(self, query: str, top_k: int = 5,
-               search_type: str = "both",
                document_ids: Optional[List[str]] = None,
                window: int = 0) -> List[SearchResult]:
+        """Search chunks only (artifacts are no longer stored in vector db).
+        
+        Args:
+            query: Search query text
+            top_k: Number of results to return
+            document_ids: Optional list of document IDs to filter by
+            window: Number of surrounding chunks to include in context (0 = disabled)
+            
+        Returns:
+            List of SearchResult objects
+        """
         if not query.strip():
             raise ValueError("Search query cannot be empty")
-        if search_type not in ("chunks", "artifacts", "both"):
-            raise ValueError(f"Invalid search_type: {search_type}")
-        results: List[SearchResult] = []
-        if search_type in ("chunks", "both"):
-            results.extend(self.search_chunks(query, top_k, document_ids, window))
-        if search_type in ("artifacts", "both"):
-            results.extend(self.search_artifacts(query, top_k, document_ids))
-        if search_type == "both":
-            results.sort(key=lambda r: r.score, reverse=True)
-            results = results[:top_k]  # Return overall top_k, not 2*top_k
-        return results
+        return self.search_chunks(query, top_k, document_ids, window)

@@ -57,19 +57,18 @@ class VectorPipeline:
 
         return converted_doc, was_loaded_from_json
 
-    def chunk(self, converted_doc: ConvertedDocument) -> tuple[List[Chunk], List[Artifact]]:
-        """Extract chunks and artifacts from a converted document.
+    def chunk(self, converted_doc: ConvertedDocument) -> List[Chunk]:
+        """Extract chunks from a converted document.
 
         Args:
             converted_doc: ConvertedDocument object
 
         Returns:
-            Tuple of (chunks, artifacts)
+            List of chunks
         """
         chunks = converted_doc.get_chunks()
-        artifacts = converted_doc.get_artifacts()
-        print(f"✅ Extracted {len(chunks)} chunks and {len(artifacts)} artifacts")
-        return chunks, artifacts
+        print(f"✅ Extracted {len(chunks)} chunks")
+        return chunks
 
     def embed_chunks(self, chunks: List[Chunk]) -> List[List[float]]:
         """Generate embeddings for chunks.
@@ -96,45 +95,6 @@ class VectorPipeline:
         for chunk, embedding in zip(chunks, embeddings):
             payload = {
                 "chunk": chunk.model_dump_json(),
-                "document_id": document_record.document_id,
-                "registered_date": document_record.registered_date.isoformat(),
-            }
-            self.store.insert(collection_name, str(uuid.uuid4()), embedding, payload)
-
-    def embed_artifacts(self, artifacts: List[Artifact]) -> List[List[float]]:
-        """Generate embeddings for artifacts.
-
-        Args:
-            artifacts: List of Artifact objects
-
-        Returns:
-            List of embeddings
-        """
-        artifact_texts = []
-        for artifact in artifacts:
-            artifact_text = (
-                f"Headings: {artifact.headings or ''}\n"
-                f"Caption: {artifact.caption or ''}\n"
-                f"Before Text: {artifact.before_text or ''}\n"
-                f"After Text: {artifact.after_text or ''}"
-            )
-            artifact_texts.append(artifact_text)
-
-        embeddings = self.embedder.embed_texts(artifact_texts)
-        print(f"✅ Generated embeddings for {len(embeddings)} artifacts")
-        return embeddings
-
-    def store_artifacts(
-        self,
-        artifacts: List[Artifact],
-        embeddings: List[List[float]],
-        document_record: DocumentRecord,
-        collection_name: str = "artifacts"
-    ) -> None:
-        """Store artifacts with document metadata in payload."""
-        for artifact, embedding in zip(artifacts, embeddings):
-            payload = {
-                'artifact': artifact.model_dump_json(),
                 "document_id": document_record.document_id,
                 "registered_date": document_record.registered_date.isoformat(),
             }
@@ -290,13 +250,6 @@ class VectorPipeline:
                 )
                 print(f"✅ Deleted chunk vectors for document {document_id}")
 
-            if document_record.artifact_collection and document_record.has_artifacts:
-                self.store.delete_document(
-                    collection=document_record.artifact_collection,
-                    document_id=document_id
-                )
-                print(f"✅ Deleted artifact vectors for document {document_id}")
-
         except Exception as e:
             print(f"❌ Error deleting vectors: {e}")
             success = False
@@ -368,7 +321,6 @@ class VectorPipeline:
         document_name = self._get_unique_document_name(file_path.stem, base_path)
 
         chunk_collection = "chunks"
-        artifact_collection = "artifacts"
 
         converted_doc, was_loaded_from_json = self.convert(str(file_path))
 
@@ -403,7 +355,6 @@ class VectorPipeline:
         document_record.artifact_count = len(artifacts)
         document_record.chunk_count = len(chunks)
         document_record.chunk_collection = chunk_collection
-        document_record.artifact_collection = artifact_collection
         document_record.tags = tags
         self.registry.update_document(document_record)
 
@@ -418,23 +369,6 @@ class VectorPipeline:
             )
 
         self.store_chunks(chunks, chunk_embeddings, document_record, collection_name=chunk_collection)
-
-        if artifacts:
-            artifact_embeddings = self.embed_artifacts(artifacts)
-            # Ensure artifact collection exists
-            existing = set(self.store.list_collections())
-            if artifact_collection not in existing:
-                self.store.create_collection(
-                    collection_name=artifact_collection,
-                    vector_size=len(artifact_embeddings[0])
-                )
-            self.store_artifacts(artifacts, artifact_embeddings, document_record, collection_name=artifact_collection)
-
-        self.store_chunks(chunks, chunk_embeddings, document_record, collection_name=chunk_collection)
-
-        if artifacts:
-            artifact_embeddings = self.embed_artifacts(artifacts)
-            self.store_artifacts(artifacts, artifact_embeddings, document_record, collection_name=artifact_collection)
 
         print(f"✅ Pipeline completed for {file_path.name}")
         return document_name

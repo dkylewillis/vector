@@ -68,13 +68,12 @@ class QueryExpansionStep(PipelineStep):
 
 
 class SearchStep(PipelineStep):
-    """Performs vector similarity search."""
+    """Performs vector similarity search on chunks."""
     
     def __init__(
         self,
         search_service: SearchService,
         top_k: int = 12,
-        search_type: str = "both",
         document_ids: Optional[List[str]] = None,
         window: int = 0
     ):
@@ -83,13 +82,11 @@ class SearchStep(PipelineStep):
         Args:
             search_service: SearchService instance
             top_k: Number of results to retrieve
-            search_type: Type of search ('chunks', 'artifacts', or 'both')
             document_ids: Optional list of document IDs to filter
             window: Number of surrounding chunks to include
         """
         self.search_service = search_service
         self.top_k = top_k
-        self.search_type = search_type
         self.document_ids = document_ids
         self.window = window
     
@@ -104,11 +101,10 @@ class SearchStep(PipelineStep):
         """
         start_time = time.time()
         
-        # Perform search
+        # Perform search (chunks only)
         search_results = self.search_service.search(
             query=context.query,
             top_k=self.top_k,
-            search_type=self.search_type,
             document_ids=self.document_ids,
             window=self.window
         )
@@ -117,7 +113,7 @@ class SearchStep(PipelineStep):
         
         # Convert SearchResult to RetrievalResult
         for sr in search_results:
-            collection = "artifacts" if sr.artifact is not None else "chunks"
+            collection = "chunks"
             context.results.append(RetrievalResult(
                 filename=sr.filename,
                 doc_id=sr.id,
@@ -131,7 +127,6 @@ class SearchStep(PipelineStep):
         
         # Store metadata
         context.add_metadata("search_latency_ms", round(latency_ms, 2))
-        context.add_metadata("search_type", self.search_type)
         context.add_metadata("window", self.window)
         
         return context
