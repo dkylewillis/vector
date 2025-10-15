@@ -26,8 +26,7 @@ class VectorWebService:
             self.registry = VectorRegistry(config=self.config)
             self.agent = ResearchAgent(
                 config=self.config,
-                chunks_collection="chunks",
-                artifacts_collection="artifacts"
+                chunks_collection="chunks"
             )
             self.pipeline = VectorPipeline(config=self.config)
             print("✅ VectorWebService initialized successfully")
@@ -46,18 +45,20 @@ class VectorWebService:
         documents: Optional[List[str]] = None,
         window: int = 0
     ) -> Tuple[str, List]:
-        """Search with thumbnails."""
+        """Search with thumbnails.
+        
+        Note: search_type parameter is kept for compatibility but ignored.
+        Always searches chunks only.
+        """
         if not self.agent:
             return "Search functionality not available", []
 
         try:
-            agent_search_type = search_type or "both"
-
             # Use the search service directly (refactored architecture)
+            # Note: search_type parameter removed - always searches chunks
             results = self.agent.retriever.search_service.search(
                 query=query,
                 top_k=top_k,
-                search_type=agent_search_type,
                 document_ids=self.get_selected_documents_by_name(documents),
                 window=window
             )
@@ -564,7 +565,7 @@ class VectorWebService:
         session_id: str,
         message: str,
         response_length: str = 'medium',
-        search_type: str = 'both',
+        search_type: str = 'chunks',
         top_k: Optional[int] = None,
         documents: Optional[List[str]] = None,
         window: int = 0
@@ -575,7 +576,7 @@ class VectorWebService:
             session_id: Chat session identifier (empty string will create new session)
             message: User message
             response_length: Response length (short/medium/long)
-            search_type: 'chunks', 'artifacts', or 'both'
+            search_type: Search type (always 'chunks', parameter kept for compatibility)
             top_k: Number of results to retrieve (uses config default if None)
             documents: Optional list of document names to filter
             window: Number of surrounding chunks to include (0 = disabled)
@@ -605,11 +606,11 @@ class VectorWebService:
             if top_k is None:
                 top_k = self.config.chat_default_top_k
             
+            # Always search chunks only (search_type parameter ignored)
             result = self.agent.chat(
                 session_id=session_id,
                 user_message=message,
                 response_length=response_length,
-                search_type=search_type,
                 top_k=top_k,
                 document_ids=document_ids,
                 window=window

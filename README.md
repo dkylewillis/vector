@@ -21,11 +21,11 @@
 - License
 
 ## Overview
-Vector is a research tool that ingests documents (text, tables, figures), extracts structured chunks and artifacts, and uses a Retrieval-Augmented Generation (RAG) pipeline (Docling + Qdrant) to answer questions with grounded citations. Retrieved chunks and artifacts are assembled into a grounded context window and passed to the LLM (currently OpenAI models only) to produce an auditable answer. It is useful for any domain where traceability to original sources matters (regulatory, legal, engineering, scientific, policy, internal knowledge, and more).
+Vector is a research tool that ingests documents (text, tables, figures), extracts structured chunks with linked artifacts, and uses a Retrieval-Augmented Generation (RAG) pipeline (Docling + Qdrant) to answer questions with grounded citations. Retrieved chunks (with their associated artifact images) are assembled into a grounded context window and passed to the LLM (currently OpenAI models only) to produce an auditable answer. It is useful for any domain where traceability to original sources matters (regulatory, legal, engineering, scientific, policy, internal knowledge, and more).
 
 ## Features
 - Multi-format ingestion (PDF, DOCX, PPTX, HTML, MD, CSV, images, Docling JSON)
-- Relevant figures and tables returned alongside responses
+- Relevant figures and tables saved as images and linked to text chunks
 - Search across multiple documents simultaneously
 - Tag-based document filtering
 - Provider-agnostic model configuration
@@ -98,25 +98,25 @@ Primary configuration lives in config.yaml at the project root. Edit that file i
 
 ## Architecture
 High-level:
-- Core: deterministic ingestion → Docling parse → chunk + artifact extraction → embeddings → Qdrant
-- Agent: query expansion → dual collection retrieval → ranking → prompt assembly → LLM answer
+- Core: deterministic ingestion → Docling parse → chunk + artifact extraction → chunk embeddings → Qdrant storage
+- Agent: query expansion → chunk retrieval → ranking → prompt assembly → LLM answer
 - Web: Gradio UI wrapping Core + Agent APIs
 
 ### Core Pipeline
-After conversion, the pipeline does two passes:
+After conversion, the pipeline processes documents in the following steps:
 
-1. Chunk pass: Docling’s hybrid chunker splits the document into readable text chunks and keeps references (self_ref ids) to any tables or figures mentioned. These references are stored as metadata.
-2. Artifact pass: It walks the full Docling document, exports each referenced table or figure as a PNG (plus a thumbnail), and builds an Artifact record (caption, headings, a little surrounding text, file paths). 
+1. **Chunk pass**: Docling's hybrid chunker splits the document into readable text chunks and keeps references (self_ref ids) to any tables or figures mentioned. These references are stored as metadata.
+2. **Artifact extraction**: The pipeline walks the full Docling document, exports each referenced table or figure as a PNG (plus a thumbnail), and builds an Artifact record (caption, headings, surrounding text, file paths).
+3. **Linking**: Each artifact is linked to the chunks that reference it, making artifacts accessible through chunk searches.
 
-Each artifact is linked back to any chunk that referenced it. This lets you search:
-- By text chunks (richer narrative context), or
-- By artifacts (focused tables/figures), or
-- Merge both for better coverage.
+The system then:
+- Embeds text chunks using sentence transformers
+- Stores chunk embeddings in Qdrant (single collection)
+- Saves artifact images to the filesystem
+- Attaches artifacts to their corresponding chunks via file paths
+- Registers the document (metadata, counts, tags) in the registry
 
-Both forms are kept intentionally. Finally, the system:
-- Embeds chunks and artifacts
-- Writes them into their Qdrant collections
-- Registers the document (metadata, counts, tags, collection names) in the registry.
+**Note**: Artifacts are NOT embedded or stored separately in the vector database. They are saved as images on disk and made available through the chunks that reference them. This simplifies the architecture while maintaining full access to tables and figures.
   
 ![Core Pipeline Diagram](./core-pipeline.png "Core pipeline: conversion → chunking → artifact extraction → embedding → storage")
 ### Agent Pipeline
@@ -127,11 +127,20 @@ Both forms are kept intentionally. Finally, the system:
 ## Data & Storage Layout
 ```
 data/
-  documents/<doc_id>.json
-  artifacts/<doc_id>/<artifact_id>.png
-  artifacts/<doc_id>/thumb_<artifact_id>.png
-registry/ (metadata store, e.g., document_registry.json)
+  converted_documents/<doc_name>/<doc_name>_document.json  # Converted Docling document
+  converted_documents/<doc_name>/artifacts/<artifact_id>.png  # Artifact images
+  converted_documents/<doc_name>/artifacts/thumb_<artifact_id>.png  # Thumbnails
+vector_registry/
+  <document_id>.json  # Document metadata (chunk count, artifact count, tags, etc.)
+qdrant_db/  # Vector database (chunks only)
+  collection/
+    chunks/  # Embedded text chunks with artifact references
 ```
+
+**Storage Strategy**:
+- **Chunks**: Embedded and stored in Qdrant vector database for semantic search
+- **Artifacts**: Saved as PNG images on filesystem, linked to chunks via file paths
+- **Metadata**: Document registry tracks all documents with their statistics and collections
 
 ## Limitations
 - In-memory chat session store (not persisted)

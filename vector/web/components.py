@@ -130,13 +130,6 @@ def create_search_tab():
                             label="Response Length",
                             scale=1
                         )
-                        components['chat_search_type'] = gr.Radio(
-                            choices=["chunks", "artifacts", "both"],
-                            value="chunks",
-                            label="Search Type",
-                            info="chunks: text content, artifacts: images/tables, both: combined",
-                            scale=1
-                        )
                         components['chat_top_k'] = gr.Slider(
                             minimum=5,
                             maximum=30,
@@ -202,13 +195,6 @@ def create_search_tab():
                     components['num_results'] = gr.Slider(
                         minimum=1, maximum=20, value=5, step=1,
                         label="Number of Results", scale=1
-                    )
-                    components['search_search_type'] = gr.Radio(
-                        choices=["chunks", "artifacts", "both"],
-                        value="both",
-                        label="Search Type",
-                        info="chunks: text content, artifacts: images/tables, both: combined",
-                        scale=1
                     )
                     components['search_window'] = gr.Slider(
                         minimum=0, maximum=50, value=0, step=1,

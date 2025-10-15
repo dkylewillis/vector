@@ -45,7 +45,6 @@ class DocumentRecord(BaseModel):
     artifact_count: int = 0
     chunk_count: int = 0
     chunk_collection: Optional[str] = None
-    artifact_collection: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
 
     def add_tags(self, tags: List[str]) -> None:

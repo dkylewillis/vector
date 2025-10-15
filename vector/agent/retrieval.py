@@ -25,7 +25,6 @@ class Retriever:
         session: ChatSession,
         user_message: str,
         top_k: int = 12,
-        search_type: str = "both",
         document_ids: Optional[List[str]] = None,
         window: int = 0,
         min_score: Optional[float] = None,
@@ -37,7 +36,6 @@ class Retriever:
             session: Current chat session
             user_message: User's current message
             top_k: Number of results to retrieve
-            search_type: Type of search ('chunks', 'artifacts', or 'both')
             document_ids: Optional list of document IDs to filter
             window: Number of surrounding chunks to include (0 = disabled)
             min_score: Optional minimum score threshold for filtering
@@ -52,7 +50,6 @@ class Retriever:
         else:
             pipeline = self._build_pipeline(
                 top_k=top_k,
-                search_type=search_type,
                 document_ids=document_ids,
                 window=window,
                 min_score=min_score
@@ -90,7 +87,6 @@ class Retriever:
     def _build_pipeline(
         self,
         top_k: int = 12,
-        search_type: str = "both",
         document_ids: Optional[List[str]] = None,
         window: int = 0,
         min_score: Optional[float] = None
@@ -99,7 +95,6 @@ class Retriever:
         
         Args:
             top_k: Number of results to retrieve
-            search_type: Type of search
             document_ids: Optional document filter
             window: Chunk window size
             min_score: Optional score threshold
@@ -112,11 +107,10 @@ class Retriever:
         # Add query expansion step
         pipeline.add_step(QueryExpansionStep(self.search_model))
         
-        # Add search step
+        # Add search step (chunks only, artifacts no longer stored in vector db)
         pipeline.add_step(SearchStep(
             self.search_service,
             top_k=top_k,
-            search_type=search_type,
             document_ids=document_ids,
             window=window
         ))
