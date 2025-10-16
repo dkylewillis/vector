@@ -48,7 +48,7 @@ dev = [
 ]
 
 [project.scripts]
-vector-core = "vector.core.cli:main"
+vector-core = "vector.cli:main"
 vector-agent = "vector.agent.cli:main"
 vector-web = "vector.web.main:main"
 

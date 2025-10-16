@@ -7,7 +7,7 @@ from uuid import uuid4
 from ..config import Config
 from ..exceptions import AIServiceError
 from ..ai.factory import AIModelFactory
-from ..core.services.search import SearchService
+from vector.search.service import SearchService
 
 # Import new modular components
 from .models import ChatSession, RetrievalResult, UsageMetrics, AggregatedUsageMetrics
@@ -38,12 +38,15 @@ class ResearchAgent:
         self.config = config or Config()
         self.chunks_collection = chunks_collection
         
-        # Initialize search service
-        from ..core.embedder import Embedder
-        from ..core.vector_store import VectorStore
+        # Initialize search service with flat structure
+        from vector.embedders.sentence_transformer import SentenceTransformerEmbedder
+        from vector.stores.factory import create_store
+        
+        embedder = SentenceTransformerEmbedder()
+        store = create_store("qdrant", db_path=self.config.vector_db_path)
         search_service = SearchService(
-            Embedder(),
-            VectorStore(),
+            embedder,
+            store,
             chunks_collection
         )
         

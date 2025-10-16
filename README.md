@@ -39,17 +39,23 @@ pip install -e .
 copy .env.example .env
 # set OPENAI_API_KEY
 docker run -p 6333:6333 qdrant/qdrant:latest
-python -m vector.core.ingest ./samples/zoning.pdf
+python -m vector.agent.api ingest ./samples/zoning.pdf
 python -m vector.agent search "corner lot setback"
 ```
 
 Programmatic:
 ```python
-from vector.core.pipeline import VectorPipeline
+from vector.stores import create_store
+from vector.embedders import SentenceTransformerEmbedder
+from vector.search import SearchService
 from vector.agent.api import Agent
 
-pipeline = VectorPipeline()
-doc_id = pipeline.run("samples/zoning.pdf", tags=["zoning"])
+# Initialize with flat structure
+store = create_store("qdrant", db_path="./qdrant_db")
+embedder = SentenceTransformerEmbedder()
+search_service = SearchService(embedder=embedder, store=store)
+
+# Use agent for processing
 agent = Agent()
 print(agent.answer("Summarize R-1 height limits", top_k=6))
 ```

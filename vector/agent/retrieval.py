@@ -1,7 +1,7 @@
 """Retrieval orchestration using pluggable pipeline."""
 
 from typing import Optional, List, Tuple
-from ..core.services.search import SearchService
+from vector.search.service import SearchService
 from .models import ChatSession, RetrievalBundle, UsageMetrics, AggregatedUsageMetrics
 from .pipeline import Pipeline, RetrievalContext
 from .steps import QueryExpansionStep, SearchStep, ScoreFilter, DiagnosticsStep

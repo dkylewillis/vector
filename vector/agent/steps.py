@@ -5,7 +5,7 @@ from typing import Optional, List
 from .pipeline import PipelineStep, RetrievalContext
 from .models import UsageMetrics, RetrievalResult
 from .prompting import build_expansion_prompt, render_recent_messages
-from ..core.services.search import SearchService
+from vector.search.service import SearchService
 
 
 class QueryExpansionStep(PipelineStep):

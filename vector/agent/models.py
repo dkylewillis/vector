@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any, Literal, TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from ..core.models import Chunk, Artifact
+    from vector.models import Chunk, Artifact
 
 
 class ChatMessage(BaseModel):

@@ -1,23 +1,32 @@
-import os
-from pathlib import Path
-from typing import Optional, Union
+"""Document conversion using Docling."""
+
 import json
+from pathlib import Path
+from typing import Optional
 
 from docling.document_converter import DocumentConverter as DoclingConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, VlmPipelineOptions
 from docling.datamodel.base_models import InputFormat
 from docling_core.types.doc.document import DoclingDocument
 from docling.pipeline.vlm_pipeline import VlmPipeline
-from docling.datamodel.pipeline_options_vlm_model import ApiVlmOptions, ResponseFormat
-from docling_core.types.doc.page import SegmentedPage
 from docling_core.types.doc import ImageRefMode
 from pydantic import ValidationError
 
-from .models import ConvertedDocument
+from vector.models import ConvertedDocument
 
 
 class DocumentConverter:
-    """Handles document conversion using Docling."""
+    """Handles document conversion using Docling.
+    
+    This converter uses Docling to parse various document formats (PDF, DOCX,
+    PPTX, HTML, MD, images, etc.) into structured DoclingDocument objects.
+    
+    Example:
+        >>> converter = DocumentConverter(generate_artifacts=True)
+        >>> doc = converter.convert_document(Path("document.pdf"))
+        >>> converted = ConvertedDocument(doc=doc)
+        >>> chunks = converted.get_chunks()
+    """
 
     def __init__(self, generate_artifacts: bool = True, use_vlm_pipeline: bool = False):
         """Initialize the document converter with configurable artifact generation.
@@ -44,7 +53,6 @@ class DocumentConverter:
             pdf_pipeline_options.images_scale = 1.0
             pdf_pipeline_options.generate_picture_images = False
 
-        # Fix: Create PdfFormatOption with pipeline_options (not a dict)
         pdf_format_option = PdfFormatOption(pipeline_options=pdf_pipeline_options)
         
         if use_vlm_pipeline:
@@ -63,7 +71,7 @@ class DocumentConverter:
                 InputFormat.JSON_DOCLING,
             ],
             format_options={
-                InputFormat.PDF: pdf_format_option  # Fix: Use the correct format option
+                InputFormat.PDF: pdf_format_option
             },
         )
 
@@ -77,12 +85,11 @@ class DocumentConverter:
             DoclingDocument object
 
         Raises:
-            ProcessingError: If conversion fails
+            Exception: If conversion fails
         """
         file_type = self._get_file_type(file_path)
         print(f"Converting: {file_path} (type: {file_type}, artifacts: {'enabled' if self.generate_artifacts else 'disabled'})")
 
-        # Convert document using Docling - it auto-detects format
         doc = self.converter.convert(str(file_path)).document
         if not doc:
             raise Exception(f"Failed to convert {file_path}")
@@ -106,7 +113,6 @@ class DocumentConverter:
             with open(json_path, 'r', encoding='utf-8') as f:
                 json_content = f.read()
             
-            # Try to validate the JSON against DoclingDocument schema
             DoclingDocument.model_validate_json(json_content)
             return True
         except (json.JSONDecodeError, ValidationError, Exception):

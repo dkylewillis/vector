@@ -11,7 +11,7 @@ from docling_core.transforms.chunker.hierarchical_chunker import (
 )
 from docling_core.transforms.serializer.markdown import MarkdownParams
 
-from .models import Chunk, Artifact, get_item_by_ref
+from vector.models import Chunk, Artifact, get_item_by_ref
 
 
 class ImgPlaceholderSerializerProvider(ChunkingSerializerProvider):
@@ -81,6 +81,7 @@ class DocumentChunker:
             # Create our Chunk model
             processed_chunk = Chunk(
                 chunk_id=f"chunk_{len(processed_chunks)}",  # Generate sequential IDs
+                chunk_index=len(processed_chunks),  # 0-based index for ordering and filtering
                 text=contextualized_text,
                 page_number=None,  # Not available in this version
                 headings=getattr(doc_chunk.meta, 'headings', None) or [],  # Use safe attribute access

@@ -162,6 +162,7 @@ class Artifact(BaseModel):
 
 class Chunk(BaseModel):
     chunk_id: str
+    chunk_index: Optional[int] = None  # Position of chunk in document (0-based), optional for backward compatibility
     text: str
     page_number: Optional[int] = None
     headings: List[str] = Field(default_factory=list)
@@ -190,7 +191,7 @@ class ConvertedDocument(BaseModel):
             raise ValueError(f"Failed to load document from {filename}: {e}")
         
     def get_chunks(self) -> List[Chunk]:
-        from .chunker import DocumentChunker
+        from vector.pipeline import DocumentChunker
         return DocumentChunker().chunk_document(self.doc)
 
     def get_artifacts(self) -> List[Artifact]:

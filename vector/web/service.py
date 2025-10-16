@@ -5,12 +5,12 @@ from typing import List, Tuple, Optional, Dict, Any
 from pathlib import Path
 
 from ..config import Config
-from ..agent import ResearchAgent
-from ..core.vector_store import VectorStore
-from ..core.document_registry import VectorRegistry
-from ..core.pipeline import VectorPipeline
-
-from ..core.models import Chunk, Artifact
+from ..agent.agent import ResearchAgent
+from ..stores.qdrant import QdrantVectorStore
+from ..pipeline.ingestion import IngestionPipeline, IngestionConfig
+from ..embedders.sentence_transformer import SentenceTransformerEmbedder
+from ..models import Chunk, Artifact
+from .registry import DocumentRegistry
 
 
 class VectorWebService:
@@ -21,20 +21,54 @@ class VectorWebService:
         self.config = config or Config()
 
         try:
-            # Initialize components
-            self.store = VectorStore(db_path=self.config.vector_db_path)
-            self.registry = VectorRegistry(config=self.config)
-            self.agent = ResearchAgent(
-                config=self.config,
-                chunks_collection="chunks"
+            # Initialize components with refactored architecture
+            self.store = QdrantVectorStore(db_path=self.config.vector_db_path)
+            self.registry = DocumentRegistry(config=self.config)
+            # Use default embedder model
+            self.embedder = SentenceTransformerEmbedder()
+            
+            # Initialize agent only if needed (lazy loading)
+            self._agent = None
+            
+            # Create IngestionConfig for the pipeline
+            ingestion_config = IngestionConfig(
+                collection_name="chunks",
+                generate_artifacts=True,
+                use_vlm_pipeline=False
             )
-            self.pipeline = VectorPipeline(config=self.config)
+            
+            self.pipeline = IngestionPipeline(
+                embedder=self.embedder,
+                store=self.store,
+                config=ingestion_config
+            )
             print("✅ VectorWebService initialized successfully")
         except Exception as e:
             print(f"⚠️  Error initializing VectorWebService: {e}")
+            import traceback
+            traceback.print_exc()
             self.store = None
             self.registry = None
-            self.agent = None
+            self._agent = None
+            self.pipeline = None
+    
+    @property
+    def agent(self):
+        """Lazy initialization of ResearchAgent (only when needed for chat/search)."""
+        if self._agent is None:
+            try:
+                print("🤖 Initializing ResearchAgent...")
+                self._agent = ResearchAgent(
+                    config=self.config,
+                    chunks_collection="chunks"
+                )
+                print("✅ ResearchAgent initialized")
+            except Exception as e:
+                print(f"⚠️  Error initializing ResearchAgent: {e}")
+                print("   Chat and AI features will be unavailable, but document upload/management will work.")
+                import traceback
+                traceback.print_exc()
+        return self._agent
 
     def search_with_thumbnails(
         self,
@@ -153,41 +187,54 @@ class VectorWebService:
         for i, file_obj in enumerate(files, 1):
             try:
                 # Get the file path from the file object
-                file_path = file_obj.name if hasattr(file_obj, 'name') else str(file_obj)
-                file_name = (
-                    file_path.split('/')[-1]
-                    if '/' in file_path
-                    else file_path.split('\\')[-1]
-                )
+                file_path = Path(file_obj.name if hasattr(file_obj, 'name') else str(file_obj))
+                file_name = file_path.name
 
                 results.append(f"\n📄 Processing file {i}/{len(files)}: {file_name}")
                 results.append("-" * 40)
 
-                # Parse tags if provided
-                parsed_tags = []
-                if tags and tags.strip():
-                    parsed_tags = [tag.strip().lower() for tag in tags.split(",") if tag.strip()]
+                # Register document in registry first
+                doc_record = self.registry.register_document(file_path, file_name)
+                document_id = doc_record.document_id
                 
-                # Use pipeline to process the document
-                document_id = self.pipeline.run(file_path, tags=parsed_tags)
+                # Use ingestion pipeline to process the document
+                ingestion_result = self.pipeline.ingest_file(
+                    file_path=file_path,
+                    document_id=document_id
+                )
 
-                results.append(f"✅ Successfully processed: {file_name}")
-                results.append(f"   Document ID: {document_id}")
-                
-                # Store document ID for tagging
-                processed_document_ids.append(document_id)
-                success_count += 1
+                if ingestion_result.success:
+                    results.append(f"✅ Successfully processed: {file_name}")
+                    results.append(f"   Document ID: {document_id}")
+                    results.append(f"   Chunks indexed: {ingestion_result.chunks_indexed}")
+                    results.append(f"   Artifacts: {ingestion_result.artifacts_generated}")
+                    
+                    # Update registry with processing results
+                    doc_record.chunk_count = ingestion_result.chunks_indexed
+                    doc_record.artifact_count = ingestion_result.artifacts_generated
+                    doc_record.has_artifacts = ingestion_result.artifacts_generated > 0
+                    doc_record.chunk_collection = collection
+                    self.registry.update_document(doc_record)
+                    
+                    # Add tags if provided
+                    if tags and tags.strip():
+                        parsed_tags = [tag.strip().lower() for tag in tags.split(",") if tag.strip()]
+                        self.registry.add_tags(document_id, parsed_tags)
+                    
+                    processed_document_ids.append(document_id)
+                    success_count += 1
+                else:
+                    error_msg = f"❌ Ingestion failed: {', '.join(ingestion_result.errors)}"
+                    results.append(error_msg)
+                    error_count += 1
 
             except Exception as e:
                 error_msg = f"❌ Error processing {file_name}: {str(e)}"
                 results.append(error_msg)
                 print(error_msg)  # Also log to console
+                import traceback
+                traceback.print_exc()
                 error_count += 1
-
-        # Add tags to successfully processed documents if any were processed
-        # but tags were not provided during initial processing
-        if tags and tags.strip() and processed_document_ids:
-            results.append(f"\n🏷️  Note: Tags were added during document processing.")
 
         # Summary
         results.append("\n" + "=" * 50)
@@ -218,26 +265,44 @@ class VectorWebService:
         if not document_names:
             return "No documents specified for deletion"
 
-        if not self.pipeline:
-            return "Document pipeline not available - cannot delete documents"
+        if not self.store or not self.registry:
+            return "Store or registry not available - cannot delete documents"
 
         results = []
         success_count = 0
         error_count = 0
 
-        for doc in document_names:
+        for doc_name in document_names:
             try:
-                print(f"🗑️ Attempting to delete document: {doc}")
-                success = self.pipeline.delete_document_by_name(doc)
-                if success:
-                    results.append(f"✅ Successfully deleted: {doc}")
-                    success_count += 1
-                else:
-                    results.append(f"❌ Failed to delete: {doc}")
+                print(f"🗑️ Attempting to delete document: {doc_name}")
+                
+                # Get document ID from registry
+                document_id = self.registry.get_id_by_display_name(doc_name)
+                if not document_id:
+                    results.append(f"❌ Document not found in registry: {doc_name}")
                     error_count += 1
+                    continue
+                
+                # Delete from vector store using document_id filter
+                from ..search.dsl import FieldEquals
+                filter_expr = FieldEquals(key="document_id", value=document_id)
+                
+                deleted_count = self.store.delete(
+                    collection_name=collection,
+                    filter_expr=filter_expr
+                )
+                
+                # Delete from registry
+                self.registry.delete_document_record(document_id)
+                
+                results.append(f"✅ Successfully deleted: {doc_name} ({deleted_count} chunks)")
+                success_count += 1
+                
             except Exception as e:
-                error_msg = f"❌ Error deleting document {doc}: {e}"
+                error_msg = f"❌ Error deleting document {doc_name}: {e}"
                 print(error_msg)
+                import traceback
+                traceback.print_exc()
                 results.append(error_msg)
                 error_count += 1
 

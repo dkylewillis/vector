@@ -115,27 +115,54 @@ def view_document_details(web_service: VectorWebService, selected_documents):
 
 
 def delete_selected_documents(web_service: VectorWebService, selected_documents, confirm_delete):
-    """Handle document deletion request."""
+    """Handle document deletion request.
+    
+    Returns:
+        Tuple of (status_message, updated_document_list, updated_tags_list)
+    """
     if not selected_documents:
-        return "Please select one or more documents to delete"
+        return "Please select one or more documents to delete", gr.update(), gr.update()
     
     if not confirm_delete:
-        return "Please check the confirmation box to proceed with deletion"
+        return "Please check the confirmation box to proceed with deletion", gr.update(), gr.update()
     
     try:
+        # Filter out documents that don't exist anymore (in case of stale selection)
+        current_documents = set(web_service.get_registry_documents())
+        valid_selections = [doc for doc in selected_documents if doc in current_documents]
+        invalid_selections = [doc for doc in selected_documents if doc not in current_documents]
+        
+        if invalid_selections:
+            invalid_msg = f"⚠️  Skipped {len(invalid_selections)} document(s) that no longer exist:\n"
+            for doc in invalid_selections:
+                invalid_msg += f"  • {doc}\n"
+        else:
+            invalid_msg = ""
+        
+        if not valid_selections:
+            return f"{invalid_msg}\nNo valid documents to delete.", gr.update(), gr.update()
+        
         # Call the service method to delete documents
-        result = web_service.delete_documents(selected_documents, "chunks")  # Default collection
+        result = web_service.delete_documents(valid_selections, "chunks")  # Default collection
         
         # Provide more detailed feedback
-        deleted_count = len(selected_documents)
+        deleted_count = len(valid_selections)
         success_message = f"Deletion request processed for {deleted_count} document(s):\n"
-        for doc in selected_documents:
+        for doc in valid_selections:
             success_message += f"• {doc}\n"
         
-        return f"{success_message}\n{result}"
+        # Get updated documents and tags for refresh
+        updated_documents = web_service.get_registry_documents()
+        updated_tags = web_service.get_all_tags()
+        
+        return (
+            f"{invalid_msg}{success_message}\n{result}",
+            gr.update(choices=updated_documents, value=[]),  # Refresh documents list and clear selection
+            gr.update(choices=updated_tags)  # Refresh tags dropdown
+        )
         
     except Exception as e:
-        return f"Error during document deletion: {str(e)}"
+        return f"Error during document deletion: {str(e)}", gr.update(), gr.update()
 
 
 def handle_add_tags(web_service: VectorWebService, document_list: List[str], tags_input: str):
@@ -500,5 +527,9 @@ def connect_events(web_service, search_components,
                 documents_checkboxgroup,  # Selected documents from main panel
                 document_management_components['confirm_delete_checkbox']
             ],
-            outputs=document_management_components['delete_output']
+            outputs=[
+                document_management_components['delete_output'],
+                documents_checkboxgroup,  # Refresh documents list
+                tag_filter_dropdown  # Refresh tags dropdown
+            ]
         )

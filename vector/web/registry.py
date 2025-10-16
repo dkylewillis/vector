@@ -1,15 +1,17 @@
+"""Document registry for managing processed documents in the web interface."""
+
 import json
 import os
 from pathlib import Path
-from typing import List, Dict, Optional, Union
+from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
-from .models import DocumentRecord
-from typing import Dict, List, Set
+
+from ..models import DocumentRecord
 from ..config import Config
 
 
-class VectorRegistry:
+class DocumentRegistry:
     """Registry for managing processed documents and their lifecycle."""
     
     def __init__(self, registry_path: str = None, config=None):
@@ -46,7 +48,7 @@ class VectorRegistry:
             has_artifacts=False,
             artifact_count=0,
             chunk_count=0,
-            collection_name=None,
+            chunk_collection=None,
             tags=[]
         )
         
@@ -290,7 +292,6 @@ class VectorRegistry:
         """
         # Check if base name is already unique
         existing_docs = self.list_documents()
-        #existing_names = [doc.display_name for doc in existing_docs if doc.document_id != document_id]
         existing_names = [doc.display_name for doc in existing_docs]
         
         if base_display_name not in existing_names:
@@ -305,4 +306,3 @@ class VectorRegistry:
             if candidate_name not in existing_names:
                 return candidate_name
             counter += 1
-
