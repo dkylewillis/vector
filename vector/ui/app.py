@@ -1,4 +1,4 @@
-"""Web interface main entry point for Vector."""
+"""Gradio application factory for Vector web interface."""
 
 import gradio as gr
 from pathlib import Path
@@ -10,16 +10,25 @@ logging.getLogger('docling_core').setLevel(logging.WARNING)
 logging.getLogger('docling.document_converter').setLevel(logging.WARNING)
 logging.getLogger('docling.backend').setLevel(logging.WARNING)
 
-from ..config import Config
+from vector.config import Config
 from .service import VectorWebService
 from .components import (
-    create_header, create_search_tab, create_document_management_tab, create_upload_tab, create_info_tab,
+    create_header, create_search_tab, create_document_management_tab, 
+    create_upload_tab, create_info_tab,
 )
 from .handlers import connect_events
 
 
-def create_vector_app() -> gr.Blocks:
-    """Create the main Gradio application."""
+def create_gradio_app() -> gr.Blocks:
+    """Create the Gradio application.
+    
+    This function creates a Gradio Blocks app that can be:
+    - Launched standalone
+    - Mounted in FastAPI at /ui
+    
+    Returns:
+        gr.Blocks: Configured Gradio application
+    """
     
     # Initialize Vector web service with config
     config = Config()
@@ -89,14 +98,21 @@ def create_vector_app() -> gr.Blocks:
 
 
 def main():
-    """Main entry point for web interface."""
-    print("🚀 Starting Vector Web Interface...")
+    """Main entry point for standalone Gradio server.
+    
+    This is used when running: python -m apps.gradio
+    """
+    print("🚀 Starting Vector Gradio Interface...")
     print("📍 Navigate to: http://127.0.0.1:7860")
     
-    app = create_vector_app()
+    app = create_gradio_app()
     app.launch(
         server_name="127.0.0.1",
         server_port=7860,
         share=False,
         debug=True
     )
+
+
+if __name__ == "__main__":
+    main()

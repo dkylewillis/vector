@@ -39,6 +39,9 @@ dependencies = [
     "python-dotenv",
     "openai",
     "gradio",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
 ]
 
 [project.optional-dependencies]
@@ -53,7 +56,8 @@ dev = [
 [project.scripts]
 vector-core = "vector.cli:main"
 vector-agent = "vector.agent.cli:main"
-vector-web = "vector.web.main:main"
+vector-ui = "vector.ui.app:main"
+vector-api = "vector.api.app:main"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/vector"

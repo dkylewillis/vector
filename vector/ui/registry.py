@@ -7,8 +7,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
 
-from ..models import DocumentRecord
-from ..config import Config
+from vector.models import DocumentRecord
+from vector.config import Config
 
 
 class DocumentRegistry:
