@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from pathlib import Path
 
 from ..config import Config
-from ..agent.agent import ResearchAgent
+from ..agent import ChatService
 from ..stores.qdrant import QdrantVectorStore
 from ..pipeline.ingestion import IngestionPipeline, IngestionConfig
 from ..embedders.sentence_transformer import SentenceTransformerEmbedder
@@ -54,17 +54,17 @@ class VectorWebService:
     
     @property
     def agent(self):
-        """Lazy initialization of ResearchAgent (only when needed for chat/search)."""
+        """Lazy initialization of ChatService (only when needed for chat/search)."""
         if self._agent is None:
             try:
-                print("🤖 Initializing ResearchAgent...")
-                self._agent = ResearchAgent(
+                print("🤖 Initializing ChatService...")
+                self._agent = ChatService(
                     config=self.config,
                     chunks_collection="chunks"
                 )
-                print("✅ ResearchAgent initialized")
+                print("✅ ChatService initialized")
             except Exception as e:
-                print(f"⚠️  Error initializing ResearchAgent: {e}")
+                print(f"⚠️  Error initializing ChatService: {e}")
                 print("   Chat and AI features will be unavailable, but document upload/management will work.")
                 import traceback
                 traceback.print_exc()

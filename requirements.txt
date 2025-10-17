@@ -17,6 +17,10 @@ numpy
 
 # Data validation
 pydantic
+pydantic-ai[openai]
+
+# Async HTTP client
+httpx
 
 # Image processing
 Pillow

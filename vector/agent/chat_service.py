@@ -1,50 +1,36 @@
-"""Research Agent with PydanticAI integration."""
+"""Chat service for managing conversation sessions and orchestrating agents."""
 
 import asyncio
-import warnings
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from uuid import uuid4
 
 from ..config import Config
 from ..exceptions import AIServiceError
 from ..ai.factory import AIModelFactory
 from vector.search.service import SearchService
+from vector.embedders.sentence_transformer import SentenceTransformerEmbedder
+from vector.stores.factory import create_store
 
-# Import modular components
-from .models import ChatSession, RetrievalResult, UsageMetrics, AggregatedUsageMetrics
+from .models import ChatSession, UsageMetrics, AggregatedUsageMetrics
 from .prompting import build_system_prompt, build_answer_prompt
 from .memory import SummarizerPolicy
 from .retrieval import Retriever
-
-# Import PydanticAI components
 from .deps import AgentDeps
-from .agents import PydanticResearchAgent
-
-warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modules.module")
-
-# Deprecation warning
-warnings.warn(
-    "ResearchAgent is deprecated and will be removed in a future version. "
-    "Use ChatService instead:\n"
-    "  from vector.agent import ChatService\n"
-    "  service = ChatService()\n",
-    DeprecationWarning,
-    stacklevel=2
-)
+from .agents import ResearchAgent
 
 
-class ResearchAgent:
+class ChatService:
     """
-    Research agent with PydanticAI integration.
+    Service for managing multi-turn conversations with document retrieval.
     
-    This agent now uses PydanticAI for advanced tool use and agent orchestration
-    while maintaining backward compatibility with the existing API.
+    This service orchestrates between classic pipeline-based retrieval
+    and modern PydanticAI agent-based approaches.
     
     Features:
-    - Multi-agent architecture (SearchAgent + AnswerAgent)
-    - Tool-based retrieval and answer generation
-    - MCP server compatibility
-    - Structured outputs with full observability
+    - Session management (start/end/get)
+    - Memory management with automatic summarization
+    - Dual-mode operation: classic pipeline or PydanticAI agents
+    - Async-to-sync bridging for compatibility
     """
 
     def __init__(
@@ -53,7 +39,7 @@ class ResearchAgent:
         chunks_collection: str = "chunks",
         use_pydantic_ai: bool = True
     ):
-        """Initialize the research agent.
+        """Initialize the chat service.
 
         Args:
             config: Configuration object. If None, loads default config.
@@ -64,19 +50,12 @@ class ResearchAgent:
         self.chunks_collection = chunks_collection
         self.use_pydantic_ai = use_pydantic_ai
         
-        # Initialize search service with flat structure
-        from vector.embedders.sentence_transformer import SentenceTransformerEmbedder
-        from vector.stores.factory import create_store
-        
+        # Initialize search service
         embedder = SentenceTransformerEmbedder()
         store = create_store("qdrant", db_path=self.config.vector_db_path)
-        search_service = SearchService(
-            embedder,
-            store,
-            chunks_collection
-        )
+        self.search_service = SearchService(embedder, store, chunks_collection)
         
-        # Initialize AI models using factory
+        # Initialize AI models
         try:
             self.search_ai_model = AIModelFactory.create_model(self.config, 'search')
             self.answer_ai_model = AIModelFactory.create_model(self.config, 'answer')
@@ -85,8 +64,8 @@ class ResearchAgent:
             self.search_ai_model = None
             self.answer_ai_model = None
         
-        # Initialize retriever with search service
-        self.retriever = Retriever(self.search_ai_model, search_service)
+        # Initialize retriever (for classic mode)
+        self.retriever = Retriever(self.search_ai_model, self.search_service)
         
         # Initialize summarizer policy
         if self.answer_ai_model:
@@ -102,58 +81,24 @@ class ResearchAgent:
         if self.use_pydantic_ai and self.search_ai_model and self.answer_ai_model:
             try:
                 deps = AgentDeps(
-                    search_service=search_service,
+                    search_service=self.search_service,
                     config=self.config,
                     search_model=self.search_ai_model,
                     answer_model=self.answer_ai_model,
                     chunks_collection=chunks_collection
                 )
-                self.pydantic_agent = PydanticResearchAgent(deps)
+                self.agent = ResearchAgent(deps)
             except Exception as e:
                 print(f"Warning: Could not initialize PydanticAI agent: {e}")
-                self.pydantic_agent = None
+                self.agent = None
                 self.use_pydantic_ai = False
         else:
-            self.pydantic_agent = None
+            self.agent = None
         
         # Session management
         self._sessions: Dict[str, ChatSession] = {}
-        self.max_answer_tokens = 800
 
-    def get_model_info(self) -> str:
-        """Get information about configured models."""
-        if not self.search_ai_model or not self.answer_ai_model:
-            return "⚠️  AI models not available"
-        
-        try:
-            search_info = self.search_ai_model.get_model_info()
-            answer_info = self.answer_ai_model.get_model_info()
-            
-            if self.search_ai_model == self.answer_ai_model:
-                return f"🤖 Single Model: {search_info['model_name']} ({search_info.get('provider', 'unknown')})"
-            
-            return (
-                f"🔍 Search Model: {search_info['model_name']} ({search_info.get('provider', 'unknown')})\n"
-                f"   Max Tokens: {search_info['configured_max_tokens']}\n"
-                f"   Temperature: {search_info['configured_temperature']}\n\n"
-                f"💬 Answer Model: {answer_info['model_name']} ({answer_info.get('provider', 'unknown')})\n"
-                f"   Max Tokens: {answer_info['configured_max_tokens']}\n"
-                f"   Temperature: {answer_info['configured_temperature']}\n\n"
-                f"📋 Available Providers: {', '.join(AIModelFactory.get_available_providers())}"
-            )
-        except Exception as e:
-            return f"⚠️  Error getting model info: {e}"
-
-    def get_collection_info(self) -> str:
-        """Get information about the collections being searched."""
-        collections = self.retriever.search_service.store.list_collections()
-        info_parts = [
-            f"Available collections: {', '.join(collections)}",
-            f"Chunks collection: {self.chunks_collection}"
-        ]
-        return "\n".join(info_parts)
-
-    # Chat Methods
+    # Session Management Methods
 
     def start_chat(self, system_prompt: Optional[str] = None) -> str:
         """Start a new chat session.
@@ -173,9 +118,7 @@ class ResearchAgent:
             messages=[]
         )
         
-        # Add system message
         session.add('system', prompt)
-        
         self._sessions[session_id] = session
         return session_id
 
@@ -201,6 +144,8 @@ class ResearchAgent:
         """
         return self._sessions.pop(session_id, None) is not None
 
+    # Main Chat Method
+
     def chat(
         self,
         session_id: str,
@@ -219,8 +164,8 @@ class ResearchAgent:
             response_length: Response length (short/medium/long)
             top_k: Number of results to retrieve
             document_ids: Optional list of document IDs to filter
-            window: Number of surrounding chunks to include (0 = disabled, 2 = 2 before and after)
-            use_tools: Whether to use PydanticAI tool-based agent (default: False for backward compatibility)
+            window: Number of surrounding chunks to include
+            use_tools: Whether to use PydanticAI tool-based agent
             
         Returns:
             Dict with assistant response, results, and metadata
@@ -231,43 +176,31 @@ class ResearchAgent:
         if session_id not in self._sessions:
             raise ValueError(f"Unknown chat session: {session_id}")
         
-        # Check if AI models are available
         if not self.answer_ai_model:
             raise AIServiceError(
-                "AI models are not available. Please configure API keys and ensure models are properly initialized."
+                "AI models are not available. Please configure API keys."
             )
         
         session = self._sessions[session_id]
-        
-        # Add user message to session
         session.add('user', user_message)
         
-        # Use PydanticAI agent if enabled and requested
-        if use_tools and self.use_pydantic_ai and self.pydantic_agent:
+        # Choose mode
+        if use_tools and self.use_pydantic_ai and self.agent:
             try:
-                return self._chat_with_tools(
-                    session_id=session_id,
-                    user_message=user_message,
-                    response_length=response_length,
-                    top_k=top_k,
-                    document_ids=document_ids,
-                    window=window
+                return self._chat_with_agent(
+                    session_id, user_message, response_length,
+                    top_k, document_ids, window
                 )
             except Exception as e:
-                print(f"Warning: PydanticAI agent failed, falling back to classic mode: {e}")
-                # Fall through to classic implementation
+                print(f"Warning: PydanticAI agent failed, falling back: {e}")
         
-        # Classic retrieval-based implementation
+        # Classic mode fallback
         return self._chat_classic(
-            session_id=session_id,
-            user_message=user_message,
-            response_length=response_length,
-            top_k=top_k,
-            document_ids=document_ids,
-            window=window
+            session_id, user_message, response_length,
+            top_k, document_ids, window
         )
     
-    def _chat_with_tools(
+    def _chat_with_agent(
         self,
         session_id: str,
         user_message: str,
@@ -276,27 +209,13 @@ class ResearchAgent:
         document_ids: Optional[List[str]],
         window: int
     ) -> Dict[str, Any]:
-        """Chat using PydanticAI tool-based agent.
-        
-        This method uses asyncio to run the async PydanticAI agent.
-        
-        Args:
-            session_id: Session identifier
-            user_message: User's message
-            response_length: Response length setting
-            top_k: Number of results to retrieve
-            document_ids: Optional document filter
-            window: Chunk window size
-            
-        Returns:
-            Dict with response and metrics
-        """
+        """Chat using PydanticAI agent."""
         session = self._sessions[session_id]
         max_tokens = self.config.response_lengths.get(response_length, 1000)
         
-        # Run async agent in sync context
+        # Run async agent
         result = asyncio.run(
-            self.pydantic_agent.retrieve_and_answer(
+            self.agent.retrieve_and_answer(
                 session=session,
                 user_message=user_message,
                 max_tokens=max_tokens,
@@ -306,14 +225,12 @@ class ResearchAgent:
             )
         )
         
-        # Add assistant response to session
+        # Update session
         session.add('assistant', result['assistant'])
         
-        # Apply summarization if needed
         if self.summarizer:
             self.summarizer.compact(session)
         
-        # Add session metadata
         result.update({
             "session_id": session_id,
             "message_count": len(session.messages),
@@ -332,24 +249,10 @@ class ResearchAgent:
         document_ids: Optional[List[str]],
         window: int
     ) -> Dict[str, Any]:
-        """Chat using classic retrieval pipeline.
-        
-        This is the original implementation using the retrieval pipeline.
-        
-        Args:
-            session_id: Session identifier
-            user_message: User's message
-            response_length: Response length setting
-            top_k: Number of results to retrieve
-            document_ids: Optional document filter
-            window: Chunk window size
-            
-        Returns:
-            Dict with response and metrics
-        """
+        """Chat using classic retrieval pipeline."""
         session = self._sessions[session_id]
         
-        # Perform retrieval with query expansion
+        # Retrieval
         retrieval, expansion_metrics = self.retriever.retrieve(
             session=session,
             user_message=user_message,
@@ -358,9 +261,9 @@ class ResearchAgent:
             window=window
         )
         
-        # Handle no results case
+        # Handle no results
         if not retrieval.results:
-            assistant_response = "I couldn't find relevant information in the documents to answer your question."
+            assistant_response = "I couldn't find relevant information to answer your question."
             session.add('assistant', assistant_response)
             
             return {
@@ -373,13 +276,10 @@ class ResearchAgent:
                 "agent_type": "classic"
             }
         
-        # Build answer prompt with retrieved context
+        # Generate answer
         answer_prompt = build_answer_prompt(session, user_message, retrieval)
-        
-        # Get max tokens for response length
         max_tokens = self.config.response_lengths.get(response_length, 1000)
         
-        # Generate AI response
         try:
             assistant_response, answer_metrics_dict = self.answer_ai_model.generate_response(
                 prompt=answer_prompt,
@@ -388,20 +288,16 @@ class ResearchAgent:
                 operation="answer"
             )
             
-            # Convert to UsageMetrics
             answer_metrics = UsageMetrics(**answer_metrics_dict)
-            
-            # Combine metrics
             all_operations = list(expansion_metrics.operations) + [answer_metrics]
             aggregated = AggregatedUsageMetrics.from_operations(all_operations)
             
         except Exception as e:
             raise AIServiceError(f"Failed to generate AI response: {e}")
         
-        # Add assistant response to session
+        # Update session
         session.add('assistant', assistant_response)
         
-        # Apply summarization if needed
         if self.summarizer:
             self.summarizer.compact(session)
         
@@ -416,4 +312,28 @@ class ResearchAgent:
             "agent_type": "classic"
         }
 
-    
+    # Info Methods
+
+    def get_model_info(self) -> str:
+        """Get information about configured models."""
+        if not self.search_ai_model or not self.answer_ai_model:
+            return "⚠️  AI models not available"
+        
+        try:
+            search_info = self.search_ai_model.get_model_info()
+            answer_info = self.answer_ai_model.get_model_info()
+            
+            if self.search_ai_model == self.answer_ai_model:
+                return f"🤖 Single Model: {search_info['model_name']}"
+            
+            return (
+                f"🔍 Search Model: {search_info['model_name']}\n"
+                f"💬 Answer Model: {answer_info['model_name']}"
+            )
+        except Exception as e:
+            return f"⚠️  Error: {e}"
+
+    def get_collection_info(self) -> str:
+        """Get information about collections."""
+        collections = self.search_service.store.list_collections()
+        return f"Collections: {', '.join(collections)}\nChunks: {self.chunks_collection}"

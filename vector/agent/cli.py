@@ -5,7 +5,7 @@ import sys
 
 from ..config import Config
 from ..exceptions import VectorError, AIServiceError
-from .agent import ResearchAgent
+from . import ChatService
 
 
 def main():
@@ -56,8 +56,8 @@ For low-level vector operations, use 'vector-core' instead.
     try:
         config = Config()
         
-        # Initialize agent
-        agent = ResearchAgent(
+        # Initialize chat service
+        service = ChatService(
             config=config,
             chunks_collection=args.chunks_collection
         )
@@ -68,7 +68,7 @@ For low-level vector operations, use 'vector-core' instead.
                 print(f"🔧 Top-k: {args.top_k}")
             
             # Use the retriever directly for simple searches
-            results = agent.retriever.search_service.search_chunks(
+            results = service.retriever.search_service.search_chunks(
                 query=args.query,
                 top_k=args.top_k
             )
@@ -83,11 +83,11 @@ For low-level vector operations, use 'vector-core' instead.
                 print("No results found")
 
         elif args.command == "collection-info":
-            info = agent.get_collection_info()
+            info = service.get_collection_info()
             print(info)
 
         elif args.command == "model-info":
-            info = agent.get_model_info()
+            info = service.get_model_info()
             print(info)
 
         elif args.command == "delete":
