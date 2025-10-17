@@ -17,7 +17,17 @@ __version__ = "0.2.0"
 
 # Export key interfaces and factories for convenience
 from .ports import VectorStore, Embedder
-from .models import Chunk, Artifact, DocumentRecord, ConvertedDocument
+from .models import (
+    Chunk, 
+    Artifact, 
+    DocumentRecord, 
+    ConvertedDocument,
+    VectorDocument,
+    DocumentSection,
+    TableElement,
+    ImageElement,
+    HeaderElement
+)
 from .stores import create_store
 from .search import SearchService, SearchRequest, SearchResponse
 from .pipeline import IngestionPipeline, IngestionConfig, DocumentConverter, DocumentChunker
@@ -31,6 +41,11 @@ __all__ = [
     "Artifact",
     "DocumentRecord",
     "ConvertedDocument",
+    "VectorDocument",
+    "DocumentSection",
+    "TableElement",
+    "ImageElement",
+    "HeaderElement",
     # Factories
     "create_store",
     # Services

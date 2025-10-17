@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Optional, List, Literal, Union, Tuple
+from typing import Dict, Optional, List, Literal, Union, Tuple, Any
 from pydantic import BaseModel, Field, model_validator
 import json
 import io
@@ -14,6 +14,70 @@ from docling_core.types.doc.document import (
     PictureItem,
     SectionHeaderItem,
 )
+
+
+# ============================================================================
+# VectorDocument - Parser-agnostic document representation
+# ============================================================================
+
+class DocumentSection(BaseModel):
+    """A logical section of the document."""
+    section_id: str
+    heading: Optional[str] = None
+    level: int = 1  # Heading level (1 = h1, 2 = h2, etc.)
+    text: str
+    page_number: Optional[int] = None
+    bbox: Optional[List[float]] = None  # [x0, y0, x1, y1]
+
+
+class TableElement(BaseModel):
+    """A table in the document."""
+    table_id: str
+    caption: Optional[str] = None
+    data: List[List[str]]  # 2D array of cell values
+    page_number: Optional[int] = None
+    image_path: Optional[str] = None  # Path to rendered table image
+
+
+class ImageElement(BaseModel):
+    """An image in the document."""
+    image_id: str
+    caption: Optional[str] = None
+    image_path: str  # Path to the image file
+    page_number: Optional[int] = None
+    bbox: Optional[List[float]] = None
+
+
+class HeaderElement(BaseModel):
+    """A heading/title in the document."""
+    header_id: str
+    text: str
+    level: int  # 1-6 like HTML h1-h6
+    page_number: Optional[int] = None
+
+
+class VectorDocument(BaseModel):
+    """Internal document representation independent of parsing library.
+    
+    This abstraction allows any document parser (Docling, Unstructured, 
+    PyMuPDF, etc.) to be used as long as they convert to this format.
+    """
+    document_id: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Core content
+    text: str  # Full document text
+    sections: List[DocumentSection] = Field(default_factory=list)
+    
+    # Structured elements
+    tables: List[TableElement] = Field(default_factory=list)
+    images: List[ImageElement] = Field(default_factory=list)
+    headers: List[HeaderElement] = Field(default_factory=list)
+    
+    # Original source info
+    source_path: Optional[str] = None
+    source_format: Optional[str] = None  # pdf, docx, html, etc.
+    page_count: Optional[int] = None
 
 
 def get_item_by_ref(doc: DoclingDocument, ref: str):

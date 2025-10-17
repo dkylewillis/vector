@@ -6,9 +6,11 @@ keeps the codebase Pythonic and flexible while maintaining clear contracts.
 """
 
 from typing import Protocol, List, Dict, Any, Union, Optional, TYPE_CHECKING
+from pathlib import Path
 
 if TYPE_CHECKING:
     from .search.dsl import SearchRequest, SearchResponse
+    from .models import VectorDocument, Chunk
 
 
 class VectorStore(Protocol):
@@ -113,5 +115,86 @@ class Embedder(Protocol):
         
         Returns:
             Integer dimension of embeddings (e.g., 384, 1536)
+        """
+        ...
+
+
+class DocumentConverter(Protocol):
+    """Protocol for document conversion implementations.
+    
+    Converts various document formats into structured VectorDocument objects.
+    Implementations can use Docling, Unstructured, PyMuPDF, etc.
+    """
+    
+    def convert_document(self, file_path: Path) -> "VectorDocument":
+        """Convert a document file to VectorDocument.
+        
+        Args:
+            file_path: Path to the file to convert
+            
+        Returns:
+            VectorDocument object
+            
+        Raises:
+            Exception: If conversion fails
+        """
+        ...
+    
+    def load_from_json(self, json_path: Path) -> "VectorDocument":
+        """Load a VectorDocument from a JSON file.
+        
+        Args:
+            json_path: Path to the JSON file
+            
+        Returns:
+            VectorDocument object
+        """
+        ...
+    
+    def save_to_json(
+        self, 
+        doc: "VectorDocument", 
+        json_path: Path
+    ) -> None:
+        """Save a VectorDocument to a JSON file.
+        
+        Args:
+            doc: The VectorDocument to save
+            json_path: Path where to save the JSON file
+        """
+        ...
+
+
+class DocumentChunker(Protocol):
+    """Protocol for document chunking implementations.
+    
+    Splits documents into chunks suitable for embedding and retrieval.
+    Implementations can use different strategies: semantic, fixed-size, 
+    overlap, hierarchical, etc.
+    """
+    
+    def chunk_document(
+        self, 
+        doc: "VectorDocument",
+        document_id: str,
+        artifacts_dir: Optional[Path] = None
+    ) -> List["Chunk"]:
+        """Split a document into chunks.
+        
+        Args:
+            doc: The VectorDocument to chunk
+            document_id: Unique identifier for the document
+            artifacts_dir: Optional directory for artifact storage
+            
+        Returns:
+            List of Chunk objects with text, metadata, and artifacts
+        """
+        ...
+    
+    def get_chunk_size(self) -> int:
+        """Get the target chunk size in characters.
+        
+        Returns:
+            Target chunk size
         """
         ...
