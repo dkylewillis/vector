@@ -4,7 +4,7 @@ import asyncio
 from typing import Dict, Any, Optional, List
 from uuid import uuid4
 
-from ..config import Config
+from ..settings import settings
 from ..exceptions import AIServiceError
 from ..ai.factory import AIModelFactory
 from vector.search.service import SearchService
@@ -14,7 +14,8 @@ from vector.stores.factory import create_store
 from .models import ChatSession, UsageMetrics, AggregatedUsageMetrics
 from .prompting import build_system_prompt, build_answer_prompt
 from .memory import SummarizerPolicy
-from .retrieval import Retriever
+# Lazy import to avoid circular dependency
+# from vector.context import ContextOrchestrator
 from .deps import AgentDeps
 from .agents import ResearchAgent
 
@@ -35,43 +36,44 @@ class ChatService:
 
     def __init__(
         self,
-        config: Optional[Config] = None,
+        config: Optional[object] = None,  # Deprecated, kept for backward compat
         chunks_collection: str = "chunks",
         use_pydantic_ai: bool = True
     ):
         """Initialize the chat service.
 
         Args:
-            config: Configuration object. If None, loads default config.
+            config: Deprecated - configuration now comes from global settings
             chunks_collection: Name of the chunks collection
             use_pydantic_ai: Whether to use PydanticAI agents (default: True)
         """
-        self.config = config or Config()
+        # config parameter is ignored, kept for backward compatibility
         self.chunks_collection = chunks_collection
         self.use_pydantic_ai = use_pydantic_ai
         
         # Initialize search service
         embedder = SentenceTransformerEmbedder()
-        store = create_store("qdrant", db_path=self.config.vector_db_path)
+        store = create_store("qdrant", db_path=settings.qdrant_local_path)
         self.search_service = SearchService(embedder, store, chunks_collection)
         
         # Initialize AI models
         try:
-            self.search_ai_model = AIModelFactory.create_model(self.config, 'search')
-            self.answer_ai_model = AIModelFactory.create_model(self.config, 'answer')
+            self.search_ai_model = AIModelFactory.create_model(settings, 'search')
+            self.answer_ai_model = AIModelFactory.create_model(settings, 'answer')
         except Exception as e:
             print(f"Warning: Could not initialize AI models: {e}")
             self.search_ai_model = None
             self.answer_ai_model = None
         
         # Initialize retriever (for classic mode)
-        self.retriever = Retriever(self.search_ai_model, self.search_service)
+        from vector.context import ContextOrchestrator
+        self.retriever = ContextOrchestrator(self.search_ai_model, self.search_service)
         
         # Initialize summarizer policy
         if self.answer_ai_model:
             self.summarizer = SummarizerPolicy(
                 ai_model=self.answer_ai_model,
-                trigger_messages=self.config.chat_summary_trigger_messages,
+                trigger_messages=settings.summary_trigger_messages,
                 keep_recent=6
             )
         else:
@@ -82,7 +84,6 @@ class ChatService:
             try:
                 deps = AgentDeps(
                     search_service=self.search_service,
-                    config=self.config,
                     search_model=self.search_ai_model,
                     answer_model=self.answer_ai_model,
                     chunks_collection=chunks_collection
@@ -211,7 +212,7 @@ class ChatService:
     ) -> Dict[str, Any]:
         """Chat using PydanticAI agent."""
         session = self._sessions[session_id]
-        max_tokens = self.config.response_lengths.get(response_length, 1000)
+        max_tokens = settings.response_length_presets.get(response_length, 1000)
         
         # Run async agent
         result = asyncio.run(
@@ -253,7 +254,7 @@ class ChatService:
         session = self._sessions[session_id]
         
         # Retrieval
-        retrieval, expansion_metrics = self.retriever.retrieve(
+        retrieval, expansion_metrics = self.retriever.build_context(
             session=session,
             user_message=user_message,
             top_k=top_k,
@@ -278,7 +279,7 @@ class ChatService:
         
         # Generate answer
         answer_prompt = build_answer_prompt(session, user_message, retrieval)
-        max_tokens = self.config.response_lengths.get(response_length, 1000)
+        max_tokens = settings.response_length_presets.get(response_length, 1000)
         
         try:
             assistant_response, answer_metrics_dict = self.answer_ai_model.generate_response(

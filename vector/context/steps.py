@@ -1,32 +1,32 @@
-"""Concrete retrieval pipeline steps.
+"""Context building pipeline steps.
 
-Provides ready-to-use pipeline steps:
+Provides ready-to-use pipeline steps for building context:
 - QueryExpansionStep: Expand queries using AI and conversation context
 - SearchStep: Vector similarity search on chunks
 - ScoreFilter: Filter results by minimum similarity score
 - DiagnosticsStep: Add diagnostic metadata
 
-Moved from vector.agent to separate retrieval concerns from chat agent logic.
+Context building can include both AI-powered operations (agents) and 
+pure retrieval operations.
 """
 
 import time
 from typing import Optional, List
 
-from vector.retrieval.pipeline import PipelineStep, RetrievalContext
+from .pipeline import ContextStep, ContextBuildResult
 from vector.agent.models import UsageMetrics, RetrievalResult
 from vector.agent.prompting import build_expansion_prompt, render_recent_messages
 from vector.search.service import SearchService
 
 
-class QueryExpansionStep(PipelineStep):
+class QueryExpansionStep(ContextStep):
     """Expands query using conversation context and AI model.
     
-    Takes the current user message and conversation history,
-    uses an AI model to generate search keyphrases that better
-    capture the user's intent.
+    This is an AI-powered context building step that enhances
+    the user's query before retrieval.
     
     Example:
-        >>> from vector.retrieval import QueryExpansionStep
+        >>> from vector.context import QueryExpansionStep
         >>> from vector.ai.factory import create_model
         >>> 
         >>> ai_model = create_model("openai", model_name="gpt-3.5-turbo")
@@ -41,11 +41,11 @@ class QueryExpansionStep(PipelineStep):
         """
         self.ai_model = ai_model
     
-    def __call__(self, context: RetrievalContext) -> RetrievalContext:
+    def __call__(self, context: ContextBuildResult) -> ContextBuildResult:
         """Expand query using conversation history.
         
         Args:
-            context: Current retrieval context
+            context: Current context
             
         Returns:
             Context with expanded query
@@ -89,14 +89,14 @@ class QueryExpansionStep(PipelineStep):
         return context
 
 
-class SearchStep(PipelineStep):
-    """Performs vector similarity search on chunks.
+class SearchStep(ContextStep):
+    """Performs vector similarity search to build context.
     
     Uses SearchService to find semantically similar content.
     Optionally includes surrounding chunks for additional context.
     
     Example:
-        >>> from vector.retrieval import SearchStep
+        >>> from vector.context import SearchStep
         >>> from vector.search.service import SearchService
         >>> 
         >>> search_service = SearchService(embedder, store)
@@ -123,11 +123,11 @@ class SearchStep(PipelineStep):
         self.document_ids = document_ids
         self.window = window
     
-    def __call__(self, context: RetrievalContext) -> RetrievalContext:
+    def __call__(self, context: ContextBuildResult) -> ContextBuildResult:
         """Perform vector search.
         
         Args:
-            context: Current retrieval context
+            context: Current context
             
         Returns:
             Context with search results
@@ -165,13 +165,13 @@ class SearchStep(PipelineStep):
         return context
 
 
-class ScoreFilter(PipelineStep):
-    """Filters results by minimum score threshold.
+class ScoreFilter(ContextStep):
+    """Filters context results by minimum score threshold.
     
     Removes results with similarity scores below the threshold.
     
     Example:
-        >>> from vector.retrieval import ScoreFilter
+        >>> from vector.context import ScoreFilter
         >>> 
         >>> step = ScoreFilter(min_score=0.5)
     """
@@ -184,11 +184,11 @@ class ScoreFilter(PipelineStep):
         """
         self.min_score = min_score
     
-    def __call__(self, context: RetrievalContext) -> RetrievalContext:
+    def __call__(self, context: ContextBuildResult) -> ContextBuildResult:
         """Filter results by score.
         
         Args:
-            context: Current retrieval context
+            context: Current context
             
         Returns:
             Context with filtered results
@@ -203,22 +203,22 @@ class ScoreFilter(PipelineStep):
         return context
 
 
-class DiagnosticsStep(PipelineStep):
-    """Adds diagnostic metadata about results.
+class DiagnosticsStep(ContextStep):
+    """Adds diagnostic metadata about context building.
     
-    Enriches context with statistics about the retrieval operation.
+    Enriches context with statistics about the context building operation.
     
     Example:
-        >>> from vector.retrieval import DiagnosticsStep
+        >>> from vector.context import DiagnosticsStep
         >>> 
         >>> step = DiagnosticsStep()
     """
     
-    def __call__(self, context: RetrievalContext) -> RetrievalContext:
+    def __call__(self, context: ContextBuildResult) -> ContextBuildResult:
         """Add diagnostics to context.
         
         Args:
-            context: Current retrieval context
+            context: Current context
             
         Returns:
             Context with diagnostic metadata

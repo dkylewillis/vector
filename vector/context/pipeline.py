@@ -1,13 +1,15 @@
-"""Retrieval pipeline - pluggable RAG orchestration.
+"""Context building pipeline - pluggable RAG orchestration.
 
-This module provides a simple, composable pipeline for retrieval operations:
-- Query expansion
-- Vector search
+This module provides a simple, composable pipeline for building context
+that will be used for chat responses. Steps can include:
+- Query expansion (AI-powered)
+- Vector search (pure retrieval)
 - Result filtering
 - Context window expansion
 - Diagnostics
 
-Moved from vector.agent to separate retrieval concerns from chat agent logic.
+Context building can include both AI-powered operations (agents) and 
+pure retrieval operations.
 """
 
 from typing import List, Dict, Any
@@ -18,8 +20,8 @@ from abc import ABC, abstractmethod
 from vector.agent.models import ChatSession, RetrievalResult, UsageMetrics
 
 
-class RetrievalContext:
-    """Shared state passed through pipeline steps.
+class ContextBuildResult:
+    """Shared state passed through context building pipeline steps.
     
     Attributes:
         session: Chat session with conversation history
@@ -39,7 +41,7 @@ class RetrievalContext:
         metadata: Dict[str, Any] = None,
         usage_metrics: List[UsageMetrics] = None
     ):
-        """Initialize retrieval context.
+        """Initialize context build result.
         
         Args:
             session: Chat session with conversation history
@@ -75,19 +77,19 @@ class RetrievalContext:
             self.usage_metrics.append(metrics)
 
 
-class PipelineStep(ABC):
-    """Abstract base class for retrieval pipeline steps.
+class ContextStep(ABC):
+    """Abstract base class for context building pipeline steps.
     
     Each step processes the context and returns a modified context.
     Steps can:
-    - Modify the query
-    - Add/filter results
+    - Modify the query (e.g., query expansion using AI)
+    - Add/filter results (e.g., vector search, filtering)
     - Enrich metadata
     - Track usage metrics
     """
     
     @abstractmethod
-    def __call__(self, context: RetrievalContext) -> RetrievalContext:
+    def __call__(self, context: ContextBuildResult) -> ContextBuildResult:
         """Process the context and return modified context.
         
         Args:
@@ -104,21 +106,21 @@ class PipelineStep(ABC):
         return self.__class__.__name__
 
 
-class Pipeline:
-    """Executes a sequence of retrieval steps.
+class ContextPipeline:
+    """Executes a sequence of context building steps.
     
     Example:
-        >>> from vector.retrieval import Pipeline, SearchStep, ScoreFilter
+        >>> from vector.context import ContextPipeline, SearchStep, ScoreFilter
         >>> 
-        >>> pipeline = Pipeline()
+        >>> pipeline = ContextPipeline()
         >>> pipeline.add_step(SearchStep(search_service, top_k=12))
         >>> pipeline.add_step(ScoreFilter(min_score=0.5))
         >>> 
-        >>> context = RetrievalContext(session, message, query)
+        >>> context = ContextBuildResult(session, message, query)
         >>> result = pipeline.run(context)
     """
     
-    def __init__(self, steps: List[PipelineStep] = None):
+    def __init__(self, steps: List[ContextStep] = None):
         """Initialize pipeline with steps.
         
         Args:
@@ -126,7 +128,7 @@ class Pipeline:
         """
         self.steps = steps or []
     
-    def add_step(self, step: PipelineStep) -> 'Pipeline':
+    def add_step(self, step: ContextStep) -> 'ContextPipeline':
         """Add a step to the pipeline (builder pattern).
         
         Args:
@@ -138,11 +140,11 @@ class Pipeline:
         self.steps.append(step)
         return self
     
-    def run(self, context: RetrievalContext) -> RetrievalContext:
+    def run(self, context: ContextBuildResult) -> ContextBuildResult:
         """Execute all steps in sequence.
         
         Args:
-            context: Initial retrieval context
+            context: Initial context
             
         Returns:
             Final context after all steps

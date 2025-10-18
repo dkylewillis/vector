@@ -1,14 +1,10 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional, List, Literal, Union, Tuple, Any
-from pydantic import BaseModel, Field, model_validator
-import json
-import io
+from pydantic import BaseModel, Field
 from datetime import datetime, timezone
-from PIL import Image as PILImage
 from docling_core.types.doc.document import (
     DoclingDocument,
-    RefItem,
     TextItem,
     TableItem,
     PictureItem,

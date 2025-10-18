@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import uuid
 
 from vector.models import DocumentRecord
-from vector.config import Config
+from vector.settings import settings
 
 
 class DocumentRegistry:
@@ -19,13 +19,11 @@ class DocumentRegistry:
         
         Args:
             registry_path: Path to directory where registry files are stored
-            config: Config object to get registry_dir from
+            config: Deprecated - kept for backward compatibility, use settings instead
         """
-        self.config = config or Config()
-        
-        # Use config registry_dir if registry_path not provided
+        # Use settings registry_dir if registry_path not provided
         if registry_path is None:
-            registry_path = self.config.storage_registry_dir
+            registry_path = settings.registry_dir
             
         self.registry_path = Path(registry_path)
         self.registry_path.mkdir(parents=True, exist_ok=True)

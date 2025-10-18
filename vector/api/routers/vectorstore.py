@@ -6,7 +6,6 @@ Provides REST API for:
 - Document operations (list, delete)
 """
 
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 import logging
 
@@ -14,9 +13,7 @@ from vector.api.deps import get_deps, AppDeps
 from vector.api.schemas import (
     CreateCollectionRequest,
     UpsertPointRequest,
-    DeleteDocumentRequest,
     SuccessResponse,
-    ErrorResponse,
     CollectionListResponse,
     DocumentListResponse
 )

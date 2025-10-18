@@ -18,6 +18,7 @@ numpy
 # Data validation
 pydantic
 pydantic-ai[openai]
+pydantic-settings
 
 # Async HTTP client
 httpx
@@ -26,11 +27,16 @@ httpx
 Pillow
 
 # Configuration and environment
-PyYAML
 python-dotenv
+PyYAML
 
 # AI services
 openai
 
-# Web dependencies
+# Web framework and API
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Web UI
 gradio>=4.0.0

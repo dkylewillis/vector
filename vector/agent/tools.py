@@ -37,16 +37,16 @@ async def retrieve_chunks(
         RetrievalBundle with results and diagnostics
     """
     # Import retriever (avoid circular imports)
-    from .retrieval import Retriever
+    from vector.context import ContextOrchestrator
     
     # Create retriever with dependencies
-    retriever = Retriever(
+    retriever = ContextOrchestrator(
         ctx.deps.search_model,
         ctx.deps.search_service
     )
     
     # Perform retrieval using existing pipeline
-    bundle, _metrics = retriever.retrieve(
+    bundle, _metrics = retriever.build_context(
         session=session,
         user_message=user_message,
         top_k=top_k,

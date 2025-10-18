@@ -8,7 +8,7 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from vector.models import Chunk, ConvertedDocument
+from vector.models import ConvertedDocument
 from vector.ports import Embedder, VectorStore
 from .converter import DocumentConverter
 

@@ -1,7 +1,7 @@
 """AI model implementations for RegScout."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, Tuple
+from typing import Dict, Any, Tuple
 
 
 class BaseAIModel(ABC):

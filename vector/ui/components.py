@@ -1,7 +1,6 @@
 """UI components for the Vector Gradio interface."""
 
 import gradio as gr
-from typing import List
 
 
 def create_header():

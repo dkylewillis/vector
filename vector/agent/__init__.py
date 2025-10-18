@@ -1,4 +1,17 @@
-"""Vector Agent - Search and Q&A functionality with PydanticAI integration."""
+"""Vector Agent - Search and Q&A functionality with PydanticAI integration.
+
+This module provides high-level agent capabilities for conversational search
+and question answering over document collections.
+
+Core Components:
+- ChatService: Multi-turn conversation management with retrieval
+- PydanticAI Agents: SearchAgent, AnswerAgent, ResearchAgent
+- Agent Tools: retrieve_chunks, search_documents, etc.
+- Memory Management: SummarizerPolicy for conversation history
+
+Note: For context building orchestration, import from vector.context instead:
+    from vector.context import ContextOrchestrator, ContextPipeline, ContextStep
+"""
 
 # Primary API
 from .chat_service import ChatService
@@ -13,13 +26,8 @@ from .prompting import (
     build_answer_prompt
 )
 
-# Memory and retrieval
+# Memory management
 from .memory import SummarizerPolicy, NoSummarizerPolicy
-from .retrieval import Retriever
-
-# Pipeline (classic mode)
-from .pipeline import Pipeline, PipelineStep, RetrievalContext
-from .steps import QueryExpansionStep, SearchStep, ScoreFilter, DiagnosticsStep
 
 # PydanticAI components
 from .deps import AgentDeps
@@ -37,14 +45,32 @@ from .tools import (
     list_available_documents
 )
 
-# MCP server
-try:
-    from .mcp_server import VectorMCPServer, create_mcp_server
-    MCP_AVAILABLE = True
-except ImportError:
-    VectorMCPServer = None
-    create_mcp_server = None
-    MCP_AVAILABLE = False
+
+def __getattr__(name):
+    """Lazy imports for backward compatibility.
+    
+    Provides backward compatibility for code that imports retrieval
+    components from vector.agent. New code should import directly from
+    vector.context instead.
+    
+    Supported for backward compatibility:
+    - Retriever (alias for ContextOrchestrator)
+    - RetrievalOrchestrator (alias for ContextOrchestrator)
+    - Pipeline, PipelineStep, RetrievalContext
+    - QueryExpansionStep, SearchStep, ScoreFilter, DiagnosticsStep
+    """
+    if name in ('Retriever', 'RetrievalOrchestrator'):
+        from vector.context import ContextOrchestrator
+        return ContextOrchestrator
+    elif name in ('Pipeline', 'PipelineStep', 'RetrievalContext'):
+        from vector.context import Pipeline, PipelineStep, RetrievalContext
+        return {'Pipeline': Pipeline, 'PipelineStep': PipelineStep, 'RetrievalContext': RetrievalContext}[name]
+    elif name in ('QueryExpansionStep', 'SearchStep', 'ScoreFilter', 'DiagnosticsStep'):
+        from vector.context import QueryExpansionStep, SearchStep, ScoreFilter, DiagnosticsStep
+        return {'QueryExpansionStep': QueryExpansionStep, 'SearchStep': SearchStep, 
+                'ScoreFilter': ScoreFilter, 'DiagnosticsStep': DiagnosticsStep}[name]
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
 
 __all__ = [
     # Primary API
@@ -61,21 +87,11 @@ __all__ = [
     'build_expansion_prompt',
     'build_answer_prompt',
     
-    # Memory and retrieval
+    # Memory management
     'SummarizerPolicy',
     'NoSummarizerPolicy',
-    'Retriever',
     
-    # Pipeline (classic mode)
-    'Pipeline',
-    'PipelineStep',
-    'RetrievalContext',
-    'QueryExpansionStep',
-    'SearchStep',
-    'ScoreFilter',
-    'DiagnosticsStep',
-    
-    # PydanticAI agents
+    # PydanticAI components
     'AgentDeps',
     'SearchAgent',
     'AnswerAgent',
@@ -89,9 +105,16 @@ __all__ = [
     'get_document_metadata',
     'list_available_documents',
     
-    # MCP server
-    'VectorMCPServer',
-    'create_mcp_server',
-    'MCP_AVAILABLE',
+    # Backward compatibility (lazy loaded via __getattr__)
+    # These are provided for backward compatibility only
+    # New code should import from vector.context
+    'Retriever',
+    'RetrievalOrchestrator',
+    'Pipeline',
+    'PipelineStep',
+    'RetrievalContext',
+    'QueryExpansionStep',
+    'SearchStep',
+    'ScoreFilter',
+    'DiagnosticsStep',
 ]
-

@@ -4,7 +4,7 @@ import os
 from typing import List, Tuple, Optional, Dict, Any
 from pathlib import Path
 
-from vector.config import Config
+from vector.settings import settings
 from vector.agent import ChatService
 from vector.stores.qdrant import QdrantVectorStore
 from vector.pipeline.ingestion import IngestionPipeline, IngestionConfig
@@ -18,12 +18,13 @@ class VectorWebService:
 
     def __init__(self, config=None):
         """Initialize web service with refactored components."""
-        self.config = config or Config()
+        # Note: config parameter kept for backward compatibility but ignored
+        # All configuration now comes from settings
 
         try:
             # Initialize components with refactored architecture
-            self.store = QdrantVectorStore(db_path=self.config.vector_db_path)
-            self.registry = DocumentRegistry(config=self.config)
+            self.store = QdrantVectorStore(db_path=settings.qdrant_local_path)
+            self.registry = DocumentRegistry()
             # Use default embedder model
             self.embedder = SentenceTransformerEmbedder()
             
@@ -59,7 +60,6 @@ class VectorWebService:
             try:
                 print("🤖 Initializing ChatService...")
                 self._agent = ChatService(
-                    config=self.config,
                     chunks_collection="chunks"
                 )
                 print("✅ ChatService initialized")
@@ -669,7 +669,7 @@ class VectorWebService:
             
             # Use config default if top_k not specified
             if top_k is None:
-                top_k = self.config.chat_default_top_k
+                top_k = settings.default_top_k
             
             # Always search chunks only (search_type parameter ignored)
             result = self.agent.chat(

@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from docling.document_converter import DocumentConverter as DoclingConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, VlmPipelineOptions
@@ -12,7 +11,6 @@ from docling.pipeline.vlm_pipeline import VlmPipeline
 from docling_core.types.doc import ImageRefMode
 from pydantic import ValidationError
 
-from vector.models import ConvertedDocument
 
 
 class DocumentConverter:

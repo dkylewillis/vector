@@ -1,7 +1,6 @@
 """Gradio application factory for Vector web interface."""
 
 import gradio as gr
-from pathlib import Path
 import logging
 
 logging.basicConfig()
@@ -10,7 +9,6 @@ logging.getLogger('docling_core').setLevel(logging.WARNING)
 logging.getLogger('docling.document_converter').setLevel(logging.WARNING)
 logging.getLogger('docling.backend').setLevel(logging.WARNING)
 
-from vector.config import Config
 from .service import VectorWebService
 from .components import (
     create_header, create_search_tab, create_document_management_tab, 
@@ -30,9 +28,8 @@ def create_gradio_app() -> gr.Blocks:
         gr.Blocks: Configured Gradio application
     """
     
-    # Initialize Vector web service with config
-    config = Config()
-    web_service = VectorWebService(config=config)
+    # Initialize Vector web service (uses global settings)
+    web_service = VectorWebService()
     
     # Get initial documents from registry
     initial_documents = web_service.get_registry_documents()

@@ -1,12 +1,10 @@
 """OpenAI model implementation for Vector."""
 
-import os
 import time
 from openai import OpenAI
 from typing import Optional, Dict, Any, Tuple
 
 from .base import BaseAIModel
-from ..config import Config
 from ..exceptions import AIServiceError
 
 
@@ -109,30 +107,29 @@ class ModelConfig:
 class OpenAIModel(BaseAIModel):
     """OpenAI GPT model implementation with multi-model support."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config_or_settings: Any):
         """Initialize OpenAI model.
         
         Args:
-            config: Configuration object
+            config_or_settings: Settings object (or old Config for backward compat)
         """
         # Try to get model name from either search or answer config
-        model_name = (config.ai_search_model_name if hasattr(config, 'ai_search_model_name') 
-                     else config.ai_answer_model_name)
+        model_name = (config_or_settings.ai_search_model_name if hasattr(config_or_settings, 'ai_search_model_name') 
+                     else config_or_settings.ai_answer_model_name)
         super().__init__(model_name)
         
-        self.config = config
-        self.api_key = config.openai_api_key
+        self.api_key = config_or_settings.openai_api_key
         
         # Use search model config as default, fall back to answer config
         try:
-            self.max_tokens = config.ai_search_max_tokens
-            self.temperature = config.ai_search_temperature
+            self.max_tokens = config_or_settings.ai_search_max_tokens
+            self.temperature = config_or_settings.ai_search_temperature
         except:
-            self.max_tokens = config.ai_answer_max_tokens
-            self.temperature = config.ai_answer_temperature
+            self.max_tokens = config_or_settings.ai_answer_max_tokens
+            self.temperature = config_or_settings.ai_answer_temperature
             
         self.provider = "openai"
-        self.service_tier = getattr(config, "openai_service_tier", "priority")
+        self.service_tier = getattr(config_or_settings, "openai_service_tier", "priority")
         
         # Get model-specific configuration
         self.model_config = ModelConfig.get_config(model_name)
@@ -173,8 +170,6 @@ class OpenAIModel(BaseAIModel):
         if service_tier:
             params["service_tier"] = service_tier
 
-        return params
-            
         return params
 
     def generate_response(self, prompt: str, system_prompt: str = "", 

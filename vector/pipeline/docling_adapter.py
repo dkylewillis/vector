@@ -24,7 +24,6 @@ from vector.models import (
     ImageElement,
     HeaderElement,
 )
-from vector.ports import DocumentConverter
 
 
 class DoclingAdapter:

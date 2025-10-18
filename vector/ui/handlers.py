@@ -1,7 +1,7 @@
 """Event handlers for the Vector Gradio interface."""
 
 import gradio as gr
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, List
 from .service import VectorWebService
 from .components import format_usage_metrics
 

@@ -1,6 +1,5 @@
 """Conversation memory and summarization policies."""
 
-from typing import Optional
 from .models import ChatSession, ChatMessage
 
 

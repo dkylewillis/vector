@@ -13,7 +13,7 @@ from .tools import (
     get_document_metadata,
     list_available_documents
 )
-from .models import ChatSession, ChatMessage
+from .models import ChatSession
 from .prompting import build_system_prompt
 
 
@@ -296,10 +296,10 @@ class ResearchAgent:
         )
         
         # Step 2: Retrieve chunks using expanded query
-        from .retrieval import Retriever
-        retriever = Retriever(self.deps.search_model, self.deps.search_service)
+        from vector.context import ContextOrchestrator
+        retriever = ContextOrchestrator(self.deps.search_model, self.deps.search_service)
         
-        retrieval_bundle, retrieval_metrics = retriever.retrieve(
+        retrieval_bundle, retrieval_metrics = retriever.build_context(
             session=session,
             user_message=user_message,
             top_k=top_k,

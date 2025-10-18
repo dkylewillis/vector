@@ -6,7 +6,7 @@ Provides REST API for:
 - Document filtering
 """
 
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
 

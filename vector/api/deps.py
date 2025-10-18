@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Optional
 import logging
 
-from vector.config import Config
+from vector.settings import settings
 from vector.stores.factory import create_store
 from vector.stores.base import BaseVectorStore
 from vector.search.service import SearchService
@@ -26,9 +26,8 @@ logger = logging.getLogger(__name__)
 class AppDeps:
     """Application dependencies container."""
     
-    config: Config
-    store: BaseVectorStore
     embedder: SentenceTransformerEmbedder
+    store: BaseVectorStore
     search_service: SearchService
     ingestion: IngestionPipeline
 
@@ -50,13 +49,9 @@ def get_deps() -> AppDeps:
     
     logger.info("Initializing application dependencies...")
     
-    # Load configuration
-    config = Config()
-    logger.info(f"Loaded configuration from {config.config_path}")
-    
-    # Create vector store
-    store = create_store("qdrant", db_path=config.vector_db_path)
-    logger.info(f"Connected to vector store at {config.vector_db_path}")
+    # Create vector store using settings
+    store = create_store("qdrant", db_path=settings.qdrant_local_path)
+    logger.info(f"Connected to vector store at {settings.qdrant_local_path}")
     
     # Create embedder
     embedder = SentenceTransformerEmbedder()
@@ -84,9 +79,8 @@ def get_deps() -> AppDeps:
     logger.info("Initialized ingestion pipeline")
     
     _singleton = AppDeps(
-        config=config,
-        store=store,
         embedder=embedder,
+        store=store,
         search_service=search_service,
         ingestion=ingestion
     )
